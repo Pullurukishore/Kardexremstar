@@ -1,0 +1,24 @@
+steps:
+  # Install dependencies and build the Next.js app
+  - name: 'node:18-alpine'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        npm ci
+        npm run build
+        npm run export
+    env:
+      - 'NODE_ENV=production'
+      - 'NEXT_TELEMETRY_DISABLED=1'
+      - 'NEXT_PUBLIC_API_URL=https://${_BACKEND_URL}'
+
+  # Deploy to Firebase Hosting
+  - name: 'gcr.io/$PROJECT_ID/firebase'
+    args: ['deploy', '--project=$PROJECT_ID', '--only=hosting']
+
+substitutions:
+  _BACKEND_URL: 'your-backend-cloud-run-url.run.app'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

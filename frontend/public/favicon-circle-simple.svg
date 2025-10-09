@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circular background -->
+  <circle cx="16" cy="16" r="16" fill="#507295"/>
+  
+  <!-- Inner circle for contrast -->
+  <circle cx="16" cy="16" r="13" fill="white"/>
+  
+  <!-- Simple K letter for better visibility at small sizes -->
+  <text x="16" y="21" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#507295">K</text>
+</svg>

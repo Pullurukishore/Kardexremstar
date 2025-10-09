@@ -1,0 +1,42 @@
+# Alternative: Deploy Next.js to Cloud Run (Server-Side Rendering)
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/kardexcare-frontend:$COMMIT_SHA', '.']
+    env:
+      - 'NEXT_PUBLIC_API_URL=https://${_BACKEND_URL}'
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/kardexcare-frontend:$COMMIT_SHA']
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'kardexcare-frontend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/kardexcare-frontend:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '3000'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,NEXT_PUBLIC_API_URL=https://${_BACKEND_URL}'
+
+substitutions:
+  _BACKEND_URL: 'your-backend-cloud-run-url.run.app'
+
+images:
+  - 'gcr.io/$PROJECT_ID/kardexcare-frontend:$COMMIT_SHA'

@@ -1,0 +1,6 @@
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  ZONE_USER = 'ZONE_USER',
+  SERVICE_PERSON = 'SERVICE_PERSON',
+  CUSTOMER = 'CUSTOMER'
+}
