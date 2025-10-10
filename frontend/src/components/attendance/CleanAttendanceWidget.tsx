@@ -1151,7 +1151,7 @@ export default function CleanAttendanceWidget({
   const renderActionButton = () => {
     if (loading) {
       return (
-        <Button disabled className="flex-1">
+        <Button disabled className="w-full h-12 text-sm font-semibold">
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           Loading...
         </Button>
@@ -1160,7 +1160,7 @@ export default function CleanAttendanceWidget({
 
     if (!attendanceData) {
       return (
-        <Button disabled className="flex-1">
+        <Button disabled className="w-full h-12 text-sm font-semibold">
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           Loading...
         </Button>
@@ -1184,31 +1184,31 @@ export default function CleanAttendanceWidget({
         <Button
           onClick={handleCheckOut}
           disabled={actionLoading}
-          className="flex-1 bg-red-600 hover:bg-red-700"
+          className="w-full h-12 bg-red-600 hover:bg-red-700 text-sm font-bold shadow-lg active:scale-95 transition-transform touch-manipulation"
         >
           {actionLoading ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
           ) : (
-            <LogOut className="w-4 h-4 mr-2" />
+            <LogOut className="w-5 h-5 mr-2" />
           )}
-          {actionLoading ? 'Checking Out...' : 'Check Out'}
+          {actionLoading ? 'Checking Out...' : '🚪 Check Out'}
         </Button>
       );
     } else if (hasAttendanceToday) {
       return (
         <div className="space-y-2">
-          <div className="text-xs text-blue-600 font-medium text-center">
-            ✅ Checked out today • You can re-check-in to resume work
+          <div className="text-xs text-blue-600 font-semibold text-center bg-blue-50 py-2 px-3 rounded-lg border border-blue-200">
+            ✅ Checked out today • Tap to resume work
           </div>
           <Button
             onClick={handleReCheckIn}
             disabled={actionLoading}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 shadow-lg"
+            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-sm font-bold shadow-lg active:scale-95 transition-transform touch-manipulation"
           >
             {actionLoading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             ) : (
-              <LogIn className="w-4 w-4 mr-2" />
+              <LogIn className="w-5 h-5 mr-2" />
             )}
             {actionLoading ? 'Re-Checking In...' : '🔄 Re-Check In'}
           </Button>
@@ -1219,14 +1219,14 @@ export default function CleanAttendanceWidget({
         <Button
           onClick={handleCheckIn}
           disabled={actionLoading}
-          className="flex-1 bg-green-600 hover:bg-green-700"
+          className="w-full h-12 bg-green-600 hover:bg-green-700 text-sm font-bold shadow-lg active:scale-95 transition-transform touch-manipulation"
         >
           {actionLoading ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
           ) : (
-            <LogIn className="w-4 h-4 mr-2" />
+            <LogIn className="w-5 h-5 mr-2" />
           )}
-          {actionLoading ? 'Checking In...' : 'Check In'}
+          {actionLoading ? 'Checking In...' : '✅ Check In'}
         </Button>
       );
     }
@@ -1318,50 +1318,52 @@ export default function CleanAttendanceWidget({
         </div>
       )}
 
-      {/* Main Attendance Card */}
-      <Card>
-        <CardHeader className="pb-3">
+      {/* Main Attendance Card - Mobile Optimized */}
+      <Card className="border-0 shadow-none">
+        <CardHeader className="pb-2 px-3 sm:px-6">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Attendance</CardTitle>
-              <CardDescription>Track your daily work hours</CardDescription>
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-base sm:text-lg font-bold text-gray-900 truncate">Attendance</CardTitle>
+              <CardDescription className="text-xs sm:text-sm text-gray-600 truncate">Track your daily work hours</CardDescription>
             </div>
-            {getStatusBadge()}
+            <div className="flex-shrink-0 ml-2">
+              {getStatusBadge()}
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Current Status */}
+        <CardContent className="space-y-3 px-3 sm:px-6 pb-4">
+          {/* Current Status - Mobile Optimized */}
           {attendanceData?.attendance && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Check-in Time:</span>
-                <span className="font-medium">{formatTime(attendanceData.attendance.checkInAt)}</span>
+            <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
+                <span className="text-gray-600 font-medium">Check-in:</span>
+                <span className="font-bold text-green-700">{formatTime(attendanceData.attendance.checkInAt)}</span>
               </div>
               
               {attendanceData.attendance.checkOutAt && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Check-out Time:</span>
-                  <span className="font-medium">{formatTime(attendanceData.attendance.checkOutAt)}</span>
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 font-medium">Check-out:</span>
+                  <span className="font-bold text-red-700">{formatTime(attendanceData.attendance.checkOutAt)}</span>
                 </div>
               )}
               
               {attendanceData.attendance.totalHours && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Total Hours:</span>
-                  <span className="font-medium">{formatHours(attendanceData.attendance.totalHours)}h</span>
+                <div className="flex items-center justify-between text-xs sm:text-sm border-t border-gray-200 pt-2">
+                  <span className="text-gray-600 font-medium">Total Hours:</span>
+                  <span className="font-bold text-blue-700 text-sm">{formatHours(attendanceData.attendance.totalHours)}h</span>
                 </div>
               )}
 
-              {/* Location Capture Status */}
+              {/* Location Capture Status - Mobile Optimized */}
               {locationState.isCapturing && (
-                <div className="pt-2 border-t border-gray-100">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="mt-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                     <div className="flex items-center space-x-2">
-                      <Navigation className="h-4 w-4 text-blue-600 animate-spin" />
-                      <span className="text-sm font-medium text-blue-800">Capturing Location...</span>
+                      <Navigation className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
+                      <span className="text-sm font-semibold text-blue-800">Capturing Location...</span>
                     </div>
                     <p className="text-xs text-blue-600 mt-1">Taking multiple GPS readings for accuracy</p>
-                    <div className="mt-2 flex items-center space-x-1">
+                    <div className="mt-2 flex items-center space-x-2">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                         <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
@@ -1500,16 +1502,16 @@ export default function CleanAttendanceWidget({
             </div>
           )}
 
-          {/* Enhanced Location Capture Dialog */}
+          {/* Enhanced Location Capture Dialog - Mobile Optimized */}
           {enhancedLocationState.showLocationCapture && (
-            <div className="space-y-3 p-4 border border-blue-200 rounded-lg bg-blue-50">
+            <div className="space-y-3 p-3 border border-blue-200 rounded-xl bg-blue-50">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-blue-900">Location Required for Attendance</h3>
+                <h3 className="text-sm font-bold text-blue-900 truncate">📍 Location Required</h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setEnhancedLocationState(prev => ({ ...prev, showLocationCapture: false }))}
-                  className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                  className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 flex-shrink-0 rounded-full"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -1531,44 +1533,47 @@ export default function CleanAttendanceWidget({
             </div>
           )}
 
-          {/* Enhanced Location Status */}
+          {/* Enhanced Location Status - Mobile Optimized */}
           {enhancedLocationState.capturedLocation && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">Location Ready</span>
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span className="text-sm font-bold text-green-800 truncate">✅ Location Ready</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex-shrink-0 ml-2">
                   {enhancedLocationState.capturedLocation.source === 'manual' ? (
-                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 px-2 py-1">
                       <MapPin className="h-3 w-3 mr-1" />
                       Manual
                     </Badge>
                   ) : (
-                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 px-2 py-1">
                       <Navigation className="h-3 w-3 mr-1" />
-                      GPS ±{Math.round(enhancedLocationState.capturedLocation.accuracy)}m
+                      ±{Math.round(enhancedLocationState.capturedLocation.accuracy)}m
                     </Badge>
                   )}
                 </div>
               </div>
-              <div className="text-sm text-green-700">
-                {enhancedLocationState.capturedLocation.address || 
+              <div className="text-xs sm:text-sm text-green-700 break-words">
+                📍 {enhancedLocationState.capturedLocation.address || 
                  `${enhancedLocationState.capturedLocation.latitude.toFixed(6)}, ${enhancedLocationState.capturedLocation.longitude.toFixed(6)}`}
               </div>
               <div className="text-xs text-green-600 mt-1">
-                Captured: {new Date(enhancedLocationState.capturedLocation.timestamp).toLocaleTimeString()}
+                🕒 {new Date(enhancedLocationState.capturedLocation.timestamp).toLocaleTimeString()}
               </div>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex space-x-2">
-            {renderActionButton()}
+          {/* Action Buttons - Mobile Optimized */}
+          <div className="flex gap-2">
+            <div className="flex-1">
+              {renderActionButton()}
+            </div>
             
             <Button
               variant="outline"
+              size="default"
               onClick={() => {
                 fetchAttendanceStatus();
                 fetchAttendanceStats();
@@ -1580,6 +1585,7 @@ export default function CleanAttendanceWidget({
                 }));
               }}
               disabled={actionLoading || locationState.isCapturing}
+              className="px-3 py-2 h-10 min-w-[44px] touch-manipulation active:scale-95 transition-transform"
             >
               <RotateCcw className="w-4 h-4" />
             </Button>

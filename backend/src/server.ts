@@ -8,6 +8,7 @@ import { prisma } from './lib/prisma';
 import { logger } from './utils/logger';
 import { CustomWebSocket } from './types/custom';
 import { cronService } from './services/cron.service';
+import { CloudinaryService } from './services/cloudinary.service';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
@@ -120,12 +121,22 @@ const startServer = async () => {
   try {
     await prisma.$connect();
     
+    // Test Cloudinary connection
+    logger.info('Testing Cloudinary connection...');
+    const cloudinaryWorking = await CloudinaryService.testConnection();
+    if (cloudinaryWorking) {
+      logger.info('✅ Cloudinary connection successful');
+    } else {
+      logger.error('❌ Cloudinary connection failed - photo uploads will not work');
+    }
+    
     // Start cron jobs
     cronService.startAutoCheckoutJob();
     logger.info('Cron jobs initialized');
     
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
       logger.info(`Server running on port ${PORT}`);
+      logger.info(`Access the server at http://0.0.0.0:${PORT}`);
     });
   } catch (error) {
     logger.error('Server startup failed:', error);

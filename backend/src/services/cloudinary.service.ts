@@ -7,6 +7,13 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Debug Cloudinary configuration
+console.log('Cloudinary Config Check:', {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'MISSING',
+  api_key: process.env.CLOUDINARY_API_KEY ? 'SET' : 'MISSING',
+  api_secret: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'MISSING'
+});
+
 export interface CloudinaryUploadResult {
   public_id: string;
   secure_url: string;
@@ -83,6 +90,16 @@ export class CloudinaryService {
 
       } catch (error) {
         console.error(`Failed to upload photo ${photo.filename}:`, error);
+        console.error('Photo details:', {
+          filename: photo.filename,
+          size: photo.size,
+          dataUrlLength: photo.dataUrl?.length || 0,
+          timestamp: photo.timestamp
+        });
+        console.error('Upload context:', context);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message);
+        }
         throw new Error(`Failed to upload photo: ${error}`);
       }
     });
@@ -94,6 +111,32 @@ export class CloudinaryService {
     } catch (error) {
       console.error('Failed to upload photos to Cloudinary:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Test Cloudinary connection with a simple upload
+   */
+  static async testConnection(): Promise<boolean> {
+    try {
+      // Create a simple test image (1x1 pixel PNG)
+      const testDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+      
+      const result = await cloudinary.uploader.upload(testDataUrl, {
+        public_id: 'kardexcare/test/connection_test',
+        folder: 'kardexcare/test',
+        resource_type: 'image'
+      });
+      
+      console.log('Cloudinary connection test successful:', result.public_id);
+      
+      // Clean up test image
+      await cloudinary.uploader.destroy(result.public_id);
+      
+      return true;
+    } catch (error) {
+      console.error('Cloudinary connection test failed:', error);
+      return false;
     }
   }
 

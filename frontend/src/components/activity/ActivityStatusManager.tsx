@@ -428,7 +428,7 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
     }
   };
 
-  const handleStatusChange = async (status: TicketStatusType, comments?: string, location?: any) => {
+  const handleStatusChange = async (status: TicketStatusType, comments?: string, location?: any, photos?: any) => {
     if (!selectedActivity) {
       console.error('No activity selected');
       return;
@@ -455,6 +455,12 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
             longitude: location.longitude,
             address: location.address,
             timestamp: location.timestamp || new Date().toISOString()
+          }
+        }),
+        ...(photos && {
+          photos: {
+            photos: photos.photos,
+            timestamp: photos.timestamp || new Date().toISOString()
           }
         })
       };
@@ -512,122 +518,108 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
 
   if (activeActivities.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Activity Status Manager
-          </CardTitle>
-          <CardDescription>
-            No active activities. Start an activity to manage its status and stages.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="text-center py-6">
+        <div className="text-4xl mb-3">📋</div>
+        <p className="text-sm text-gray-500">No active activities</p>
+        <p className="text-xs text-gray-400 mt-1">Start an activity to manage its progress</p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Active Activities ({activeActivities.length})
-          </CardTitle>
-          <CardDescription>
-            Manage the status and stages of your ongoing activities
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {activeActivities.map((activity) => {
-            const activityType = getActivityType(activity.activityType);
-            const currentStage = getCurrentStage(activity);
-            const nextStages = getNextAvailableStages(activity);
-            const stageInfo = STAGE_DEFINITIONS[currentStage];
+    <div className="space-y-3">
+      {activeActivities.map((activity) => {
+        const activityType = getActivityType(activity.activityType);
+        const currentStage = getCurrentStage(activity);
+        const nextStages = getNextAvailableStages(activity);
+        const stageInfo = STAGE_DEFINITIONS[currentStage];
 
-            return (
-              <Card key={activity.id} className="border-l-4 border-l-blue-500">
-                <CardContent className="pt-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">{activityType.icon}</span>
-                        <Badge className={activityType.color}>
-                          {activityType.label}
-                        </Badge>
-                        <Badge variant="outline" className={stageInfo?.color}>
-                          {stageInfo?.icon} {stageInfo?.label}
-                        </Badge>
-                      </div>
-                      
-                      <h3 className="font-semibold text-lg mb-1">{activity.title}</h3>
-                      {activity.description && (
-                        <p className="text-gray-600 text-sm mb-2">{activity.description}</p>
-                      )}
-                      
-                      {/* Current Ticket Status */}
-                      {activity.ticket && (
-                        <div className="mb-2">
-                          <span className="text-xs font-medium text-gray-500">Current Ticket Status:</span>
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {activity.ticket.status.replace(/_/g, ' ')}
-                          </Badge>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Timer className="h-4 w-4" />
-                          {formatDuration(activity.startTime)}
-                        </div>
-                        {activity.location && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            <span className="truncate max-w-32">{activity.location}</span>
-                          </div>
-                        )}
-                      </div>
+        return (
+          <div key={activity.id} className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+            <div className="space-y-3">
+              {/* Header with Activity Type and Stage */}
+              <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-base flex-shrink-0">{activityType.icon}</span>
+                      <Badge className={`${activityType.color} text-xs px-2 py-1 truncate`}>
+                        {activityType.label}
+                      </Badge>
                     </div>
-                    
-                    <div className="flex flex-col gap-2 ml-4">
-                      {/* Update Status button for TICKET_WORK activities */}
-                      {activity.activityType === 'TICKET_WORK' && activity.ticketId && currentStage !== 'CLOSED_PENDING' && currentStage !== 'CLOSED' && currentStage !== 'RESOLVED' && (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedActivity(activity);
-                            setShowStatusDialog(true);
-                          }}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          <Settings className="h-3 w-3 mr-1" />
-                          Update Status
-                        </Button>
-                      )}
-                      
-                      {/* Update Stage button for non-TICKET_WORK activities (excluding WORK_FROM_HOME) */}
-                      {activity.activityType !== 'TICKET_WORK' && activity.activityType !== 'WORK_FROM_HOME' && currentStage !== 'COMPLETED' && (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedActivity(activity);
-                            setShowStageDialog(true);
-                          }}
-                          className="bg-purple-600 hover:bg-purple-700"
-                        >
-                          <ArrowRight className="h-3 w-3 mr-1" />
-                          Update Stage
-                        </Button>
-                      )}
-                    </div>
+                    <Badge variant="outline" className={`${stageInfo?.color} text-xs px-2 py-1 flex-shrink-0`}>
+                      {stageInfo?.icon} {stageInfo?.label}
+                    </Badge>
                   </div>
                   
-                </CardContent>
-              </Card>
-            );
-          })}
-        </CardContent>
-      </Card>
+                  {/* Activity Title */}
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-gray-900 line-clamp-2 leading-tight">{activity.title}</h3>
+                    {activity.description && (
+                      <p className="text-gray-600 text-xs sm:text-sm mt-1 line-clamp-2">{activity.description}</p>
+                    )}
+                  </div>
+                  
+                  {/* Current Ticket Status */}
+                  {activity.ticket && (
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-600">Ticket Status:</span>
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-800">
+                          {activity.ticket.status.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Duration and Location */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <Timer className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                      <span className="font-medium text-xs text-gray-500">{formatDuration(activity.startTime)}</span>
+                    </div>
+                    {activity.location && (
+                      <div className="flex items-start gap-1">
+                        <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500 mt-0.5" />
+                        <span className="text-xs text-gray-600 break-words leading-relaxed">{activity.location}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Action Buttons - Mobile Optimized */}
+                  <div className="flex gap-2">
+                    {/* Update Status button for TICKET_WORK activities */}
+                    {activity.activityType === 'TICKET_WORK' && activity.ticketId && currentStage !== 'CLOSED_PENDING' && currentStage !== 'CLOSED' && currentStage !== 'RESOLVED' && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedActivity(activity);
+                          setShowStatusDialog(true);
+                        }}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-xs font-semibold h-9 active:scale-95 transition-transform touch-manipulation"
+                      >
+                        <Settings className="h-3 w-3 mr-1" />
+                        Update Status
+                      </Button>
+                    )}
+                    
+                    {/* Update Stage button for non-TICKET_WORK activities (excluding WORK_FROM_HOME) */}
+                    {activity.activityType !== 'TICKET_WORK' && activity.activityType !== 'WORK_FROM_HOME' && currentStage !== 'COMPLETED' && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedActivity(activity);
+                          setShowStageDialog(true);
+                        }}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-xs font-semibold h-9 active:scale-95 transition-transform touch-manipulation"
+                      >
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        Update Stage
+                      </Button>
+                    )}
+                  </div>
+            </div>
+          </div>
+        );
+      })}
 
       {/* Ticket Status Change Dialog */}
       <StatusChangeDialog
@@ -641,36 +633,36 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
         onStatusChange={handleStatusChange}
       />
 
-      {/* Activity Stage Update Dialog */}
+      {/* Activity Stage Update Dialog - Mobile Optimized */}
       <Dialog open={showStageDialog} onOpenChange={(open) => !open && setShowStageDialog(false)}>
-        <DialogContent className="sm:max-w-[400px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[400px] max-h-[90vh] overflow-y-auto mx-3">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Activity className="h-4 w-4 text-purple-600" />
               Update Stage
             </DialogTitle>
-            <DialogDescription className="text-sm">
+            <DialogDescription className="text-xs sm:text-sm">
               Progress to next stage
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            {/* Current Stage */}
-            <div className="bg-muted p-2 rounded-lg">
-              <p className="text-xs font-medium text-muted-foreground mb-1">Current Stage</p>
+            {/* Current Stage - Mobile Optimized */}
+            <div className="bg-muted p-3 rounded-xl">
+              <p className="text-xs font-bold text-muted-foreground mb-2">Current Stage</p>
               <div className="flex items-center gap-2">
-                <span className="text-sm">{STAGE_DEFINITIONS[getCurrentStage(selectedActivity || {} as Activity)]?.icon}</span>
-                <span className="font-semibold text-sm">
+                <span className="text-base">{STAGE_DEFINITIONS[getCurrentStage(selectedActivity || {} as Activity)]?.icon}</span>
+                <span className="font-bold text-sm">
                   {STAGE_DEFINITIONS[getCurrentStage(selectedActivity || {} as Activity)]?.label}
                 </span>
               </div>
             </div>
 
-            {/* Next Stage Selection */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium">Select Next Stage</label>
+            {/* Next Stage Selection - Mobile Optimized */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold">Select Next Stage</label>
               <Select value={selectedStage} onValueChange={setSelectedStage}>
-                <SelectTrigger>
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="Choose next stage..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -686,15 +678,15 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
               </Select>
             </div>
 
-            {/* Stage Notes */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium">Notes (Optional)</label>
+            {/* Stage Notes - Mobile Optimized */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold">Notes (Optional)</label>
               <Textarea
                 value={stageNotes}
                 onChange={(e) => setStageNotes(e.target.value)}
                 placeholder="Add notes about this stage..."
-                rows={2}
-                className="text-sm"
+                rows={3}
+                className="text-sm resize-none"
               />
             </div>
 
@@ -747,7 +739,7 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
             )}
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex gap-2 pt-2">
             <Button
               variant="outline"
               onClick={() => {
@@ -760,6 +752,7 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
                 setCapturedPhotos([]);
               }}
               disabled={isUpdatingStage}
+              className="flex-1 h-11 text-sm font-semibold"
             >
               Cancel
             </Button>
@@ -767,7 +760,7 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
               onClick={handleStageUpdate}
               disabled={!selectedStage || isUpdatingStage || 
                 (requiresPhoto(selectedStage) && capturedPhotos.length === 0)}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="flex-1 h-11 bg-purple-600 hover:bg-purple-700 text-sm font-semibold"
             >
               {isUpdatingStage ? (
                 <>
@@ -784,7 +777,6 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
           </div>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

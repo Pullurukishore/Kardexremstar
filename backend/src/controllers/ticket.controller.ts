@@ -524,6 +524,15 @@ export const getTickets = async (req: TicketRequest, res: Response) => {
               address: true
             } 
           },
+          contact: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              role: true
+            }
+          },
           asset: {
             select: {
               id: true,

@@ -8,6 +8,8 @@ export function getRoleBasedRedirect(role?: UserRole): string {
       return '/service-person/dashboard';
     case UserRole.ZONE_USER:
       return '/zone/dashboard';
+    case UserRole.EXTERNAL_USER:
+      return '/dashboard';
     default:
       return '/dashboard';
   }
@@ -26,6 +28,7 @@ export function isRouteAccessible(route: string, userRole?: UserRole): boolean {
     [UserRole.ADMIN]: ['/admin', '/api/admin', '/admin/FSA', '/api/assets', '/api/customers'],
     [UserRole.SERVICE_PERSON]: ['/service-person', '/api/service-person'],
     [UserRole.ZONE_USER]: ['/zone', '/api/zone'],
+    [UserRole.EXTERNAL_USER]: ['/external', '/api/external', '/dashboard'],
   };
 
   // Get allowed routes for the user's role

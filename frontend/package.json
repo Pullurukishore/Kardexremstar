@@ -7,7 +7,7 @@
     "build": "next build",
     "build:standalone": "BUILD_STANDALONE=true next build",
     "build:export": "NEXT_EXPORT=true next build && next export",
-    "start": "next start",
+    "start": "node server.js",
     "lint": "next lint",
     "deploy:firebase": "npm run build:export && firebase deploy --only hosting",
     "deploy:cloudrun": "gcloud builds submit --config cloudbuild-cloudrun.yaml"

@@ -85,7 +85,7 @@ export default async function ServicePersonDashboardPage() {
   const dashboardData = await getServicePersonDashboardData();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-x-hidden w-full max-w-full">
       <ServicePersonDashboardClientFixed initialAttendanceData={dashboardData?.attendance} />
     </div>
   );

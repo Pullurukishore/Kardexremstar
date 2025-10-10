@@ -42,7 +42,7 @@ export class EnhancedPhotoStorageService {
             path: cloudinaryResult.secure_url,
             mimeType: `image/${cloudinaryResult.format}`,
             size: cloudinaryResult.bytes,
-            ticketId: context.ticketId || 0, // Use 0 as placeholder for activity photos
+            ticketId: context.ticketId || null, // Use null for activity photos
             uploadedById: context.userId
           }
         });
@@ -63,6 +63,11 @@ export class EnhancedPhotoStorageService {
 
     } catch (error) {
       console.error('Failed to store photos:', error);
+      console.error('Context:', context);
+      console.error('Photos count:', photos.length);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message, error.stack);
+      }
       throw new Error(`Failed to store photos: ${error}`);
     }
   }

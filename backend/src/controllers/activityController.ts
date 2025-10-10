@@ -111,8 +111,13 @@ export const activityController = {
         longitude = parsed.longitude;
       }
 
-      // Always get real address from coordinates using geocoding service
-      if (latitude && longitude) {
+      // Handle location based on source - preserve manual input, geocode GPS coordinates
+      if (validatedData.locationSource === 'manual' && validatedData.location) {
+        // For manual locations, preserve the user's original input
+        locationAddress = validatedData.location;
+        console.log(`Using manual location: ${locationAddress}`);
+      } else if (latitude && longitude) {
+        // For GPS locations, get real address from coordinates using geocoding service
         try {
           const { address } = await GeocodingService.reverseGeocode(latitude, longitude);
           locationAddress = address || `${latitude}, ${longitude}`;
@@ -581,7 +586,7 @@ export const activityController = {
   createActivityStage: async (req: Request, res: Response) => {
     try {
       const { activityId } = req.params;
-      const { stage, location, notes, photos } = req.body;
+      const { stage, location, notes, photos, latitude, longitude, locationSource } = req.body;
       const user = (req as any).user;
 
       // Validate activity exists and belongs to user
@@ -599,8 +604,26 @@ export const activityController = {
         });
       }
 
-      // Parse location if provided
-      const { latitude, longitude } = parseLocation(location);
+      // Handle location based on source - preserve manual input, use coordinates for GPS
+      let finalLocation = location;
+      let finalLatitude = latitude;
+      let finalLongitude = longitude;
+
+      // If location is provided as string but lat/lng are null, parse the location
+      if (location && (!finalLatitude || !finalLongitude)) {
+        const parsed = parseLocation(location);
+        finalLatitude = parsed.latitude;
+        finalLongitude = parsed.longitude;
+      }
+
+      // For manual locations, preserve the user's original input
+      if (locationSource === 'manual' && location) {
+        finalLocation = location;
+        console.log(`Using manual stage location: ${finalLocation}`);
+      } else if (finalLatitude && finalLongitude) {
+        // For GPS locations, could geocode but for stages we'll keep it simple
+        finalLocation = location || `${finalLatitude}, ${finalLongitude}`;
+      }
 
       // Handle photo data for verification - now store permanently in Cloudinary
       let photoMetadata = null;
@@ -668,13 +691,14 @@ export const activityController = {
           stage,
           startTime: new Date(),
           updatedAt: new Date(),
-          location,
-          latitude,
-          longitude,
+          location: finalLocation,
+          latitude: finalLatitude,
+          longitude: finalLongitude,
           notes: notesWithPhotos,
           metadata: {
             createdBy: user.id,
             createdAt: new Date().toISOString(),
+            locationSource: locationSource || 'gps',
             ...(photoMetadata && { photos: photoMetadata })
           }
         }

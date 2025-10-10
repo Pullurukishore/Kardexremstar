@@ -92,11 +92,18 @@ const corsOptions: cors.CorsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
+    // Check if CORS_ORIGIN is set to allow all origins
+    if (process.env.CORS_ORIGIN === '*') {
+      return callback(null, true);
+    }
+    
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://34.14.156.49:3000',
+      process.env.CORS_ORIGIN,
       // Add other allowed origins as needed
-    ];
+    ].filter(Boolean);
     
     if (allowedOrigins.includes(origin)) {
       callback(null, true);

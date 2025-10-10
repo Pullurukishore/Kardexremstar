@@ -511,7 +511,9 @@ function ActivityLoggerComponent({
     try {
       // Get current location if not already available
       let locationData = activityLocation;
-      if (!locationData) {
+      let enhancedLocationData = enhancedLocation;
+      
+      if (!locationData && !enhancedLocationData) {
         locationData = await getCurrentLocationForActivity();
         if (!locationData) {
           toast({
@@ -525,12 +527,15 @@ function ActivityLoggerComponent({
         }
       }
 
-      // Prepare activity data for backend
+      // Prepare activity data for backend - use enhanced location if available
       const activityData = {
         activityType: formData.activityType,
         title: formData.title,
-        latitude: locationData.lat,
-        longitude: locationData.lng,
+        latitude: enhancedLocationData?.latitude || locationData?.lat,
+        longitude: enhancedLocationData?.longitude || locationData?.lng,
+        location: enhancedLocationData?.address || locationData?.address,
+        accuracy: enhancedLocationData?.accuracy,
+        locationSource: enhancedLocationData?.source || 'gps',
         ticketId: formData.ticketId ? parseInt(formData.ticketId) : undefined,
         startTime: new Date().toISOString(),
       };
@@ -545,7 +550,9 @@ function ActivityLoggerComponent({
         ticketId: "",
       });
       setActivityLocation(null);
+      setEnhancedLocation(null);
       setLocationError(null);
+      setShowLocationCapture(false);
       setDialogOpen(false);
 
       // Force refresh activities immediately after creating new activity
@@ -931,11 +938,11 @@ function ActivityLoggerComponent({
                     Log Activity
                   </Button>
                 </DialogTrigger>
-                <DialogContent className={isMobile ? "w-[95vw] max-w-[95vw] h-[85vh] p-4" : "sm:max-w-[500px]"}>
-                  <DialogHeader className={isMobile ? "pb-4" : ""}>
-                    <DialogTitle className={isMobile ? "text-lg" : "text-xl"}>Log New Activity</DialogTitle>
+                <DialogContent className={isMobile ? "w-[95vw] max-w-[95vw] max-h-[90vh] p-3 overflow-y-auto" : "sm:max-w-[500px] max-h-[90vh] overflow-y-auto"}>
+                  <DialogHeader className={isMobile ? "pb-3 sticky top-0 bg-white z-10" : "pb-4"}>
+                    <DialogTitle className={isMobile ? "text-base font-bold" : "text-xl"}>Log New Activity</DialogTitle>
                   </DialogHeader>
-                  <div className={`space-y-4 py-4 ${isMobile ? 'space-y-3' : 'space-y-4'}`}>
+                  <div className={`space-y-3 pb-4 ${isMobile ? 'space-y-3' : 'space-y-4'}`}>
                     <div className="space-y-2">
                       <Label htmlFor="activityType" className={isMobile ? "text-sm font-medium" : ""}>Activity Type *</Label>
                       <Select
@@ -1061,14 +1068,14 @@ function ActivityLoggerComponent({
                       
                       {/* Show location capture dialog when needed */}
                       {showLocationCapture ? (
-                        <div className="space-y-3 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                        <div className={`space-y-3 border border-blue-200 rounded-xl bg-blue-50 ${isMobile ? 'p-3' : 'p-4'}`}>
                           <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-medium text-blue-900">Capture Location for Activity</h3>
+                            <h3 className={`font-bold text-blue-900 ${isMobile ? 'text-xs' : 'text-sm'}`}>📍 Capture Location</h3>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setShowLocationCapture(false)}
-                              className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                              className={`p-0 text-blue-600 hover:text-blue-800 ${isMobile ? 'h-8 w-8' : 'h-6 w-6'}`}
                             >
                               ✕
                             </Button>
@@ -1101,11 +1108,11 @@ function ActivityLoggerComponent({
                         <div className="space-y-2">
                           {(activityLocation || enhancedLocation) ? (
                             /* Location captured - show details */
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <div className={`bg-green-50 border border-green-200 rounded-xl ${isMobile ? 'p-2.5' : 'p-3'}`}>
                               <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <CheckCircle className="h-4 w-4 text-green-600" />
-                                  <span className="text-sm font-medium text-green-800">Location Ready</span>
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <CheckCircle className={`text-green-600 flex-shrink-0 ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
+                                  <span className={`font-bold text-green-800 truncate ${isMobile ? 'text-xs' : 'text-sm'}`}>✅ Location Ready</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {enhancedLocation?.source === 'manual' ? (
@@ -1129,12 +1136,12 @@ function ActivityLoggerComponent({
                                   </Button>
                                 </div>
                               </div>
-                              <div className="text-sm text-green-700">
+                              <div className="text-xs sm:text-sm text-green-700 break-words leading-relaxed">
                                 {(enhancedLocation?.address || activityLocation?.address) || 
                                  `${(enhancedLocation?.latitude || activityLocation?.lat)?.toFixed(6)}, ${(enhancedLocation?.longitude || activityLocation?.lng)?.toFixed(6)}`}
                               </div>
                               <div className="text-xs text-green-600 mt-1">
-                                Captured: {enhancedLocation ? new Date(enhancedLocation.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}
+                                🕒 {enhancedLocation ? new Date(enhancedLocation.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}
                               </div>
                             </div>
                           ) : (
@@ -1142,10 +1149,10 @@ function ActivityLoggerComponent({
                             <Button
                               variant="outline"
                               onClick={() => setShowLocationCapture(true)}
-                              className="w-full border-dashed border-2 border-blue-300 text-blue-600 hover:bg-blue-50"
+                              className={`w-full border-dashed border-2 border-blue-300 text-blue-600 hover:bg-blue-50 ${isMobile ? 'h-12 text-base font-semibold touch-manipulation' : ''}`}
                             >
-                              <MapPin className="h-4 w-4 mr-2" />
-                              Capture Location
+                              <MapPin className={`mr-2 ${isMobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
+                              📍 Capture Location
                             </Button>
                           )}
                         </div>
@@ -1216,12 +1223,9 @@ function ActivityLoggerComponent({
                 </p>
               )}
               {activeActivity.location && (
-                <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
-                  <MapPin className="h-3 w-3" />
-                  <span
-                    className="truncate max-w-[300px]"
-                    title={activeActivity.location}
-                  >
+                <div className="flex items-start gap-1 mt-2 text-sm text-muted-foreground">
+                  <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                  <span className="break-words leading-relaxed text-xs">
                     {activeActivity.location}
                   </span>
                 </div>
@@ -1369,9 +1373,9 @@ function ActivityLoggerComponent({
                           )}
                         </div>
                         {activity.location && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className={isMobile ? "h-4 w-4" : "h-3 w-3"} />
-                            <span className={`truncate ${isMobile ? 'max-w-[250px]' : 'max-w-[200px]'}`}>
+                          <div className="flex items-start gap-1">
+                            <MapPin className={`flex-shrink-0 mt-0.5 ${isMobile ? "h-4 w-4" : "h-3 w-3"}`} />
+                            <span className="break-words leading-relaxed text-xs">
                               {activity.location}
                             </span>
                           </div>

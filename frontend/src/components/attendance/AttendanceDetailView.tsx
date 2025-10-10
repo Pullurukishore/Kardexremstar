@@ -32,11 +32,13 @@ import {
   Mail,
   Navigation,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  Camera
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/api-client';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import Link from 'next/link';
+import PhotoGallery from '@/components/photo/PhotoGallery';
 
 // Types based on backend schema
 interface ActivityStage {
@@ -49,6 +51,13 @@ interface ActivityStage {
   latitude?: number;
   longitude?: number;
   notes?: string;
+  photos?: Array<{
+    id: number;
+    filename: string;
+    cloudinaryUrl: string;
+    thumbnailUrl: string;
+    createdAt: string;
+  }>;
 }
 
 interface TicketStatusHistory {
@@ -295,6 +304,17 @@ export default function AttendanceDetailView({
     return `${mins}m`;
   };
 
+  // Calculate total hours from check-in/check-out times
+  const calculateTotalHours = () => {
+    if (!attendance?.checkInAt) return null;
+    
+    const checkInTime = parseISO(attendance.checkInAt);
+    const checkOutTime = attendance.checkOutAt ? parseISO(attendance.checkOutAt) : new Date();
+    
+    const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
+    return totalMinutes > 0 ? totalMinutes / 60 : null;
+  };
+
   // Format date for display
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -386,7 +406,7 @@ export default function AttendanceDetailView({
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="activities">Activities ({activities.length})</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+          <TabsTrigger value="audit">History</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -507,7 +527,19 @@ export default function AttendanceDetailView({
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total Hours</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {attendance.totalHours ? `${Number(attendance.totalHours).toFixed(1)}h` : 'N/A'}
+                      {(() => {
+                        // Use backend totalHours if available, otherwise calculate from times
+                        const backendHours = attendance.totalHours;
+                        const calculatedHours = calculateTotalHours();
+                        
+                        if (backendHours && backendHours > 0) {
+                          return `${Number(backendHours).toFixed(1)}h`;
+                        } else if (calculatedHours && calculatedHours > 0) {
+                          return `${calculatedHours.toFixed(1)}h`;
+                        } else {
+                          return 'N/A';
+                        }
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -815,6 +847,19 @@ export default function AttendanceDetailView({
                           <p className="text-sm text-gray-600 mt-1">🎫 Ticket #{activity.ticket.id} - {activity.ticket.customer.companyName}</p>
                         )}
 
+                        {/* Ticket Photos */}
+                        {activity.activityType === 'TICKET_WORK' && activity.ticket && (
+                          <div className="mt-2">
+                            <PhotoGallery 
+                              ticketId={activity.ticket.id}
+                              title="Ticket Photos"
+                              className="border-0 bg-transparent"
+                              showUploadTime={true}
+                              maxPhotosToShow={6}
+                            />
+                          </div>
+                        )}
+
                         {/* Activity Stages in Timeline */}
                         {activity.ActivityStage && activity.ActivityStage.length > 0 && (
                           <div className="mt-2 ml-6 space-y-2">
@@ -844,6 +889,35 @@ export default function AttendanceDetailView({
                                     )}
                                     {stage.notes && (
                                       <p className="text-xs text-gray-600 mt-1 italic">"{stage.notes}"</p>
+                                    )}
+                                    {/* Stage Photos */}
+                                    {stage.photos && stage.photos.length > 0 && (
+                                      <div className="mt-2">
+                                        <div className="flex items-center gap-1 mb-2">
+                                          <Camera className="h-3 w-3 text-blue-600" />
+                                          <span className="text-xs font-medium text-blue-600">
+                                            {stage.photos.length} Photo{stage.photos.length > 1 ? 's' : ''}
+                                          </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                          {stage.photos.map((photo) => (
+                                            <div key={photo.id} className="relative group">
+                                              <img
+                                                src={photo.thumbnailUrl || photo.cloudinaryUrl}
+                                                alt={photo.filename}
+                                                className="w-full h-16 object-cover rounded-md border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer"
+                                                onClick={() => window.open(photo.cloudinaryUrl, '_blank')}
+                                              />
+                                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-md transition-opacity flex items-center justify-center">
+                                                <ExternalLink className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                              </div>
+                                              <div className="text-xs text-gray-400 mt-1 truncate">
+                                                {format(parseISO(photo.createdAt), 'HH:mm')}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -921,19 +995,19 @@ export default function AttendanceDetailView({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Audit Trail
+                Activity History
               </CardTitle>
               <CardDescription>
-                Complete history of attendance actions and modifications ({auditLogs.length} events)
+                A timeline of all actions and changes made during this work session ({auditLogs.length} events)
               </CardDescription>
             </CardHeader>
             <CardContent>
               {auditLogs.length === 0 ? (
                 <div className="text-center py-8">
                   <Info className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-500">No audit logs found</p>
+                  <p className="text-sm text-gray-500">No activity history available</p>
                   <p className="text-xs text-gray-400 mt-1">
-                    No system events or modifications recorded for this attendance session
+                    No actions or changes have been recorded for this work session yet
                   </p>
                 </div>
               ) : (
@@ -959,15 +1033,18 @@ export default function AttendanceDetailView({
                                   {actionConfig.label}
                                 </Badge>
                                 {/* Add simple description */}
-                                <span className="text-xs text-gray-600 ml-2">
-                                  {log.action === 'ATTENDANCE_CHECKED_IN' && '- Started work session'}
-                                  {log.action === 'ATTENDANCE_CHECKED_OUT' && '- Ended work session'}
-                                  {log.action === 'ATTENDANCE_RE_CHECKED_IN' && '- Resumed work after checkout'}
-                                  {log.action === 'ACTIVITY_LOG_ADDED' && '- Logged new work activity'}
-                                  {log.action === 'ACTIVITY_STAGE_UPDATED' && '- Updated activity progress'}
-                                  {log.action === 'AUTO_CHECKOUT_PERFORMED' && '- System ended work session'}
-                                  {log.action === 'TICKET_STATUS_CHANGED' && '- Updated ticket status'}
-                                  {log.action === 'ATTENDANCE_UPDATED' && '- Modified attendance record'}
+                                <span className="text-sm text-gray-700 ml-2 font-medium">
+                                  {log.action === 'ATTENDANCE_CHECKED_IN' && '→ Employee started their work day'}
+                                  {log.action === 'ATTENDANCE_CHECKED_OUT' && '→ Employee ended their work day'}
+                                  {log.action === 'ATTENDANCE_RE_CHECKED_IN' && '→ Employee resumed work after break'}
+                                  {log.action === 'ACTIVITY_LOG_ADDED' && '→ New work activity was recorded'}
+                                  {log.action === 'ACTIVITY_STAGE_UPDATED' && '→ Work activity progress was updated'}
+                                  {log.action === 'AUTO_CHECKOUT_PERFORMED' && '→ System automatically ended work day'}
+                                  {log.action === 'TICKET_STATUS_CHANGED' && '→ Ticket status was changed'}
+                                  {log.action === 'ATTENDANCE_UPDATED' && '→ Attendance record was modified'}
+                                  {log.action === 'ATTENDANCE_MANUAL_CHECKOUT' && '→ Admin manually ended work session'}
+                                  {log.action === 'LOCATION_UPDATED' && '→ Location information was updated'}
+                                  {log.action === 'NOTES_UPDATED' && '→ Notes or comments were added'}
                                 </span>
                                 {log.entityType && log.entityId && (
                                   <span className="text-xs text-gray-500">
@@ -988,20 +1065,18 @@ export default function AttendanceDetailView({
                             <div className="flex items-center gap-2 text-sm">
                               <User className="h-3 w-3 text-gray-400" />
                               <span className="text-gray-600">
+                                <span className="text-gray-500">Done by: </span>
                                 {log.performedBy ? (
                                   <>
-                                    <span className="font-medium">{log.performedBy.name}</span>
+                                    <span className="font-medium text-gray-800">{log.performedBy.name}</span>
                                     {log.performedBy.email && (
-                                      <span className="text-gray-500 ml-1">({log.performedBy.email})</span>
+                                      <span className="text-gray-500 ml-1 text-xs">({log.performedBy.email})</span>
                                     )}
                                   </>
                                 ) : (
-                                  <span className="font-medium text-blue-600">System Automated</span>
+                                  <span className="font-medium text-blue-600">🤖 System (Automatic)</span>
                                 )}
                               </span>
-                              {log.ipAddress && (
-                                <span className="text-gray-400 text-xs">• IP: {log.ipAddress}</span>
-                              )}
                             </div>
 
                             {/* Details Section */}

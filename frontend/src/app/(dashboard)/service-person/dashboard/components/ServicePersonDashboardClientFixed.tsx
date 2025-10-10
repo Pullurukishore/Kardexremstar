@@ -80,6 +80,22 @@ interface ServicePersonDashboardClientProps {
 
 export default function ServicePersonDashboardClientFixed({ initialLocation, initialAttendanceData }: ServicePersonDashboardClientProps) {
   const { user } = useAuth();
+  
+  // Prevent horizontal scrolling on mobile
+  useEffect(() => {
+    document.body.style.overflowX = 'hidden';
+    document.documentElement.style.overflowX = 'hidden';
+    document.body.style.maxWidth = '100vw';
+    document.documentElement.style.maxWidth = '100vw';
+    
+    return () => {
+      document.body.style.overflowX = '';
+      document.documentElement.style.overflowX = '';
+      document.body.style.maxWidth = '';
+      document.documentElement.style.maxWidth = '';
+    };
+  }, []);
+  
   // Removed tab state - using unified dashboard
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
     todayHours: 0,
@@ -93,6 +109,7 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [showNewActivityDialog, setShowNewActivityDialog] = useState(false);
 
   // Fetch dashboard data
   const fetchDashboardData = useCallback(async () => {
@@ -134,11 +151,23 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
         } else if (Array.isArray(ticketsResponseData)) {
           ticketsData = ticketsResponseData;
         }
+        
+        // Filter out closed tickets - only show active tickets
+        ticketsData = ticketsData.filter((ticket: any) => 
+          ticket.status !== 'CLOSED' && 
+          ticket.status !== 'RESOLVED' && 
+          ticket.status !== 'CANCELLED'
+        );
       } else {
         console.error('Tickets API failed:', ticketsResponse.reason);
       }
       setTickets(ticketsData);
-      console.log('Tickets loaded:', ticketsData.length, ticketsData);
+      console.log('Active tickets loaded:', ticketsData.length, ticketsData);
+      // Debug: Check if contact data is present
+      if (ticketsData.length > 0) {
+        console.log('First ticket contact data:', ticketsData[0].contact);
+        console.log('First ticket full structure:', JSON.stringify(ticketsData[0], null, 2));
+      }
 
       // Handle attendance response
       if (attendanceResponse.status === 'fulfilled') {
@@ -293,44 +322,44 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-safe">
+    <div className="min-h-screen bg-gray-50 pb-safe overflow-x-hidden w-full max-w-full">
       {/* Mobile-First Header with Status Bar Support */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-4 sm:px-6 sm:py-6 shadow-lg pt-safe">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-            <div className="flex-1">
-              <h1 className="text-xl sm:text-2xl font-bold">Service Dashboard</h1>
-              <p className="text-blue-100 text-sm">Welcome, {user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'Service Person'}!</p>
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-3 sm:px-6 sm:py-6 shadow-lg pt-safe sticky top-0 z-50 w-full box-border">
+        <div className="max-w-7xl mx-auto w-full">
+          <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 w-full">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold truncate">Service Dashboard</h1>
+              <p className="text-blue-100 text-xs sm:text-sm truncate">Welcome, {user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'Service Person'}!</p>
               {/* Mobile-Optimized Attendance Status */}
               {attendanceStatus && (
-                <div className="mt-2 flex items-center space-x-2">
+                <div className="mt-1.5 flex items-center space-x-2">
                   {(() => {
                     console.log('Header: Rendering attendance status, isCheckedIn:', attendanceStatus.isCheckedIn);
                     return attendanceStatus.isCheckedIn ? (
                       <>
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-xs sm:text-sm text-green-200">
-                          Checked In {attendanceStatus.attendance?.checkInAt ? 
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse flex-shrink-0"></div>
+                        <span className="text-xs sm:text-sm text-green-200 truncate">
+                          ✓ {attendanceStatus.attendance?.checkInAt ? 
                             new Date(attendanceStatus.attendance.checkInAt).toLocaleTimeString('en-US', {
                               hour: '2-digit',
                               minute: '2-digit',
                               hour12: true
-                            }) : ''
+                            }) : 'Checked In'
                           }
                         </span>
                       </>
                     ) : (
                       <>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                        <span className="text-xs sm:text-sm text-gray-300">Not Checked In</span>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                        <span className="text-xs sm:text-sm text-gray-300 truncate">Not Checked In</span>
                       </>
                     );
                   })()}
                 </div>
               )}
             </div>
-            <div className="text-left sm:text-right">
-              <p className="text-xs sm:text-sm text-blue-100">
+            <div className="text-left sm:text-right flex-shrink-0 min-w-0">
+              <p className="text-xs sm:text-sm text-blue-100 font-medium whitespace-nowrap">
                 {new Date().toLocaleDateString('en-US', { 
                   weekday: 'short', 
                   month: 'short', 
@@ -339,7 +368,9 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
               </p>
               {/* Mobile Location Status */}
               {attendanceStatus?.attendance && (
-                <p className="text-xs text-blue-200 mt-1 truncate max-w-[250px] sm:max-w-xs">
+                <p className="text-xs text-blue-200 mt-1 truncate max-w-[150px] sm:max-w-xs" title={attendanceStatus.isCheckedIn 
+                    ? (attendanceStatus.attendance.checkInAddress || 'Location not available')
+                    : (attendanceStatus.attendance.checkOutAddress || attendanceStatus.attendance.checkInAddress || 'Location not available')}>
                   📍 {attendanceStatus.isCheckedIn 
                     ? (attendanceStatus.attendance.checkInAddress || 'Location not available')
                     : (attendanceStatus.attendance.checkOutAddress || attendanceStatus.attendance.checkInAddress || 'Location not available')
@@ -351,45 +382,45 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
         </div>
       </div>
 
-      {/* Fixed-Height Mobile Stats Cards */}
-      <div className="max-w-7xl mx-auto px-4 -mt-6 mb-6 sm:px-6 sm:-mt-8 sm:mb-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-blue-500 touch-manipulation h-20 sm:h-24">
-            <div className="flex items-center h-full">
-              <div className="text-xl sm:text-2xl flex-shrink-0">⏰</div>
-              <div className="ml-3 sm:ml-4 min-w-0 flex-1 flex flex-col justify-center">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate leading-tight">Today's Hours</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight">{dashboardStats.todayHours.toFixed(1)}h</p>
+      {/* Enhanced Mobile Stats Cards */}
+      <div className="max-w-7xl mx-auto px-3 mt-4 mb-4 sm:px-6 sm:mt-6 sm:mb-8 w-full box-border">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-6 w-full box-border">
+          <div className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border-l-4 border-blue-500 touch-manipulation active:scale-95 transition-transform">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl sm:text-3xl flex-shrink-0 bg-blue-50 p-2 rounded-lg">⏰</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">Today's Hours</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{dashboardStats.todayHours.toFixed(1)}h</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-green-500 touch-manipulation h-20 sm:h-24">
-            <div className="flex items-center h-full">
-              <div className="text-xl sm:text-2xl flex-shrink-0">🔄</div>
-              <div className="ml-3 sm:ml-4 min-w-0 flex-1 flex flex-col justify-center">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate leading-tight">Active Activities</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight">{dashboardStats.activeActivities}</p>
+          <div className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border-l-4 border-green-500 touch-manipulation active:scale-95 transition-transform">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl sm:text-3xl flex-shrink-0 bg-green-50 p-2 rounded-lg">🔄</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">Active Activities</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{dashboardStats.activeActivities}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-orange-500 touch-manipulation h-20 sm:h-24">
-            <div className="flex items-center h-full">
-              <div className="text-xl sm:text-2xl flex-shrink-0">🎫</div>
-              <div className="ml-3 sm:ml-4 min-w-0 flex-1 flex flex-col justify-center">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate leading-tight">Assigned Tickets</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight">{dashboardStats.assignedTickets}</p>
+          <div className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border-l-4 border-orange-500 touch-manipulation active:scale-95 transition-transform">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl sm:text-3xl flex-shrink-0 bg-orange-50 p-2 rounded-lg">🎫</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">Assigned Tickets</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{dashboardStats.assignedTickets}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-purple-500 touch-manipulation h-20 sm:h-24">
-            <div className="flex items-center h-full">
-              <div className="text-xl sm:text-2xl flex-shrink-0">✅</div>
-              <div className="ml-3 sm:ml-4 min-w-0 flex-1 flex flex-col justify-center">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate leading-tight">Completed Today</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight">{dashboardStats.completedToday}</p>
+          <div className="bg-white rounded-xl shadow-lg p-3 sm:p-4 border-l-4 border-purple-500 touch-manipulation active:scale-95 transition-transform">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl sm:text-3xl flex-shrink-0 bg-purple-50 p-2 rounded-lg">✅</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">Completed Today</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{dashboardStats.completedToday}</p>
               </div>
             </div>
           </div>
@@ -397,11 +428,11 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
       </div>
 
       {/* Mobile-Optimized Main Content */}
-      <div className="max-w-7xl mx-auto px-4 pb-8 sm:px-6 sm:pb-12">
+      <div className="max-w-7xl mx-auto px-3 pb-6 sm:px-6 sm:pb-12 w-full box-border">
         {/* Unified Dashboard */}
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-3 sm:space-y-6 w-full box-border">
           {/* Attendance Widget */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100" data-section="attendance">
             <CleanAttendanceWidget 
               onStatusChange={handleAttendanceChange}
               initialData={attendanceStatus}
@@ -409,10 +440,10 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
           </div>
 
           {/* Consolidated Activity Status Manager - Single Component */}
-          <div className="bg-white rounded-lg shadow-md border-l-4 border-l-blue-500">
-            <div className="p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                <span className="text-lg sm:text-xl">🔄</span>
+          <div className="bg-white rounded-xl shadow-lg border-l-4 border-l-blue-500" data-section="activities">
+            <div className="p-3 sm:p-6">
+              <h3 className="text-sm sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                <span className="text-base sm:text-xl bg-blue-50 p-1.5 rounded-lg">🔄</span>
                 <span className="truncate">Active Activities</span>
               </h3>
               <ActivityStatusManager 
@@ -423,10 +454,10 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
           </div>
 
           {/* Mobile-Optimized Create New Activity */}
-          <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg shadow-md border border-green-200">
-            <div className="p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                <span className="text-lg sm:text-xl bg-green-100 p-1 rounded-lg">➕</span>
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-xl shadow-lg border border-green-200" data-section="new-activity">
+            <div className="p-3 sm:p-6">
+              <h3 className="text-sm sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                <span className="text-base sm:text-xl bg-green-100 p-1.5 rounded-lg">➕</span>
                 <span className="truncate">New Activity</span>
               </h3>
               <ActivityLogger 
@@ -436,12 +467,12 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
             </div>
           </div>
 
-          {/* Enhanced Assigned Tickets - Side by Side Layout */}
-          <div className="bg-white rounded-lg shadow-md border-l-4 border-l-red-500">
-            <div className="p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                <span className="text-lg sm:text-xl">🎯</span>
-                Total Tickets ({tickets.length})
+          {/* Enhanced Assigned Tickets - Mobile Optimized */}
+          <div className="bg-white rounded-xl shadow-lg border-l-4 border-l-red-500">
+            <div className="p-3 sm:p-6">
+              <h3 className="text-sm sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                <span className="text-base sm:text-xl bg-red-50 p-1.5 rounded-lg">🎯</span>
+                <span className="truncate">Active Tickets ({tickets.length})</span>
               </h3>
               {tickets.length === 0 ? (
                 <div className="text-center py-8">
@@ -449,68 +480,141 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
                   <p className="text-gray-500 text-sm">No tickets assigned yet</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
                   {tickets.map((ticket) => (
-                    <div key={ticket.id} className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-xl hover:border-blue-300 transition-all duration-300 transform hover:-translate-y-1">
-                      {/* Enhanced Header with Status Prominence */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-2">
-                          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-sm">
+                    <div key={ticket.id} className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-3 sm:p-4 hover:shadow-xl hover:border-blue-300 transition-all duration-300 transform hover:-translate-y-1 active:scale-95">
+                      {/* Enhanced Header with Status Prominence - Mobile Optimized */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-1 min-w-0 flex-1">
+                          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm flex-shrink-0">
                             #{ticket.id}
                           </div>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${PRIORITY_CONFIG[ticket.priority as keyof typeof PRIORITY_CONFIG]?.color || 'bg-gray-100 text-gray-800'}`}>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold truncate ${PRIORITY_CONFIG[ticket.priority as keyof typeof PRIORITY_CONFIG]?.color || 'bg-gray-100 text-gray-800'}`}>
                             {PRIORITY_CONFIG[ticket.priority as keyof typeof PRIORITY_CONFIG]?.icon} {ticket.priority}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-500 font-medium">
+                        <div className="text-xs text-gray-500 font-medium flex-shrink-0 ml-2">
                           {new Date(ticket.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
                       </div>
 
-                      {/* Prominent Current Status Display */}
-                      <div className="mb-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-600">Current Status:</span>
+                      {/* Prominent Current Status Display - Mobile Optimized */}
+                      <div className="mb-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-gray-600">Status:</span>
                         </div>
-                        <div className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-semibold mt-1 ${STATUS_CONFIG[ticket.status as keyof typeof STATUS_CONFIG]?.color || 'bg-gray-100 text-gray-800'} border-2 border-opacity-20`}>
-                          <span className="mr-2">{STATUS_CONFIG[ticket.status as keyof typeof STATUS_CONFIG]?.icon}</span>
-                          <span>{ticket.status.replace(/_/g, ' ')}</span>
+                        <div className={`inline-flex items-center px-2 py-1.5 rounded-lg text-xs font-bold w-full justify-center ${STATUS_CONFIG[ticket.status as keyof typeof STATUS_CONFIG]?.color || 'bg-gray-100 text-gray-800'} border border-opacity-30`}>
+                          <span className="mr-1">{STATUS_CONFIG[ticket.status as keyof typeof STATUS_CONFIG]?.icon}</span>
+                          <span className="truncate">{ticket.status.replace(/_/g, ' ')}</span>
                         </div>
                       </div>
 
-                      {/* Title */}
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3 line-clamp-2 leading-tight min-h-[2.5rem]">
+                      {/* Title - Mobile Optimized */}
+                      <h4 className="text-sm font-bold text-gray-900 mb-2 line-clamp-2 leading-tight min-h-[2rem]">
                         {ticket.title}
                       </h4>
 
-                      {/* Compact Key Info */}
-                      <div className="space-y-2 mb-4 text-xs">
-                        <div className="flex items-center">
-                          <span className="w-4 text-gray-400">🏢</span>
-                          <span className="ml-2 font-medium text-gray-600 w-16">Customer:</span>
-                          <span className="flex-1 truncate text-gray-800">{ticket.customer?.companyName || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="w-4 text-gray-400">⚙️</span>
-                          <span className="ml-2 font-medium text-gray-600 w-16">Asset:</span>
-                          <span className="flex-1 truncate text-gray-800">{ticket.asset?.model || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="w-4 text-gray-400">🔢</span>
-                          <span className="ml-2 font-medium text-gray-600 w-16">Serial:</span>
-                          <span className="flex-1 font-mono bg-gray-100 px-2 py-1 rounded text-xs truncate">
-                            {ticket.asset?.serialNo || 'N/A'}
-                          </span>
-                        </div>
-                        {(ticket.asset?.location || ticket.customer?.address) && (
-                          <div className="flex items-start">
-                            <span className="w-4 text-gray-400 mt-0.5">📍</span>
-                            <span className="ml-2 font-medium text-gray-600 w-16 mt-0.5">Location:</span>
-                            <span className="flex-1 text-xs leading-relaxed line-clamp-2 text-gray-800">
-                              {ticket.asset?.location || ticket.customer?.address}
-                            </span>
+                      {/* Compact Key Info - Mobile Optimized */}
+                      <div className="space-y-1.5 text-xs">
+                        <div className="bg-gray-50 rounded-lg p-2 space-y-1.5">
+                          <div className="flex items-start gap-1">
+                            <span className="text-gray-400 flex-shrink-0 mt-0.5">🏢</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-gray-600 text-xs mb-0.5">Customer</div>
+                              <div className="text-gray-800 text-xs break-words">{ticket.customer?.companyName || 'N/A'}</div>
+                            </div>
                           </div>
-                        )}
+                          <div className="flex items-start gap-1">
+                            <span className="text-gray-400 flex-shrink-0 mt-0.5">⚙️</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-gray-600 text-xs mb-0.5">Asset</div>
+                              <div className="text-gray-800 text-xs break-words">{ticket.asset?.model || 'N/A'}</div>
+                            </div>
+                          </div>
+                          {ticket.asset?.serialNo && (
+                            <div className="flex items-start gap-1">
+                              <span className="text-gray-400 flex-shrink-0 mt-0.5">🔢</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-gray-600 text-xs mb-0.5">Serial</div>
+                                <div className="font-mono bg-white px-1.5 py-0.5 rounded text-xs border break-all">
+                                  {ticket.asset.serialNo}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {(ticket.asset?.location || ticket.customer?.address) && (
+                            <div className="flex items-start gap-1">
+                              <span className="text-gray-400 flex-shrink-0 mt-0.5">📍</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-gray-600 text-xs mb-0.5">Location</div>
+                                <div className="text-gray-800 text-xs leading-relaxed break-words">
+                                  {ticket.asset?.location || ticket.customer?.address}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {/* Contact Person Details */}
+                          {(() => {
+                            const ticketWithContact = ticket as any;
+                            const contactPerson = ticketWithContact.contact;
+                            
+                            // Debug: Always show this section for now to test
+                            console.log('Rendering contact for ticket:', ticket.id, 'contact:', contactPerson);
+                            
+                            // Show placeholder if no contact data
+                            if (!contactPerson) {
+                              return (
+                                <div className="flex items-start gap-1">
+                                  <span className="text-gray-400 flex-shrink-0 mt-0.5">👤</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-gray-600 text-xs mb-0.5">Contact Person</div>
+                                    <div className="text-gray-800 text-xs break-words">
+                                      <div className="font-medium text-gray-400">
+                                        Contact info not available
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <div className="flex items-start gap-1">
+                                <span className="text-gray-400 flex-shrink-0 mt-0.5">👤</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-gray-600 text-xs mb-0.5">Contact Person</div>
+                                  <div className="text-gray-800 text-xs break-words">
+                                    <div className="font-medium">
+                                      {contactPerson.name || 'N/A'}
+                                    </div>
+                                    {contactPerson.phone && (
+                                      <div className="flex items-center gap-1 mt-0.5">
+                                        <span className="text-gray-400">📞</span>
+                                        <a 
+                                          href={`tel:${contactPerson.phone}`}
+                                          className="text-blue-600 hover:text-blue-800 font-mono text-xs"
+                                        >
+                                          {contactPerson.phone}
+                                        </a>
+                                      </div>
+                                    )}
+                                    {contactPerson.email && (
+                                      <div className="flex items-center gap-1 mt-0.5">
+                                        <span className="text-gray-400">✉️</span>
+                                        <a 
+                                          href={`mailto:${contactPerson.email}`}
+                                          className="text-blue-600 hover:text-blue-800 text-xs break-all"
+                                        >
+                                          {contactPerson.email}
+                                        </a>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
 
                     </div>
@@ -542,6 +646,7 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
         onStatusUpdate={handleStatusUpdate}
         accuracyThreshold={50}
       />
+
     </div>
   );
 }
