@@ -11,7 +11,7 @@ import { prisma } from './lib/prisma';
 import { logger } from './utils/logger';
 import { CustomWebSocket } from './types/custom';
 import { cronService } from './services/cron.service';
-import { CloudinaryService } from './services/cloudinary.service';
+import { LocalPhotoStorageService } from './services/local-photo-storage.service';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
@@ -124,13 +124,13 @@ const startServer = async () => {
   try {
     await prisma.$connect();
     
-    // Test Cloudinary connection
-    logger.info('Testing Cloudinary connection...');
-    const cloudinaryWorking = await CloudinaryService.testConnection();
-    if (cloudinaryWorking) {
-      logger.info('✅ Cloudinary connection successful');
-    } else {
-      logger.error('❌ Cloudinary connection failed - photo uploads will not work');
+    // Initialize local storage
+    logger.info('Initializing local storage...');
+    try {
+      await LocalPhotoStorageService.initialize();
+      logger.info('✅ Local storage initialized successfully');
+    } catch (error) {
+      logger.error('❌ Local storage initialization failed - photo uploads will not work:', error);
     }
     
     // Start cron jobs

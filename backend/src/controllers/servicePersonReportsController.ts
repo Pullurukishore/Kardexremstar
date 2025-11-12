@@ -1360,9 +1360,9 @@ export const servicePersonReportsController = {
 
       const reportData = {
         person: {
-          name: person.name,
+          name: person.name || 'Unknown',
           email: person.email,
-          phone: person.phone,
+          phone: person.phone || '',
           zones: person.serviceZones.map(sz => sz.serviceZone.name).join(', ')
         },
         period: {

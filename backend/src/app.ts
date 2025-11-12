@@ -32,6 +32,7 @@ import servicePersonAttendanceRoutes from './routes/service-person-attendance.ro
 import notificationRoutes from './routes/notification.routes';
 import geocodingRoutes from './routes/geocoding.routes';
 import photoRoutes from './routes/photo.routes';
+import { storageConfig, initializeStorage } from './config/storage.config';
 
 const app = express();
 const server = http.createServer(app);
@@ -137,14 +138,33 @@ app.use(cors(corsOptions));
 // Handle preflight requests
 app.options('*', cors(corsOptions));
 
-// Parse JSON bodies
-app.use(express.json());
+// Parse JSON bodies with increased limit for photo uploads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Parse cookies
 app.use(cookieParser());
 
-// serve uploaded files
-app.use('/uploads', express.static(path.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads')));
+// Ensure storage directories exist and serve storage files with CORS headers
+initializeStorage();
+// Use storageConfig.root to keep serving path consistent with where files are saved
+const storagePath = storageConfig.root;
+console.log('📁 Static storage path:', storagePath);
+
+app.use('/storage', (req, res, next) => {
+  console.log('📂 Storage request:', req.path);
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+}, express.static(storagePath));
+
+// Also serve from parent project root storage as a fallback (in case files were saved there)
+const parentStoragePath = path.resolve(process.cwd(), '..', 'storage');
+if (parentStoragePath !== storagePath) {
+  console.log('📁 Fallback storage path enabled:', parentStoragePath);
+  app.use('/storage', express.static(parentStoragePath));
+}
 
 // API Routes
 app.use('/api/auth', authRoutes);

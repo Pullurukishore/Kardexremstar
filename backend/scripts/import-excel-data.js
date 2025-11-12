@@ -228,9 +228,10 @@ async function upsertCustomer(customerName, place, serviceZoneId) {
  * Create Asset linked to Customer
  */
 async function createAsset(serialNumber, department, customerId) {
+  // Handle missing serial number - generate unique one
+  let finalSerialNumber = serialNumber && serialNumber.trim() ? serialNumber.trim() : null;
+  
   try {
-    // Handle missing serial number - generate unique one
-    let finalSerialNumber = serialNumber && serialNumber.trim() ? serialNumber.trim() : null;
     
     if (!finalSerialNumber) {
       // Generate unique serial number if missing
@@ -263,10 +264,7 @@ async function createAsset(serialNumber, department, customerId) {
         serialNo: finalSerialNumber,
         status: 'ACTIVE',
         customerId: customerId,
-        location: null, // Not provided in Excel
-        purchaseDate: null,
-        warrantyEnd: null,
-        amcEnd: null
+        location: null // Not provided in Excel
       }
     });
     

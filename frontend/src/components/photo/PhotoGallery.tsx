@@ -17,13 +17,20 @@ import {
 import { cn } from '@/lib/utils';
 import PhotoUploadService from '@/services/photo-upload.service';
 
+// Build server base URL for static assets. If NEXT_PUBLIC_API_URL ends with '/api',
+// strip it so that '/storage/...' can be fetched from the server root.
+const getServerBaseUrl = () => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5003';
+  return raw.replace(/\/(api)\/?$/, '');
+};
+
 interface StoredPhoto {
   id: number;
   filename: string;
-  cloudinaryUrl: string;
-  thumbnailUrl: string;
-  publicId: string;
+  url: string; // Local storage URL
+  path: string; // File system path
   size: number;
+  mimeType: string;
   createdAt: string;
 }
 
@@ -97,7 +104,8 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
   const handleDownload = async (photo: StoredPhoto) => {
     try {
-      const response = await fetch(photo.cloudinaryUrl);
+      const fullUrl = getPhotoUrl(photo);
+      const response = await fetch(fullUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -126,10 +134,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           }
         }
       } else {
-        // Fallback: extract from Cloudinary URL
-        const urlParts = photo.cloudinaryUrl.split('/');
-        const cloudinaryFilename = urlParts[urlParts.length - 1];
-        const cleanFilename = cloudinaryFilename.split('?')[0];
+        // Fallback: extract from local storage URL
+        const urlParts = photo.url.split('/');
+        const localFilename = urlParts[urlParts.length - 1];
+        const cleanFilename = localFilename.split('?')[0];
         
         downloadFilename = cleanFilename.includes('.') 
           ? cleanFilename 
@@ -153,7 +161,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       
       // Fallback: try to open in new tab
       try {
-        window.open(photo.cloudinaryUrl, '_blank');
+        window.open(getPhotoUrl(photo), '_blank');
         toast({
           title: 'Download Failed',
           description: 'Opened photo in new tab instead. You can right-click to save.',
@@ -170,7 +178,17 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   };
 
   const openInNewTab = (photo: StoredPhoto) => {
-    window.open(photo.cloudinaryUrl, '_blank');
+    const fullUrl = photo.url.startsWith('/storage') 
+      ? `${getServerBaseUrl()}${photo.url}` 
+      : photo.url;
+    window.open(fullUrl, '_blank');
+  };
+
+  // Helper to get full URL for local storage photos
+  const getPhotoUrl = (photo: StoredPhoto) => {
+    return photo.url.startsWith('/storage') 
+      ? `${getServerBaseUrl()}${photo.url}` 
+      : photo.url;
   };
 
   if (loading) {
@@ -236,13 +254,13 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               {/* Photo Thumbnail */}
               <div className="relative aspect-video bg-gray-100">
                 <img
-                  src={photo.thumbnailUrl}
+                  src={getPhotoUrl(photo)}
                   alt={`Verification photo ${index + 1}`}
                   className="w-full h-full object-cover cursor-pointer"
                   onClick={() => setSelectedPhoto(photo)}
                   onError={(e) => {
-                    // Fallback to main URL if thumbnail fails
-                    (e.target as HTMLImageElement).src = photo.cloudinaryUrl;
+                    // Show placeholder if image fails to load
+                    console.error('Failed to load image:', getPhotoUrl(photo));
                   }}
                 />
                 
@@ -295,7 +313,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           >
             <div className="relative max-w-4xl max-h-full">
               <img
-                src={selectedPhoto.cloudinaryUrl}
+                src={getPhotoUrl(selectedPhoto)}
                 alt="Full size verification photo"
                 className="max-w-full max-h-full object-contain rounded-lg"
                 onClick={(e) => e.stopPropagation()}

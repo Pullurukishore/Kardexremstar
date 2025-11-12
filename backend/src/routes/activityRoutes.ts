@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { activityController } from '../controllers/activityController';
+import { activityController, getActivityPhotos } from '../controllers/activityController';
 import { authenticate, requireRole } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -30,5 +30,8 @@ router.get('/templates/:activityType', requireRole(['SERVICE_PERSON']), activity
 // Activity Report Routes
 router.post('/:activityId/reports', requireRole(['SERVICE_PERSON']), activityController.uploadActivityReport);
 router.get('/:activityId/reports', requireRole(['SERVICE_PERSON', 'ADMIN', 'ZONE_USER']), activityController.getActivityReports);
+
+// Get photos for an activity
+router.get('/:activityId/photos', requireRole(['SERVICE_PERSON', 'ADMIN', 'ZONE_USER']), getActivityPhotos);
 
 export default router;

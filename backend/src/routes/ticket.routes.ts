@@ -30,7 +30,8 @@ import {
   completeOnsiteVisitAndReturn,
   updatePOReached,
   getOnsiteVisitTracking,
-  updateStatusWithLifecycle
+  updateStatusWithLifecycle,
+  getTicketPhotos
 } from '../controllers/ticket.controller';
 import { authenticate, requireRole } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validate-request';
@@ -467,6 +468,17 @@ router.patch(
   ],
   requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
   updateStatusWithLifecycle
+);
+
+// Get photos for a ticket
+router.get(
+  '/:id/photos',
+  [
+    param('id').isInt().toInt().withMessage('Invalid ticket ID'),
+    validateRequest
+  ],
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  getTicketPhotos
 );
 
 export default router;

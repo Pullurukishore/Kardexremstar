@@ -6,10 +6,10 @@ export interface PhotoUploadResponse {
   photos?: {
     id: number;
     filename: string;
-    cloudinaryUrl: string;
-    thumbnailUrl: string;
-    publicId: string;
+    url: string; // Local storage URL
+    path: string; // File system path
     size: number;
+    mimeType: string;
     createdAt: string;
   }[];
   error?: string;
@@ -17,7 +17,7 @@ export interface PhotoUploadResponse {
 
 export class PhotoUploadService {
   /**
-   * Upload photos to backend (which will store them in Cloudinary)
+   * Upload photos to backend (which will store them in local storage)
    */
   static async uploadPhotos(
     photos: CapturedPhoto[],

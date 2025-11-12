@@ -5,7 +5,7 @@ import { NotificationService } from '../services/notification.service';
 import { TicketNotificationService } from '../services/ticket-notification.service';
 import { activityController } from './activityController';
 import { GeocodingService } from '../services/geocoding.service';
-import { EnhancedPhotoStorageService } from '../services/enhanced-photo-storage.service';
+import { LocalPhotoStorageService } from '../services/local-photo-storage.service';
 import { TicketStatus, Priority, CallType, OnsiteVisitEvent } from '@prisma/client';
 
 // Enum-like object for UserRole values
@@ -810,19 +810,19 @@ export const updateStatus = async (req: Request, res: Response) => {
       }
     }
 
-    // Handle photo data for onsite visit statuses - now store permanently in Cloudinary
+    // Handle photo data for onsite visit statuses - now store permanently in local storage
     let photoInfo = '';
     let storedPhotos: any[] = [];
     
     if (photos && photos.photos && photos.photos.length > 0) {
       try {
-        // Store photos permanently in Cloudinary
-        storedPhotos = await EnhancedPhotoStorageService.storePhotos(
+        // Store photos permanently in local storage
+        storedPhotos = await LocalPhotoStorageService.storePhotos(
           photos.photos,
           {
             ticketId: Number(id),
             userId: user.id,
-            type: 'ticket_verification'
+            type: 'ticket'
           }
         );
 
@@ -832,10 +832,10 @@ export const updateStatus = async (req: Request, res: Response) => {
           ? `${(totalSize / (1024 * 1024)).toFixed(1)}MB`
           : `${Math.round(totalSize / 1024)}KB`;
         
-        photoInfo = `\n\n📸 Photos: ${photoCount} verification photo${photoCount > 1 ? 's' : ''} stored permanently (${formattedSize})\n🕒 Photo Time: ${new Date().toLocaleString()}\n🔗 Cloudinary URLs: ${storedPhotos.map(p => p.cloudinaryUrl).join(', ')}`;
+        photoInfo = `\n\n📸 Photos: ${photoCount} verification photo${photoCount > 1 ? 's' : ''} stored permanently (${formattedSize})\n🕒 Photo Time: ${new Date().toLocaleString()}\n🔗 Local URLs: ${storedPhotos.map(p => p.url).join(', ')}`;
         
         // Log photo storage for audit trail
-        console.log(`Ticket ${id}: ${photoCount} photos stored in Cloudinary for status ${status} by user ${user.id}`);
+        console.log(`Ticket ${id}: ${photoCount} photos stored locally for status ${status} by user ${user.id}`);
         
       } catch (error) {
         console.error(`Failed to store photos for ticket ${id}:`, error);
@@ -2856,5 +2856,34 @@ export const updateStatusWithLifecycle = async (req: Request, res: Response) => 
   } catch (error) {
     console.error('Error updating ticket status:', error);
     return res.status(500).json({ error: 'Failed to update status' });
+  }
+};
+
+// Get photos for a ticket
+export const getTicketPhotos = async (req: TicketRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Ticket ID is required' 
+      });
+    }
+
+    // Get photos from local storage service
+    const photos = await LocalPhotoStorageService.getTicketPhotos(Number(id));
+    
+    return res.json({
+      success: true,
+      photos: photos
+    });
+
+  } catch (error) {
+    console.error('Error fetching ticket photos:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch photos' 
+    });
   }
 };

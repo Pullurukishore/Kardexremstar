@@ -228,6 +228,13 @@ const STAGE_CONFIG = {
   CLEANUP: { label: 'Cleanup', color: 'bg-lime-100 text-lime-800', icon: Activity },
 };
 
+// Build server base URL for static assets. If NEXT_PUBLIC_API_URL ends with '/api',
+// strip it so that '/storage/...' can be fetched from the server root.
+const getServerBaseUrl = () => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5003';
+  return raw.replace(/\/(api)\/?$/, '');
+};
+
 // Helper function to safely get activity config
 const getActivityConfig = (activityType: string) => {
   return ACTIVITY_TYPE_CONFIG[activityType as keyof typeof ACTIVITY_TYPE_CONFIG] || ACTIVITY_TYPE_CONFIG.OTHER;
@@ -972,8 +979,8 @@ export default function AttendanceDetailView({
                                     {stage.notes && (
                                       <div className="mt-1">
                                         {(() => {
-                                          // Check if notes contain Cloudinary URLs
-                                          const urlRegex = /https:\/\/res\.cloudinary\.com\/[^\s,]+/g;
+                                          // Check if notes contain Local Storage URLs
+                                          const urlRegex = /\/storage\/images\/[^\s,]+/g;
                                           const urls = stage.notes.match(urlRegex) || [];
                                           
                                           if (urls.length > 0) {
@@ -1001,13 +1008,23 @@ export default function AttendanceDetailView({
                                                   </div>
                                                   
                                                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                                    {urls.slice(0, 6).map((url: string, photoIndex: number) => (
+                                                    {urls.slice(0, 6).map((url: string, photoIndex: number) => {
+                                                      const fullUrl = `${getServerBaseUrl()}${url}`;
+                                                      console.log('🖼️ Loading image:', fullUrl);
+                                                      return (
                                                       <div key={`note-photo-${photoIndex}`} className="group relative">
                                                         <div className="aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
                                                           <img
-                                                            src={url}
+                                                            src={fullUrl}
                                                             alt={`Verification photo ${photoIndex + 1}`}
                                                             className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                                            onError={(e) => {
+                                                              console.error('❌ Failed to load image:', fullUrl);
+                                                              console.error('Image error event:', e);
+                                                            }}
+                                                            onLoad={() => {
+                                                              console.log('✅ Image loaded successfully:', fullUrl);
+                                                            }}
                                                           />
                                                         </div>
                                                         
@@ -1018,7 +1035,7 @@ export default function AttendanceDetailView({
                                                               size="sm"
                                                               variant="secondary"
                                                               className="h-8 w-8 p-0 bg-white/90 hover:bg-white"
-                                                              onClick={() => window.open(url, '_blank')}
+                                                              onClick={() => window.open(`${getServerBaseUrl()}${url}`, '_blank')}
                                                             >
                                                               <ExternalLink className="h-3 w-3" />
                                                             </Button>
@@ -1028,7 +1045,7 @@ export default function AttendanceDetailView({
                                                               className="h-8 w-8 p-0 bg-white/90 hover:bg-white"
                                                               onClick={async () => {
                                                                 try {
-                                                                  const response = await fetch(url);
+                                                                  const response = await fetch(`${getServerBaseUrl()}${url}`);
                                                                   const blob = await response.blob();
                                                                   const downloadUrl = window.URL.createObjectURL(blob);
                                                                   const link = document.createElement('a');
@@ -1041,7 +1058,7 @@ export default function AttendanceDetailView({
                                                                 } catch (error) {
                                                                   console.error('Download failed:', error);
                                                                   // Fallback to direct link
-                                                                  window.open(url, '_blank');
+                                                                  window.open(`${getServerBaseUrl()}${url}`, '_blank');
                                                                 }
                                                               }}
                                                             >
@@ -1061,7 +1078,8 @@ export default function AttendanceDetailView({
                                                           </div>
                                                         </div>
                                                       </div>
-                                                    ))}
+                                                      );
+                                                    })}
                                                   </div>
                                                   
                                                   {urls.length > 6 && (

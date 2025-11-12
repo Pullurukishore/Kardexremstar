@@ -450,8 +450,8 @@ export function StatusChangeDialog({
   // Check if status requires photo capture (when reaching onsite)
   const requiresPhoto = (status: TicketStatusType): boolean => {
     const photoRequiredStatuses: TicketStatusType[] = [
-      TicketStatus.ONSITE_VISIT_REACHED,
-      TicketStatus.ONSITE_VISIT_IN_PROGRESS
+      TicketStatus.ONSITE_VISIT_REACHED
+      // ONSITE_VISIT_IN_PROGRESS removed - photos not required
     ];
     return photoRequiredStatuses.includes(status);
   };
