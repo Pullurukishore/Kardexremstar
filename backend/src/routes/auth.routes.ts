@@ -10,6 +10,11 @@ import {
   forgotPassword,
   resetPassword
 } from '../controllers/auth.controller';
+import { 
+  validatePin, 
+  checkPinStatus, 
+  generateNewPin 
+} from '../controllers/pinAuthController';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 // Type guard for UserRole
@@ -125,6 +130,34 @@ router.post(
   ]),
   (req: Request, res: Response, next: NextFunction) => {
     return resetPassword(req, res).catch(next);
+  }
+);
+
+// PIN Authentication routes
+router.post('/validate-pin', (req: Request, res: Response, next: NextFunction) => {
+  console.log('🚀 Auth Route - /validate-pin hit!');
+  return validatePin(req, res).catch(next);
+});
+
+router.get('/pin-status', (req: Request, res: Response, next: NextFunction) => {
+  // Removed debug log to reduce spam
+  return checkPinStatus(req, res);
+});
+
+// Admin only - generate new PIN
+router.post(
+  '/generate-pin',
+  authenticate,
+  validateRequest([
+    body('newPin').isLength({ min: 6, max: 6 }).isNumeric()
+  ]),
+  (req: Request, res: Response, next: NextFunction) => {
+    const authReq = req as unknown as AuthenticatedRequest;
+    // Check if user is admin
+    if (authReq.user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    return generateNewPin(req, res).catch(next);
   }
 );
 

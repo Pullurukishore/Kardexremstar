@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import AuthProvider from "@/contexts/AuthContext";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { NavigationProvider } from "@/providers/NavigationProvider";
+import PinGuard from "@/components/PinGuard";
 import "./globals.css";
 
 // Dynamically import ErrorBoundary with no SSR
@@ -62,7 +63,9 @@ export default function RootLayout({
           <AuthProvider>
             <QueryProvider>
               <NavigationProvider>
-                {children}
+                <PinGuard>
+                  {children}
+                </PinGuard>
                 <Toaster position="top-center" richColors closeButton />
               </NavigationProvider>
             </QueryProvider>

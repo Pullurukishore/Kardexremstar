@@ -363,7 +363,8 @@ function AuthProvider({ children }: { children: ReactNode }) {
         }
         
         // If we already have a valid user with the same role as the cookie, don't re-fetch
-        if (user && user.email && user.role === role && token) {
+        // This prevents unnecessary API calls and reduces the chance of token conflicts
+        if (user && user.email && user.role === role && token && !pathname.startsWith('/auth/')) {
           console.log('CheckAuth - User already valid, skipping re-fetch:', user.email, user.name, user.role);
           setAccessToken(token as string);
           setIsLoading(false);
@@ -414,11 +415,16 @@ function AuthProvider({ children }: { children: ReactNode }) {
           }
         } catch (err) {
           console.error('CheckAuth - Failed to load user:', err);
-          // Only clear auth state if the error indicates invalid credentials
+          // Handle errors more gracefully for concurrent sessions
           if (err && typeof err === 'object' && 'response' in err) {
             const response = (err as any).response;
-            if (response?.status === 401 || response?.status === 403) {
-              console.log('CheckAuth - Invalid credentials, clearing auth state');
+            // Only clear auth state for definitive authentication failures
+            // Don't clear for network errors or temporary server issues
+            if (response?.status === 401 && response?.data?.code === 'TOKEN_MISMATCH') {
+              console.log('CheckAuth - Token mismatch (concurrent session), clearing auth state');
+              await clearAuthState();
+            } else if (response?.status === 403) {
+              console.log('CheckAuth - Account deactivated, clearing auth state');
               await clearAuthState();
             } else {
               // For network errors, try to use cached user
@@ -753,15 +759,15 @@ function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
-      // Clear all auth-related cookies with all possible options to ensure they're removed
+      // Clear all auth-related cookies with all possible options to ensure they're removed (but preserve PIN session)
       const clearAllCookies = () => {
         const cookies = document.cookie.split(';');
         const domain = window.location.hostname;
         
-        // Clear cookies with domain
+        // Clear cookies with domain (but skip PIN session)
         cookies.forEach(cookie => {
           const [name] = cookie.split('=').map(c => c.trim());
-          if (name) {
+          if (name && name !== 'pinSession') {
             document.cookie = `${name}=; path=/; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
             document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
           }
@@ -777,7 +783,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
           `.${window.location.hostname.split('.').slice(-2).join('.')}`
         ];
 
-        // Ensure we clear all variations of the cookies
+        // Ensure we clear all variations of the cookies (but preserve PIN session)
         ['accessToken', 'refreshToken', 'token', 'userRole', 'auth_token', 'refresh_token'].forEach(cookieName => {
           // Clear with all possible domain variations
           domains.forEach(domain => {
@@ -804,12 +810,14 @@ function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error clearing cookies:', e);
       }
 
-      // Clear local storage and session storage
+      // Clear local storage and session storage (but preserve PIN session)
       if (typeof window !== 'undefined') {
-        // Preserve "Remember Me" credentials before clearing
+        // Preserve important data before clearing
         const rememberedEmail = localStorage.getItem('rememberedEmail');
         const rememberedPassword = localStorage.getItem('rememberedPassword');
         const wasRemembered = localStorage.getItem('wasRemembered');
+        const pinAccessSession = localStorage.getItem('pinAccessSession');
+        const pinLockoutInfo = localStorage.getItem('pinLockoutInfo');
         
         // Clear all storage
         localStorage.clear();
@@ -822,6 +830,17 @@ function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('wasRemembered', wasRemembered);
           console.log('AuthContext: Preserved Remember Me credentials during logout');
         }
+        
+        // Restore PIN session data for convenience
+        if (pinAccessSession) {
+          localStorage.setItem('pinAccessSession', pinAccessSession);
+          console.log('AuthContext: Preserved PIN session during logout');
+        }
+        
+        if (pinLockoutInfo) {
+          localStorage.setItem('pinLockoutInfo', pinLockoutInfo);
+          console.log('AuthContext: Preserved PIN lockout info during logout');
+        }
       }
 
       // Reset state
@@ -829,7 +848,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(null);
       setError(null);
 
-      // Redirect to login
+      // Redirect to login (PIN session remains active for convenience)
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/login';
       }

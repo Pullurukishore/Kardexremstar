@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
+import { toast } from 'sonner';
 
 // Cookie helper function
 const getCookie = (name: string): string | null => {
@@ -41,7 +42,6 @@ const removeToken = (): void => {
     localStorage.removeItem('refreshToken');
   }
 };
-import { toast } from 'sonner';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -75,6 +75,7 @@ class ApiClient {
   private client: AxiosInstance;
   private isRefreshing = false;
   private refreshSubscribers: ((token: string) => void)[] = [];
+  private pinSessionId: string | null = null;
 
   private constructor() {
     this.client = axios.create({
@@ -95,6 +96,16 @@ class ApiClient {
     return ApiClient.instance;
   }
 
+  // Method to set PIN session manually (for fallbacks)
+  public setPinSession(sessionId: string): void {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Setting manual PIN session ID:', sessionId);
+    }
+    this.pinSessionId = sessionId;
+    // Note: Backend now controls expiration in the main PIN validation response
+    // This manual session storage is just for fallback cases
+  }
+
   private setupInterceptors(): void {
     // Request interceptor
     this.client.interceptors.request.use(
@@ -102,8 +113,26 @@ class ApiClient {
         const token = getToken();
         if (token) {
           config.headers['Authorization'] = `Bearer ${token}`;
+        } else if (this.pinSessionId) {
+          // Add PIN session to Authorization header as fallback when cookies fail
+          config.headers['Authorization'] = `PinSession ${this.pinSessionId}`;
         } else {
-          console.warn('No access token found in local storage');
+          // Try to get PIN session from localStorage if not set in memory
+          try {
+            if (typeof window !== 'undefined') {
+              const pinSessionData = localStorage.getItem('pinAccessSession');
+              if (pinSessionData) {
+                const parsedData = JSON.parse(pinSessionData);
+                if (parsedData.sessionId && new Date(parsedData.expiresAt) > new Date()) {
+                  config.headers['Authorization'] = `PinSession ${parsedData.sessionId}`;
+                  this.pinSessionId = parsedData.sessionId;
+                  console.log('Using PIN session from localStorage:', parsedData.sessionId);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error retrieving PIN session from localStorage:', error);
+          }
         }
         return config;
       },
@@ -119,8 +148,12 @@ class ApiClient {
       async (error: AxiosError<ApiError>) => {
         const originalRequest = error.config as any;
         
-        // If error is not 401 or it's a refresh token request, reject
-        if (error.response?.status !== 401 || originalRequest._retry) {
+        // Skip token refresh logic for PIN validation and other requests that want to handle errors themselves
+        const shouldSkipTokenRefresh = originalRequest.headers?.['X-Skip-Global-Error-Handler'] || 
+                                     originalRequest.url?.includes('/auth/validate-pin');
+        
+        // If error is not 401 or it's a refresh token request, or should skip token refresh, reject
+        if (error.response?.status !== 401 || originalRequest._retry || shouldSkipTokenRefresh) {
           // Check if request wants to skip global error handling
           if (!originalRequest.headers?.['X-Skip-Global-Error-Handler']) {
             this.handleError(error);

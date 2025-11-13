@@ -105,7 +105,7 @@ const nextConfig = {
   },
   // Add environment variables
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5003',
   },
   
   // Output configuration for different deployment targets

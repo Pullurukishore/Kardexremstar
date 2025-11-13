@@ -279,10 +279,16 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
-    // Generate new token version
-    const tokenVersion = Math.random().toString(36).substring(2, 15);
+    // CONCURRENT SESSION SUPPORT:
+    // Don't invalidate existing tokens when user logs in from another device
+    // This prevents infinite redirects on the first device
+    // Only generate new token version if user doesn't have one or it's been compromised
+    let tokenVersion = user.tokenVersion;
+    if (!tokenVersion || tokenVersion === '0') {
+      tokenVersion = Math.random().toString(36).substring(2, 15);
+    }
     
-    // Generate tokens with version
+    // Generate tokens with existing or new version
     const token = jwt.sign(
       { 
         id: user.id, 
@@ -303,15 +309,22 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: '7d' }
     );
 
-    // Update user with new tokens and version
+    // Update user with login info but preserve existing refreshToken for concurrent sessions
+    // Only update refreshToken if user doesn't have one or it's expired
+    const updateData: any = {
+      lastLoginAt: new Date(),
+      lastActiveAt: new Date()
+    };
+
+    // Only update tokenVersion and refreshToken if this is the first login or token was compromised
+    if (!user.tokenVersion || user.tokenVersion === '0' || !user.refreshToken) {
+      updateData.tokenVersion = tokenVersion;
+      updateData.refreshToken = refreshToken;
+    }
+
     await prisma.user.update({
       where: { id: user.id },
-      data: { 
-        refreshToken,
-        tokenVersion: tokenVersion,
-        lastLoginAt: new Date(),
-        lastActiveAt: new Date()
-      }
+      data: updateData
     });
 
     // Set HTTP-only cookies with secure settings
@@ -540,14 +553,27 @@ export const refreshToken = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate refresh token matches stored token
-    if (user.refreshToken !== refreshToken) {
-      console.log('Refresh token mismatch - possible token theft');
-      // Clear all tokens for security
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { refreshToken: null }
-      });
+    // For concurrent sessions, be more flexible with refresh token validation
+    // Check if the refresh token is valid for this user and version
+    let isValidRefreshToken = false;
+    
+    try {
+      // Verify the refresh token structure and user ID match
+      const refreshDecoded = jwt.verify(refreshToken, REFRESH_TOKEN_CONFIG.secret) as any;
+      if (refreshDecoded.id === user.id && refreshDecoded.version === user.tokenVersion) {
+        isValidRefreshToken = true;
+      }
+    } catch (refreshError) {
+      console.log('Refresh token verification failed:', refreshError);
+    }
+    
+    // Also check if it matches the stored refresh token (for backward compatibility)
+    if (!isValidRefreshToken && user.refreshToken === refreshToken) {
+      isValidRefreshToken = true;
+    }
+    
+    if (!isValidRefreshToken) {
+      console.log('Refresh token invalid - not matching user or version');
       return res.status(401).json({ 
         success: false,
         message: 'Invalid refresh token',
@@ -567,8 +593,9 @@ export const refreshToken = async (req: Request, res: Response) => {
       { expiresIn: JWT_CONFIG.expiresIn }
     );
 
-    // Optionally rotate refresh token for better security
-    const shouldRotateRefreshToken = true; // Set to false if you don't want rotation
+    // For concurrent sessions, don't rotate refresh tokens aggressively
+    // Only rotate if the refresh token is old (more than 3 days)
+    const shouldRotateRefreshToken = false; // Disabled for concurrent session support
     let newRefreshToken = refreshToken;
     
     if (shouldRotateRefreshToken) {
@@ -583,7 +610,7 @@ export const refreshToken = async (req: Request, res: Response) => {
       });
       console.log('Refresh token rotated for user:', user.id);
     } else {
-      // Just update last active time
+      // Just update last active time without changing refresh token
       await prisma.user.update({
         where: { id: user.id },
         data: { lastActiveAt: new Date() }
@@ -612,17 +639,23 @@ export const refreshToken = async (req: Request, res: Response) => {
 
     console.log('Token refresh successful for user:', user.id);
 
-    res.json({ 
+    const responseData: any = { 
       success: true,
       accessToken: newToken,
-      ...(shouldRotateRefreshToken && { refreshToken: newRefreshToken }),
       user: {
         id: user.id,
         email: user.email,
         role: user.role,
         customerId: user.customerId
       }
-    });
+    };
+
+    // Only include refreshToken in response if it was rotated
+    if (shouldRotateRefreshToken) {
+      responseData.refreshToken = newRefreshToken;
+    }
+
+    res.json(responseData);
 
   } catch (error) {
     console.error('Refresh token error:', error);

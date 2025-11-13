@@ -387,6 +387,12 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
                         <span>Manage External Users</span>
                       </a>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <a href="/admin/pin-management" className="flex w-full items-center px-3 py-2 rounded-lg text-slate-600 hover:text-slate-800 hover:bg-blue-50 transition-all duration-200 group">
+                        <svg className="mr-3 h-4 w-4 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 7a2 2 0 1 0-4 0v2a2 2 0 1 0 4 0V7z"/><path d="M12 15v2"/><circle cx="12" cy="12" r="10"/></svg>
+                        <span>Pin Management</span>
+                      </a>
+                    </DropdownMenuItem>
                   </div>
                   <DropdownMenuSeparator className="bg-slate-200/60" />
                 </>

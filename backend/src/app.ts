@@ -33,6 +33,7 @@ import notificationRoutes from './routes/notification.routes';
 import geocodingRoutes from './routes/geocoding.routes';
 import photoRoutes from './routes/photo.routes';
 import { storageConfig, initializeStorage } from './config/storage.config';
+import { pinAuthMiddleware } from './middleware/pinAuth';
 
 const app = express();
 const server = http.createServer(app);
@@ -122,6 +123,7 @@ const corsOptions: cors.CorsOptions = {
     'Origin',
     'X-Access-Token',
     'X-Refresh-Token',
+    'X-Skip-Global-Error-Handler',
   ],
   exposedHeaders: [
     'Content-Range',
@@ -168,6 +170,10 @@ if (parentStoragePath !== storagePath) {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+
+// Apply PIN authentication middleware to all routes except auth
+app.use(pinAuthMiddleware);
+
 app.use('/api/customers', customerRoutes);
 app.use('/api/contacts', contactAdminRoutes);
 app.use('/api/assets', assetRoutes);

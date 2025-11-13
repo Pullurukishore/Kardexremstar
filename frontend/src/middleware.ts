@@ -43,8 +43,17 @@ export async function middleware(request: NextRequest) {
       console.log('Could not read request body');
     }
 
-    // Block access to API routes if not authenticated
-    if (!authToken || !refreshToken) {
+    // Skip authentication check for PIN auth endpoints
+    const pinAuthEndpoints = [
+      '/api/auth/validate-pin',
+      '/api/auth/pin-status',
+      '/api/auth/generate-pin'
+    ];
+    
+    const isPinAuthEndpoint = pinAuthEndpoints.some(endpoint => pathname === endpoint);
+
+    // Block access to API routes if not authenticated (except PIN auth endpoints)
+    if (!isPinAuthEndpoint && (!authToken || !refreshToken)) {
       console.log('Unauthenticated API access attempt');
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -52,8 +61,8 @@ export async function middleware(request: NextRequest) {
       );
     }
 
-    // Check if user has access to the API route
-    if (!isRouteAccessible(pathname, userRole)) {
+    // Check if user has access to the API route (skip for PIN auth endpoints)
+    if (!isPinAuthEndpoint && !isRouteAccessible(pathname, userRole)) {
       console.log('Unauthorized API access attempt');
       return NextResponse.json(
         { error: 'You do not have permission to access this resource' },

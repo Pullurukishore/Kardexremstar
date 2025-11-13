@@ -27,7 +27,6 @@ export const AUTH_CONFIG = {
   // API endpoints
   ENDPOINTS: {
     LOGIN: '/auth/login',
-    REGISTER: '/auth/register',
     LOGOUT: '/auth/logout',
     REFRESH: '/auth/refresh-token',
     PROFILE: '/auth/me',
@@ -94,7 +93,6 @@ export type TicketPriority = keyof typeof TICKET_PRIORITY;
 export const ROUTES = {
   HOME: '/',
   LOGIN: '/auth/login',
-  REGISTER: '/auth/register',
   FORGOT_PASSWORD: '/auth/forgot-password',
   RESET_PASSWORD: '/auth/reset-password',
   DASHBOARD: '/dashboard',

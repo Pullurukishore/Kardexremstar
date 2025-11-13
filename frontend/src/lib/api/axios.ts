@@ -32,7 +32,6 @@ api.interceptors.request.use(
   async (config) => {
     // Skip token refresh for auth endpoints
     if (config.url?.includes('/auth/login') || 
-        config.url?.includes('/auth/register') ||
         config.url?.includes('/auth/refresh-token')) {
       return config;
     }
@@ -149,7 +148,6 @@ api.interceptors.response.use(
     
     // Don't intercept if the request is for login or refresh-token endpoints
     if (originalRequest.url?.includes('/auth/login') || 
-        originalRequest.url?.includes('/auth/register') ||
         originalRequest.url?.includes('/auth/refresh-token')) {
       return Promise.reject(error);
     }

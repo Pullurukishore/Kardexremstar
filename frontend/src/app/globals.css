@@ -271,6 +271,19 @@
     @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
   }
   
+  /* PIN Access Page Animations */
+  @keyframes float {
+    0% { transform: translateY(0) translateX(0) rotate(0); opacity: 0.7; }
+    25% { transform: translateY(-15px) translateX(10px) rotate(5deg); opacity: 0.8; }
+    50% { transform: translateY(-25px) translateX(-10px) rotate(-5deg); opacity: 0.9; }
+    75% { transform: translateY(-15px) translateX(-15px) rotate(3deg); opacity: 0.8; }
+    100% { transform: translateY(0) translateX(0) rotate(0); opacity: 0.7; }
+  }
+  
+  .animate-float {
+    animation: float 15s ease-in-out infinite;
+  }
+  
   /* Hide scrollbars on mobile while keeping functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
