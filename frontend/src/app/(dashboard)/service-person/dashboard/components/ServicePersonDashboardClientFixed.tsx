@@ -263,30 +263,32 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 flex items-center justify-center px-4 relative overflow-hidden">
-        {/* Animated background */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-500"></div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center px-4 relative overflow-hidden">
+        {/* Modern Background */}
+        <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.05),_transparent_50%)] pointer-events-none"></div>
+        <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(168,85,247,0.05),_transparent_50%)] pointer-events-none"></div>
+        
+        {/* Floating Orbs */}
+        <div className="fixed top-20 left-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl animate-pulse pointer-events-none"></div>
+        <div className="fixed bottom-20 right-10 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl animate-pulse delay-1000 pointer-events-none"></div>
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-400/5 rounded-full blur-3xl animate-pulse delay-500 pointer-events-none"></div>
         
         <div className="text-center relative z-10">
           <div className="relative mb-8">
-            <div className="animate-spin rounded-full h-24 w-24 border-4 border-transparent border-t-blue-400 border-r-purple-400 mx-auto"></div>
-            <div className="absolute inset-2 animate-spin rounded-full h-20 w-20 border-4 border-transparent border-b-blue-300 border-l-purple-300 animate-reverse"></div>
-            <div className="absolute inset-4 animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-blue-200 border-r-purple-200"></div>
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-blue-500 border-r-purple-500 mx-auto shadow-lg"></div>
+            <div className="absolute inset-2 animate-spin rounded-full h-16 w-16 border-4 border-transparent border-b-blue-400 border-l-purple-400 animate-reverse"></div>
+            <div className="absolute inset-4 animate-spin rounded-full h-12 w-12 border-4 border-transparent border-t-blue-300 border-r-purple-300"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-4xl">⚡</div>
+              <div className="text-3xl">🛠️</div>
             </div>
           </div>
-          <div className="space-y-3">
-            <h2 className="text-2xl font-bold text-white">Loading Dashboard</h2>
-            <p className="text-blue-200 animate-pulse">Preparing your premium workspace...</p>
-            <div className="flex items-center justify-center space-x-2 mt-4">
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce delay-100"></div>
-              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-200"></div>
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900">Loading Service Dashboard</h2>
+            <p className="text-gray-600 animate-pulse font-medium">Preparing your workspace...</p>
+            <div className="flex items-center justify-center space-x-2 mt-6">
+              <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce shadow-sm"></div>
+              <div className="w-2.5 h-2.5 bg-purple-500 rounded-full animate-bounce delay-100 shadow-sm"></div>
+              <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce delay-200 shadow-sm"></div>
             </div>
           </div>
         </div>
@@ -295,84 +297,110 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 pb-safe overflow-x-hidden w-full max-w-full relative">
-      {/* Subtle Background Pattern */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),rgba(255,255,255,0))]"></div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 pb-safe overflow-x-hidden w-full max-w-full relative">
+      {/* Modern Background Pattern */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.05),_transparent_50%)] pointer-events-none"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(168,85,247,0.05),_transparent_50%)] pointer-events-none"></div>
       
-      {/* Mobile-First Header with Premium Glassmorphism */}
-      <div className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white px-3 py-4 sm:px-6 sm:py-8 shadow-2xl pt-safe sticky top-0 z-50 w-full box-border backdrop-blur-lg">
+      {/* Floating Orbs for Depth */}
+      <div className="fixed top-20 left-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl animate-pulse pointer-events-none"></div>
+      <div className="fixed bottom-20 right-10 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl animate-pulse delay-1000 pointer-events-none"></div>
+      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-400/5 rounded-full blur-3xl animate-pulse delay-500 pointer-events-none"></div>
+      
+      {/* Modern Header with Glassmorphism */}
+      <div className="relative bg-white/80 backdrop-blur-xl border-b border-gray-200/50 text-gray-800 px-4 py-4 sm:px-6 sm:py-6 shadow-lg sticky top-0 z-50 w-full box-border">
         {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5"></div>
         
         <div className="max-w-7xl mx-auto w-full relative">
-          <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 w-full">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 w-full">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-1 h-8 bg-gradient-to-b from-yellow-400 to-orange-400 rounded-full"></div>
-                <h1 className="text-xl sm:text-3xl font-black truncate bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-100">
-                  Service Dashboard
-                </h1>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full shadow-lg shadow-blue-500/30"></div>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                    <span className="text-white text-lg font-bold">🛠️</span>
+                  </div>
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+                      Service Dashboard
+                    </h1>
+                    <p className="text-sm text-gray-500 font-medium">
+                      Field Operations Center
+                    </p>
+                  </div>
+                </div>
               </div>
-              <p className="text-blue-100 text-sm sm:text-base font-medium truncate">
-                👋 Welcome back, <span className="font-bold text-white">{user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'Service Person'}</span>!
-              </p>
-              {/* Premium Attendance Status Badge */}
-              {attendanceStatus && (
-                <div className="mt-2.5 inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
-                  {(() => {
-                    return attendanceStatus.isCheckedIn ? (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <p className="text-gray-600 font-medium">
+                  👋 Welcome back, <span className="font-bold text-gray-900">{user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'Service Person'}</span>
+                </p>
+                {/* Modern Attendance Status Badge */}
+                {attendanceStatus && (
+                  <div className={`inline-flex items-center space-x-2 px-3 py-2 rounded-full border transition-all duration-300 ${
+                    attendanceStatus.isCheckedIn 
+                      ? 'bg-green-50 border-green-200 text-green-700 shadow-sm shadow-green-500/20' 
+                      : 'bg-gray-100 border-gray-200 text-gray-600'
+                  }`}>
+                    {attendanceStatus.isCheckedIn ? (
                       <>
-                        <div className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse flex-shrink-0 shadow-lg shadow-green-400/50"></div>
-                        <span className="text-xs sm:text-sm text-white font-semibold truncate">
-                          🟢 Checked In • {attendanceStatus.attendance?.checkInAt ? 
+                        <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50"></div>
+                        <span className="text-sm font-semibold">
+                          🟢 Active • {attendanceStatus.attendance?.checkInAt ? 
                             new Date(attendanceStatus.attendance.checkInAt).toLocaleTimeString('en-US', {
                               hour: '2-digit',
                               minute: '2-digit',
                               hour12: true
-                            }) : 'Active'
+                            }) : 'Working'
                           }
                         </span>
                       </>
                     ) : (
                       <>
-                        <div className="w-2.5 h-2.5 bg-gray-400 rounded-full flex-shrink-0"></div>
-                        <span className="text-xs sm:text-sm text-gray-200 font-medium truncate">⚪ Not Checked In</span>
+                        <div className="w-2.5 h-2.5 bg-gray-400 rounded-full"></div>
+                        <span className="text-sm font-medium">⚪ Off Duty</span>
                       </>
-                    );
-                  })()}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="text-left sm:text-right flex-shrink-0 min-w-0">
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-2 rounded-lg border border-white/20">
-                <span className="text-2xl">📅</span>
-                <div>
-                  <p className="text-sm sm:text-base text-white font-bold whitespace-nowrap">
-                    {new Date().toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </p>
-                  <p className="text-xs text-blue-200 font-medium">
-                    {new Date().toLocaleDateString('en-US', { weekday: 'long' })}
-                  </p>
+            <div className="flex flex-col items-end gap-3 flex-shrink-0 min-w-0">
+              {/* Modern Date Card */}
+              <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+                    <span className="text-white text-lg">📅</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">
+                      {new Date().toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    <p className="text-xs text-gray-500 font-medium">
+                      {new Date().toLocaleDateString('en-US', { weekday: 'long' })}
+                    </p>
+                  </div>
                 </div>
               </div>
-              {/* Premium Location Badge */}
+              {/* Modern Location Badge */}
               {attendanceStatus?.attendance && (
-                <div className="mt-2 inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-white/20 max-w-[180px] sm:max-w-xs" 
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-2.5 max-w-[200px]" 
                      title={attendanceStatus.isCheckedIn 
                        ? (attendanceStatus.attendance.checkInAddress || 'Location not available')
                        : (attendanceStatus.attendance.checkOutAddress || attendanceStatus.attendance.checkInAddress || 'Location not available')}>
-                  <span className="text-base flex-shrink-0">📍</span>
-                  <p className="text-xs text-white font-medium truncate">
-                    {attendanceStatus.isCheckedIn 
-                      ? (attendanceStatus.attendance.checkInAddress || 'Location not available')
-                      : (attendanceStatus.attendance.checkOutAddress || attendanceStatus.attendance.checkInAddress || 'Location not available')
-                    }
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-500 text-sm">📍</span>
+                    <p className="text-xs text-gray-600 font-medium truncate">
+                      {attendanceStatus.isCheckedIn 
+                        ? (attendanceStatus.attendance.checkInAddress || 'Location not available')
+                        : (attendanceStatus.attendance.checkOutAddress || attendanceStatus.attendance.checkInAddress || 'Location not available')
+                      }
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -380,66 +408,77 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
         </div>
       </div>
 
-      {/* Premium Glassmorphism Stats Cards */}
-      <div className="max-w-7xl mx-auto px-3 mt-6 mb-6 sm:px-6 sm:mt-8 sm:mb-10 w-full box-border relative z-10">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 w-full box-border">
+      {/* Modern Stats Cards */}
+      <div className="max-w-7xl mx-auto px-4 mt-8 mb-8 sm:px-6 w-full box-border relative z-10">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 w-full">
           {/* Active Activities Card */}
-          <div className="group relative bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 rounded-2xl shadow-2xl p-4 sm:p-6 overflow-hidden touch-manipulation hover:scale-105 active:scale-95 transition-all duration-300">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="relative flex items-center gap-3 sm:gap-4">
-              <div className="flex-shrink-0 bg-white/20 backdrop-blur-md p-3 sm:p-4 rounded-xl border border-white/30 shadow-lg">
-                <div className="text-3xl sm:text-4xl">🔄</div>
+          <div className="group relative bg-white rounded-2xl shadow-lg border border-gray-200/50 p-6 overflow-hidden hover:shadow-2xl hover:border-blue-300/50 transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-400/10 to-teal-400/10 rounded-full blur-2xl"></div>
+            <div className="relative">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-3 rounded-xl shadow-lg">
+                  <span className="text-white text-2xl">🔄</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Active Tasks</p>
+                  <p className="text-3xl font-bold text-gray-900">{dashboardStats.activeActivities}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-bold text-white/90 mb-1 uppercase tracking-wide">Active Activities</p>
-                <p className="text-3xl sm:text-4xl font-black text-white drop-shadow-lg">{dashboardStats.activeActivities}</p>
-                <p className="text-xs text-white/70 mt-1 font-medium">In Progress</p>
+              <div className="flex items-center gap-2 text-emerald-600">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium">In Progress</span>
               </div>
             </div>
           </div>
           
           {/* Assigned Tickets Card */}
-          <div className="group relative bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-600 rounded-2xl shadow-2xl p-4 sm:p-6 overflow-hidden touch-manipulation hover:scale-105 active:scale-95 transition-all duration-300">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="relative flex items-center gap-3 sm:gap-4">
-              <div className="flex-shrink-0 bg-white/20 backdrop-blur-md p-3 sm:p-4 rounded-xl border border-white/30 shadow-lg">
-                <div className="text-3xl sm:text-4xl">🎫</div>
+          <div className="group relative bg-white rounded-2xl shadow-lg border border-gray-200/50 p-6 overflow-hidden hover:shadow-2xl hover:border-amber-300/50 transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-orange-400/10 to-amber-400/10 rounded-full blur-2xl"></div>
+            <div className="relative">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="bg-gradient-to-br from-orange-500 to-amber-600 p-3 rounded-xl shadow-lg">
+                  <span className="text-white text-2xl">🎫</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Assigned</p>
+                  <p className="text-3xl font-bold text-gray-900">{dashboardStats.assignedTickets}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-bold text-white/90 mb-1 uppercase tracking-wide">Assigned Tickets</p>
-                <p className="text-3xl sm:text-4xl font-black text-white drop-shadow-lg">{dashboardStats.assignedTickets}</p>
-                <p className="text-xs text-white/70 mt-1 font-medium">Pending Work</p>
+              <div className="flex items-center gap-2 text-amber-600">
+                <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                <span className="text-sm font-medium">Pending Work</span>
               </div>
             </div>
           </div>
           
           {/* Completed Today Card */}
-          <div className="group relative bg-gradient-to-br from-purple-500 via-violet-500 to-indigo-600 rounded-2xl shadow-2xl p-4 sm:p-6 overflow-hidden touch-manipulation hover:scale-105 active:scale-95 transition-all duration-300">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="relative flex items-center gap-3 sm:gap-4">
-              <div className="flex-shrink-0 bg-white/20 backdrop-blur-md p-3 sm:p-4 rounded-xl border border-white/30 shadow-lg">
-                <div className="text-3xl sm:text-4xl">✅</div>
+          <div className="group relative bg-white rounded-2xl shadow-lg border border-gray-200/50 p-6 overflow-hidden hover:shadow-2xl hover:border-purple-300/50 transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-400/10 to-violet-400/10 rounded-full blur-2xl"></div>
+            <div className="relative">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="bg-gradient-to-br from-purple-500 to-violet-600 p-3 rounded-xl shadow-lg">
+                  <span className="text-white text-2xl">✅</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Completed</p>
+                  <p className="text-3xl font-bold text-gray-900">{dashboardStats.completedToday}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-bold text-white/90 mb-1 uppercase tracking-wide">Completed Today</p>
-                <p className="text-3xl sm:text-4xl font-black text-white drop-shadow-lg">{dashboardStats.completedToday}</p>
-                <p className="text-xs text-white/70 mt-1 font-medium">Tasks Done</p>
+              <div className="flex items-center gap-2 text-purple-600">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span className="text-sm font-medium">Today's Tasks</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Premium Main Content */}
-      <div className="max-w-7xl mx-auto px-3 pb-8 sm:px-6 sm:pb-16 w-full box-border relative z-10">
-        {/* Unified Dashboard */}
-        <div className="space-y-5 sm:space-y-8 w-full box-border">
-          {/* Premium Attendance Widget */}
-          <div className="group bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden hover:shadow-3xl transition-all duration-300" data-section="attendance">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      {/* Modern Main Content */}
+      <div className="max-w-7xl mx-auto px-4 pb-12 sm:px-6 w-full box-border relative z-10">
+        <div className="space-y-6 sm:space-y-8 w-full">
+          {/* Modern Attendance Widget */}
+          <div className="group bg-white rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden hover:shadow-2xl transition-all duration-300" data-section="attendance">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
             <div className="relative">
               <CleanAttendanceWidget 
                 onStatusChange={handleAttendanceChange}
@@ -448,17 +487,17 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
             </div>
           </div>
 
-          {/* Premium Activity Status Manager */}
-          <div className="group relative bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border-l-4 border-l-blue-500" data-section="activities">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative p-4 sm:p-8">
-              <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                <div className="flex-shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-xl shadow-lg">
-                  <div className="text-2xl sm:text-3xl">🔄</div>
+          {/* Modern Activity Status Manager */}
+          <div className="group relative bg-white rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden hover:shadow-2xl transition-all duration-300" data-section="activities">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            <div className="relative p-6 sm:p-8">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-xl shadow-lg">
+                  <span className="text-white text-2xl">🔄</span>
                 </div>
                 <div>
-                  <h3 className="text-lg sm:text-2xl font-black text-gray-900 bg-clip-text">Active Activities</h3>
-                  <p className="text-xs sm:text-sm text-gray-500 font-medium">Manage your ongoing tasks</p>
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">Active Activities</h3>
+                  <p className="text-sm text-gray-500 font-medium">Manage your ongoing tasks</p>
                 </div>
               </div>
               <ActivityStatusManager 
@@ -468,17 +507,17 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
             </div>
           </div>
 
-          {/* Premium Create New Activity */}
-          <div className="group relative bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 rounded-2xl shadow-2xl border-2 border-green-200/50 overflow-hidden" data-section="new-activity">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative p-4 sm:p-8">
-              <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                <div className="flex-shrink-0 bg-gradient-to-br from-green-500 to-teal-600 p-3 rounded-xl shadow-lg">
-                  <div className="text-2xl sm:text-3xl">➕</div>
+          {/* Modern Create New Activity */}
+          <div className="group relative bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 rounded-2xl shadow-lg border border-emerald-200/50 overflow-hidden hover:shadow-2xl transition-all duration-300" data-section="new-activity">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            <div className="relative p-6 sm:p-8">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-3 rounded-xl shadow-lg">
+                  <span className="text-white text-2xl">➕</span>
                 </div>
                 <div>
-                  <h3 className="text-lg sm:text-2xl font-black text-gray-900">Create New Activity</h3>
-                  <p className="text-xs sm:text-sm text-gray-600 font-medium">Start tracking a new task</p>
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">Create New Activity</h3>
+                  <p className="text-sm text-gray-600 font-medium">Start tracking a new task</p>
                 </div>
               </div>
               <ActivityLogger 
@@ -488,22 +527,22 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
             </div>
           </div>
 
-          {/* Premium Assigned Tickets Section */}
-          <div className="group relative bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border-l-4 border-l-rose-500">
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-50/30 to-pink-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative p-4 sm:p-8">
-              <div className="flex items-center justify-between mb-5 sm:mb-7">
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0 bg-gradient-to-br from-rose-500 to-pink-600 p-3 rounded-xl shadow-lg">
-                    <div className="text-2xl sm:text-3xl">🎯</div>
+          {/* Modern Assigned Tickets Section */}
+          <div className="group relative bg-white rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden hover:shadow-2xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-50/30 to-pink-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            <div className="relative p-6 sm:p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-gradient-to-br from-rose-500 to-pink-600 p-3 rounded-xl shadow-lg">
+                    <span className="text-white text-2xl">🎯</span>
                   </div>
                   <div>
-                    <h3 className="text-lg sm:text-2xl font-black text-gray-900">Active Tickets</h3>
-                    <p className="text-xs sm:text-sm text-gray-600 font-medium">Your assigned work orders</p>
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900">Active Tickets</h3>
+                    <p className="text-sm text-gray-600 font-medium">Your assigned work orders</p>
                   </div>
                 </div>
-                <div className="flex-shrink-0 bg-gradient-to-br from-rose-100 to-pink-100 px-4 py-2 rounded-full border-2 border-rose-200">
-                  <span className="text-sm font-black text-rose-700">{tickets.length}</span>
+                <div className="bg-gradient-to-br from-rose-100 to-pink-100 px-4 py-2 rounded-full border-2 border-rose-200">
+                  <span className="text-sm font-bold text-rose-700">{tickets.length}</span>
                 </div>
               </div>
               {tickets.length === 0 ? (
@@ -515,15 +554,15 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                   {tickets.map((ticket) => (
-                    <div key={ticket.id} className="group relative bg-gradient-to-br from-white via-white to-gray-50/50 border-2 border-gray-200/50 rounded-2xl p-4 sm:p-5 hover:shadow-2xl hover:border-blue-400/50 transition-all duration-300 transform hover:-translate-y-2 active:scale-95 overflow-hidden">
+                    <div key={ticket.id} className="group relative bg-white border border-gray-200/50 rounded-2xl p-5 hover:shadow-xl hover:border-blue-400/50 transition-all duration-300 transform hover:-translate-y-1 overflow-hidden">
                       {/* Decorative gradient overlay */}
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-100/30 to-purple-100/30 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-100/20 to-purple-100/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                       
                       <div className="relative">
-                        {/* Premium Header with ID and Priority */}
+                        {/* Modern Header with ID and Priority */}
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-2 min-w-0 flex-1">
-                            <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-lg shadow-blue-500/30 flex-shrink-0">
+                            <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-500/30 flex-shrink-0">
                               #{ticket.id}
                             </div>
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold truncate shadow-sm ${PRIORITY_CONFIG[ticket.priority as keyof typeof PRIORITY_CONFIG]?.color || 'bg-gray-100 text-gray-800'}`}>
@@ -536,20 +575,20 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
                           </div>
                         </div>
 
-                        {/* Premium Status Badge */}
+                        {/* Modern Status Badge */}
                         <div className="mb-3">
-                          <div className={`inline-flex items-center px-3 py-2 rounded-xl text-xs font-black w-full justify-center shadow-md ${STATUS_CONFIG[ticket.status as keyof typeof STATUS_CONFIG]?.color || 'bg-gray-100 text-gray-800'} border-2 border-opacity-50`}>
+                          <div className={`inline-flex items-center px-3 py-2 rounded-xl text-xs font-bold w-full justify-center shadow-md ${STATUS_CONFIG[ticket.status as keyof typeof STATUS_CONFIG]?.color || 'bg-gray-100 text-gray-800'} border-2 border-opacity-50`}>
                             <span className="mr-1.5 text-base">{STATUS_CONFIG[ticket.status as keyof typeof STATUS_CONFIG]?.icon}</span>
                             <span className="truncate uppercase tracking-wide">{ticket.status.replace(/_/g, ' ')}</span>
                           </div>
                         </div>
 
-                        {/* Premium Title */}
-                        <h4 className="text-base font-black text-gray-900 mb-3 line-clamp-2 leading-snug min-h-[2.5rem]">
+                        {/* Modern Title */}
+                        <h4 className="text-base font-bold text-gray-900 mb-3 line-clamp-2 leading-snug min-h-[2.5rem]">
                           {ticket.title}
                         </h4>
 
-                        {/* Premium Key Info */}
+                        {/* Modern Key Info */}
                         <div className="space-y-2 text-xs">
                           <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-3 space-y-2 border border-gray-200/50">
                           <div className="flex items-start gap-1">
@@ -593,8 +632,6 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
                             const ticketWithContact = ticket as any;
                             const contactPerson = ticketWithContact.contact;
                             
-                            // Debug: Always show this section for now to test
-                            // Show placeholder if no contact data
                             if (!contactPerson) {
                               return (
                                 <div className="flex items-start gap-1">
@@ -649,6 +686,16 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
                           })()}
                           </div>
                         </div>
+                        
+                        {/* Modern Action Button */}
+                        <div className="mt-4 pt-4 border-t border-gray-200/50">
+                          <button
+                            onClick={() => handleTicketStatusUpdate(ticket)}
+                            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+                          >
+                            Update Status
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -656,15 +703,16 @@ export default function ServicePersonDashboardClientFixed({ initialLocation, ini
               )}
             </div>
           </div>
-        </div>
+
+          </div>
       </div>
 
-      {/* Subtle Refreshing Overlay */}
+      {/* Modern Refreshing Overlay */}
       {isRefreshing && (
-        <div className="fixed top-0 right-0 z-50 p-4">
-          <div className="bg-white/90 backdrop-blur-md rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex items-center gap-3">
+        <div className="fixed top-4 right-4 z-50">
+          <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-gray-200 px-4 py-3 flex items-center gap-3">
             <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
-            <span className="text-sm text-gray-600 font-medium">Updating...</span>
+            <span className="text-sm text-gray-600 font-medium">Updating dashboard...</span>
           </div>
         </div>
       )}
