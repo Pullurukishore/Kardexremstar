@@ -58,10 +58,21 @@ export default function CustomerFormComponent({ customer, customerId }: Customer
   useEffect(() => {
     const loadServiceZones = async () => {
       try {
-        // Use a reasonable limit that works with the API
+        // Fetch all service zones with a high limit to get all records
         const response = await getServiceZones(1, 100);
-        setServiceZones(response.data);
+        // The response has a data property that contains the array of service zones
+        setServiceZones(response.data || []);
+        
+        // If no service zones were found, show a warning
+        if (!response.data || response.data.length === 0) {
+          toast({
+            title: 'No Service Zones',
+            description: 'No service zones found. Please create service zones first.',
+            variant: 'destructive',
+          });
+        }
       } catch (error) {
+        console.error('Error loading service zones:', error);
         toast({
           title: 'Error',
           description: 'Failed to load service zones. Please try again later.',
@@ -265,26 +276,47 @@ export default function CustomerFormComponent({ customer, customerId }: Customer
                     <FormField
                       control={form.control}
                       name="serviceZoneId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium">Service Zone</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={field.value.toString()}>
-                            <FormControl>
-                              <SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-blue-500">
-                                <SelectValue placeholder="Select a service zone" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {serviceZones.map((zone) => (
-                                <SelectItem key={zone.id} value={zone.id.toString()}>
-                                  {zone.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        // Ensure field.value is a number and exists in the serviceZones array
+                        const value = serviceZones.some(zone => zone.id === field.value) 
+                          ? field.value 
+                          : serviceZones[0]?.id || '';
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Service Zone *</FormLabel>
+                            <Select 
+                              value={value ? value.toString() : ''}
+                              onValueChange={(val) => field.onChange(parseInt(val))}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                                  <SelectValue placeholder="Select a service zone" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {serviceZones.length > 0 ? (
+                                  serviceZones.map((zone) => (
+                                    <SelectItem key={zone.id} value={zone.id.toString()}>
+                                      {zone.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                    No service zones available
+                                  </div>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            {serviceZones.length === 0 && (
+                              <p className="text-xs text-red-500 mt-1">
+                                No service zones found. Please create service zones first.
+                              </p>
+                            )}
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <FormField

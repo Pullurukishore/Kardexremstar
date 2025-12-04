@@ -526,6 +526,32 @@ export const activityController = {
     location?: { latitude: number; longitude: number; address?: string; timestamp: string; accuracy?: number; source?: 'gps' | 'manual' | 'network' }
   ) {
     try {
+      // Only check for very recent duplicate status changes (within 1 minute)
+      const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+      
+      // Check if the exact same status change happened very recently
+      const duplicateActivity = await prisma.dailyActivityLog.findFirst({
+        where: {
+          ticketId,
+          activityType: 'TICKET_WORK',
+          createdAt: {
+            gte: oneMinuteAgo
+          },
+          metadata: {
+            path: ['newStatus'],
+            equals: newStatus
+          }
+        },
+        select: {
+          id: true
+        }
+      });
+
+      if (duplicateActivity) {
+        console.log(`Skipping duplicate activity log for ticket ${ticketId} - same status change detected within the last minute`);
+        return;
+      }
+
       const ticket = await prisma.ticket.findUnique({
         where: { id: ticketId },
         include: {
@@ -562,36 +588,43 @@ export const activityController = {
         }
       }
 
+      const activityData: any = {
+        userId,
+        ticketId,
+        activityType: 'TICKET_WORK',
+        title,
+        description,
+        startTime: new Date(),
+        endTime: new Date(),
+        duration: 5, // Assume 5 minutes for status update
+        metadata: {
+          oldStatus,
+          newStatus,
+          ticketTitle: ticket.title,
+          customerName: ticket.customer.companyName,
+        }
+      };
+
+      // Add location data if available
+      if (location) {
+        activityData.latitude = location.latitude;
+        activityData.longitude = location.longitude;
+        activityData.location = locationAddress || location.address;
+        
+        // Add location details to metadata
+        activityData.metadata = {
+          ...activityData.metadata,
+          locationAddress: locationAddress || location.address,
+          locationSource: location.source || 'gps',
+          accuracy: location.accuracy
+        };
+      }
+
       await prisma.dailyActivityLog.create({
-        data: {
-          userId,
-          ticketId,
-          activityType: 'TICKET_WORK',
-          title,
-          description,
-          startTime: new Date(),
-          endTime: new Date(),
-          duration: 5, // Assume 5 minutes for status update
-          ...(location && {
-            latitude: location.latitude,
-            longitude: location.longitude,
-            location: locationAddress || location.address,
-            locationSource: location.source || 'gps'
-          }),
-          metadata: {
-            oldStatus,
-            newStatus,
-            ticketTitle: ticket.title,
-            customerName: ticket.customer.companyName,
-            ...(location && {
-              locationAddress,
-              locationSource: location.source || 'gps',
-              accuracy: location.accuracy
-            })
-          },
-        },
+        data: activityData,
       });
     } catch (error) {
+      console.error('Error in createTicketActivity:', error);
       // Don't throw error to avoid breaking the main ticket update flow
     }
   },

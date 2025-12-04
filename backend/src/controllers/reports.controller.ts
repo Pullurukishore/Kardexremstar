@@ -147,11 +147,39 @@ interface ReportFilters {
 export const generateReport = async (req: Request, res: Response) => {
   try {
     const { from, to, zoneId, reportType, customerId, assetId } = req.query as unknown as ReportFilters;
-    const startDate = from ? new Date(from) : subDays(new Date(), 30);
-    const endDate = to ? new Date(to) : new Date();
     
-    // Set end date to end of day
-    endDate.setHours(23, 59, 59, 999);
+    // Parse dates and ensure proper time is set with timezone consideration
+    const userTimeZone = 'Asia/Kolkata'; // Set your timezone here
+    
+    // Create dates in the user's timezone
+    const now = new Date();
+    let startDate = from ? new Date(from) : subDays(now, 30);
+    let endDate = to ? new Date(to) : now;
+    
+    // Set start of day for start date (00:00:00.000) in local time
+    startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+    
+    // Set end of day for end date (23:59:59.999) in local time
+    endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999);
+    
+    // Adjust for timezone offset to ensure we get the correct UTC time
+    const tzOffset = startDate.getTimezoneOffset() * 60000;
+    const startUTC = new Date(startDate.getTime() - tzOffset);
+    const endUTC = new Date(endDate.getTime() - tzOffset);
+    
+    console.log('Generating report with date range (Local):', {
+      startDate: startDate.toString(),
+      endDate: endDate.toString()
+    });
+    
+    console.log('Generating report with date range (UTC):', {
+      startDate: startUTC.toISOString(),
+      endDate: endUTC.toISOString()
+    });
+    
+    // Use the UTC dates for the query
+    startDate = startUTC;
+    endDate = endUTC;
 
     const whereClause: any = {
       createdAt: {
@@ -1591,6 +1619,17 @@ const getNestedValue = (obj: any, path: string) => {
 
 // Helper functions to get report data without sending response
 async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: Date): Promise<TicketSummaryData> {
+  // Debug: Log the where clause to see what's being filtered
+  console.log('Fetching tickets with where clause:', JSON.stringify(whereClause, null, 2));
+  
+  // First, get all tickets without any filters to verify data exists
+  const allTickets = await prisma.ticket.findMany({
+    take: 1 // Just get one ticket to check if any exist
+  });
+  
+  console.log(`Found ${allTickets.length} total tickets in the database`);
+  
+  // Now get the actual tickets with the provided filters
   const tickets = await prisma.ticket.findMany({
     where: whereClause,
     include: { 
@@ -1604,8 +1643,13 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
       feedbacks: true,
       rating: true,
       reports: true
+    },
+    orderBy: {
+      createdAt: 'desc'
     }
   });
+  
+  console.log(`Found ${tickets.length} tickets matching the filters`);
 
   const statusDistribution = await prisma.ticket.groupBy({
     by: ['status'],
@@ -1778,6 +1822,46 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
     };
   });
 
+  // Create default empty distributions
+  const emptyDistribution = {
+    OPEN: 0,
+    IN_PROGRESS: 0,
+    RESOLVED: 0,
+    CLOSED: 0,
+    CANCELLED: 0
+  };
+
+  const emptyPriorityDistribution = {
+    LOW: 0,
+    MEDIUM: 0,
+    HIGH: 0,
+    CRITICAL: 0
+  };
+
+  // If no tickets found, return empty data with zeros
+  if (tickets.length === 0) {
+    console.warn('No tickets found with the given filters');
+    return {
+      tickets: [],
+      summary: {
+        totalTickets: 0,
+        openTickets: 0,
+        inProgressTickets: 0,
+        resolvedTickets: 0,
+        closedTickets: 0,
+        averageResolutionTime: 0,
+        escalatedTickets: 0,
+      },
+      statusDistribution: emptyDistribution,
+      priorityDistribution: emptyPriorityDistribution,
+      dailyTrends: dailyTrends.map(trend => ({
+        ...trend,
+        created: 0,
+        resolved: 0
+      }))
+    };
+  }
+
   return {
     tickets: enhancedTickets,
     summary: {
@@ -1791,14 +1875,18 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
       averageResolutionTime: avgResolutionTime,
       escalatedTickets: tickets.filter((t: { isEscalated: boolean }) => t.isEscalated).length,
     },
-    statusDistribution: statusDistribution.reduce((acc: Record<string, number>, curr: { status: string; _count: number }) => ({
-      ...acc,
-      [curr.status]: curr._count
-    }), {}),
-    priorityDistribution: priorityDistribution.reduce((acc: Record<string, number>, curr: { priority: string; _count: number }) => ({
-      ...acc,
-      [curr.priority]: curr._count
-    }), {}),
+    statusDistribution: statusDistribution.length > 0 
+      ? statusDistribution.reduce((acc: Record<string, number>, curr: { status: string; _count: number }) => ({
+          ...acc,
+          [curr.status]: curr._count
+        }), {})
+      : emptyDistribution,
+    priorityDistribution: priorityDistribution.length > 0
+      ? priorityDistribution.reduce((acc: Record<string, number>, curr: { priority: string; _count: number }) => ({
+          ...acc,
+          [curr.priority]: curr._count
+        }), {})
+      : emptyPriorityDistribution,
     dailyTrends
   };
 }

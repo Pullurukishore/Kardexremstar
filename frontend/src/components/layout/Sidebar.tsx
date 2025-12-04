@@ -23,6 +23,8 @@ import {
   Calendar,
   Ticket,
   Activity,
+  MessageCircle,
+  DollarSign,
 } from "lucide-react";
 
 // Constants
@@ -108,6 +110,14 @@ const navigation: NavItem[] = [
     roles: [UserRole.ADMIN],
     iconColor: "text-amber-600",
     iconBgColor: "bg-amber-50"
+  },
+  { 
+    title: "Offer Funnel", 
+    href: "/admin/offer-funnel", 
+    icon: DollarSign, 
+    roles: [UserRole.ADMIN],
+    iconColor: "text-purple-600",
+    iconBgColor: "bg-purple-50"
   },
 
   // Service Person
