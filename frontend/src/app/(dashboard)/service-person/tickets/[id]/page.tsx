@@ -110,12 +110,6 @@ export default function ServicePersonTicketDetailPage() {
         }
       }
 
-      toast({
-        title: 'Success',
-        description: `Ticket status updated to ${newStatus.replace('_', ' ').toLowerCase()}`,
-        variant: 'default'
-      });
-
       // Refresh ticket data
       await fetchTicketDetails();
 
@@ -131,11 +125,6 @@ export default function ServicePersonTicketDetailPage() {
   const addComment = async (content: string) => {
     try {
       await apiClient.post(`/tickets/${id}/comments`, { content });
-      toast({
-        title: 'Success',
-        description: 'Comment added successfully',
-        variant: 'default'
-      });
       await fetchTicketDetails();
     } catch (error: any) {
       toast({
@@ -426,10 +415,6 @@ export default function ServicePersonTicketDetailPage() {
         onClose={() => setIsStatusDialogOpen(false)}
         onStatusUpdate={() => {
           fetchTicketDetails();
-          toast({
-            title: 'Status Updated',
-            description: 'Ticket status has been updated successfully'
-          });
         }}
         accuracyThreshold={50}
       />

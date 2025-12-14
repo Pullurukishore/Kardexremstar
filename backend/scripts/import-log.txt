@@ -1,0 +1,18 @@
+=== SPARE PARTS IMPORT LOG ===
+Starting import...
+✓ Excel file found
+✓ Found headers: HSN Code, Product Name, Part ID, Image and brochures of product, (Use/Application of product), Model Specification, Manufacturing Unit, Ratings/Technical sheet
+✓ Read 261 data rows from Excel
+✓ Admin user found: admin@kardex.com
+Progress: 50/261
+Progress: 100/261
+Progress: 150/261
+Progress: 200/261
+Progress: 250/261
+
+=== RESULTS ===
+Created: 258
+Duplicates: 3
+Errors: 0
+Total: 261
+✓ Import completed!

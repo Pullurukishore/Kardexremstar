@@ -1,591 +1,526 @@
 import { Response } from 'express';
 import { format } from 'date-fns';
 import ExcelJS from 'exceljs';
-import * as fs from 'fs';
-import * as path from 'path';
+import path from 'path';
+import fs from 'fs';
 
 export interface ColumnDefinition {
-  key: string;
-  header: string;
-  format?: (value: any, item?: any) => string | number;
-  dataType?: 'text' | 'number' | 'date' | 'currency' | 'percentage';
-  width?: number;
+    key: string;
+    header: string;
+    format?: (value: any, item?: any) => string | number;
+    dataType?: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'duration';
+    width?: number;
 }
 
-export interface ExcelStyle {
-  headerBg?: string;
-  headerFont?: string;
-  alternateRowBg?: string;
-  fontSize?: number;
-  wrapText?: boolean;
-}
+// Professional color scheme matching Kardex Remstar branding
+const COLORS = {
+    // Primary brand colors
+    brandPrimary: '1E3A8A',    // Deep blue
+    brandSecondary: '3B82F6',  // Bright blue
+    brandAccent: 'DC2626',     // Red accent (Kardex red)
 
-export interface ExcelOptions {
-  enableFreezePanes?: boolean;
-  enableAutoFilter?: boolean;
-  enableConditionalFormatting?: boolean;
-  maxRowsPerSheet?: number;
-  showLogo?: boolean;
-  logoPosition?: 'left' | 'right' | 'center';
-  removeEmojis?: boolean;
-  worksheetName?: string;
-}
+    // UI colors
+    headerBg: '1E3A8A',
+    headerText: 'FFFFFF',
+    titleBg: 'EFF6FF',
+    titleText: '1E40AF',
 
-// Helper function to format cell values based on data type
+    // Table colors
+    tableHeader: '1E40AF',
+    tableHeaderText: 'FFFFFF',
+    rowEven: 'F8FAFC',
+    rowOdd: 'FFFFFF',
+    borderLight: 'E2E8F0',
+    borderDark: 'CBD5E1',
+
+    // Text colors
+    textDark: '1E293B',
+    textMedium: '475569',
+    textLight: '64748B',
+
+    // Status colors
+    success: '059669',
+    warning: 'D97706',
+    danger: 'DC2626',
+    info: '0284C7',
+};
+
+// Helper to safely format values
 function formatExcelValue(value: any, column: ColumnDefinition, item?: any): any {
-  if (value === null || value === undefined) return '';
-  
-  // Apply custom formatter first if provided
-  if (column.format) {
-    try {
-      return column.format(value, item);
-    } catch (e) {
-      }
-  }
-  
-  // Apply Excel-specific formatting based on data type
-  switch (column.dataType) {
-    case 'number':
-      const numValue = Number(value);
-      return isNaN(numValue) ? value : numValue;
-    case 'currency':
-      const currValue = Number(value);
-      return isNaN(currValue) ? value : currValue;
-    case 'percentage':
-      const pctValue = Number(value);
-      return isNaN(pctValue) ? value : pctValue / 100; // Excel expects decimal for percentage
-    case 'date':
-      if (value instanceof Date) return value;
-      if (typeof value === 'string' && !isNaN(Date.parse(value))) {
-        return new Date(value);
-      }
-      return value;
-    default:
-      return String(value);
-  }
+    if (value === null || value === undefined || value === '') return '-';
+
+    if (column.format) {
+        try {
+            const result = column.format(value, item);
+            return result === null || result === undefined ? '-' : result;
+        } catch (e) {
+            return String(value);
+        }
+    }
+
+    switch (column.dataType) {
+        case 'number':
+            const numValue = Number(value);
+            return isNaN(numValue) ? String(value) : numValue;
+        case 'currency':
+            const currValue = Number(value);
+            return isNaN(currValue) ? String(value) : currValue;
+        case 'percentage':
+            const pctValue = Number(value);
+            return isNaN(pctValue) ? String(value) : pctValue / 100;
+        case 'duration':
+            // Format minutes as "Xh Xm"
+            const minutes = Number(value);
+            if (isNaN(minutes) || minutes <= 0) return '-';
+            const hours = Math.floor(minutes / 60);
+            const mins = Math.round(minutes % 60);
+            if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+            if (hours > 0) return `${hours}h`;
+            return `${mins}m`;
+        case 'date':
+            if (value instanceof Date) return value;
+            if (typeof value === 'string' && !isNaN(Date.parse(value))) {
+                return new Date(value);
+            }
+            return String(value);
+        default:
+            return String(value);
+    }
 }
 
-// Helper function to get nested object values
+// Helper to get nested object values
 function getNestedValue(obj: any, path: string): any {
-  return path.split('.').reduce((current, key) => {
-    if (current && typeof current === 'object' && key in current) {
-      return current[key];
-    }
-    return '';
-  }, obj);
+    if (!obj || !path) return '';
+    return path.split('.').reduce((current, key) => {
+        if (current && typeof current === 'object' && key in current) {
+            return current[key];
+        }
+        return '';
+    }, obj);
 }
 
-// Main function to generate Excel file
+// Main export function
 export const generateExcel = async (
-  res: Response,
-  data: any[],
-  columns: ColumnDefinition[],
-  title: string,
-  filters: { [key: string]: any },
-  summaryData?: any,
-  style?: ExcelStyle,
-  options?: ExcelOptions
+    res: Response,
+    data: any[],
+    columns: ColumnDefinition[],
+    title: string,
+    filters: { [key: string]: any },
+    summaryData?: any
 ): Promise<void> => {
-  try {
-    // Set default options
-    const defaultOptions: ExcelOptions = {
-      enableFreezePanes: true,
-      enableAutoFilter: true,
-      enableConditionalFormatting: false, // Disabled due to ExcelJS dataBar type issues
-      maxRowsPerSheet: 1000000,
-      showLogo: true,
-      logoPosition: 'right',
-      removeEmojis: true,
-      worksheetName: 'Report Data',
-      ...options
-    };
+    try {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'KardexCare System';
+        workbook.lastModifiedBy = 'KardexCare Reports';
+        workbook.created = new Date();
+        workbook.modified = new Date();
+        workbook.properties.date1904 = false;
 
-    // Create a new workbook and worksheet
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(defaultOptions.worksheetName!);
+        const worksheet = workbook.addWorksheet('Report', {
+            properties: {
+                tabColor: { argb: COLORS.brandPrimary },
+                defaultRowHeight: 18
+            },
+            pageSetup: {
+                paperSize: 9,
+                orientation: 'landscape',
+                fitToPage: true,
+                fitToWidth: 1,
+                fitToHeight: 0,
+                margins: {
+                    left: 0.5,
+                    right: 0.5,
+                    top: 0.75,
+                    bottom: 0.75,
+                    header: 0.3,
+                    footer: 0.3
+                }
+            }
+        });
 
-    // Set default styles
-    const defaultStyle: ExcelStyle = {
-      headerBg: '4F81BD',
-      headerFont: 'FFFFFF',
-      alternateRowBg: 'F2F2F2',
-      fontSize: 11,
-      wrapText: true,
-      ...style
-    };
-
-    let currentRow = 1;
-
-    // Enhanced header with logo and professional branding
-    if (defaultOptions.showLogo) {
-      try {
-        const logoPath = path.join(__dirname, '../../../frontend/public/kardex.png');
-        if (fs.existsSync(logoPath)) {
-          const logoImageId = workbook.addImage({
-            filename: logoPath,
-            extension: 'png',
-          });
-          
-          // Dynamic logo positioning based on configuration
-          let logoCol = 8; // default center-right
-          if (defaultOptions.logoPosition === 'left') {
-            logoCol = 0;
-          } else if (defaultOptions.logoPosition === 'center') {
-            logoCol = Math.max(Math.floor(columns.length / 2) - 1, 4);
-          } else { // right
-            logoCol = Math.max(columns.length - 2, 8);
-          }
-          
-          worksheet.addImage(logoImageId, {
-            tl: { col: logoCol, row: 0 },
-            ext: { width: 100, height: 50 }, // Optimized size
-            editAs: 'oneCell'
-          });
-        }
-      } catch (error) {
-        }
-    }
-
-    // Set optimal row heights for professional layout
-    worksheet.getRow(1).height = 35;
-    worksheet.getRow(2).height = 25;
-    worksheet.getRow(3).height = 20;
-    worksheet.getRow(4).height = 18;
-    worksheet.getRow(5).height = 15;
-
-    // Create professional header layout
-    currentRow = 1;
-    
-    // Main title positioned on LEFT (logo now on right)
-    const titleCell = worksheet.getCell(`A${currentRow}`);
-    titleCell.value = title.toUpperCase();
-    titleCell.font = { 
-      size: 22, 
-      bold: true, 
-      color: { argb: '1F4E79' },
-      name: 'Calibri'
-    };
-    titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
-    worksheet.mergeCells(`A${currentRow}:${String.fromCharCode(64 + Math.min(columns.length - 2, 8))}${currentRow}`);
-    currentRow++;
-
-    // Company branding line
-    const brandCell = worksheet.getCell(`A${currentRow}`);
-    brandCell.value = 'KARDEX REMSTAR';
-    brandCell.font = { 
-      size: 12, 
-      bold: true, 
-      color: { argb: '2E7D32' },
-      name: 'Calibri'
-    };
-    brandCell.alignment = { horizontal: 'left', vertical: 'middle' };
-    worksheet.mergeCells(`A${currentRow}:${String.fromCharCode(64 + Math.min(columns.length - 2, 6))}${currentRow}`);
-    currentRow++;
-
-    // Generation timestamp
-    const dateCell = worksheet.getCell(`C${currentRow}`);
-    dateCell.value = `Generated: ${format(new Date(), 'MMM dd, yyyy | HH:mm:ss')}`;
-    dateCell.font = { 
-      size: 9, 
-      color: { argb: '64748B' },
-      name: 'Calibri'
-    };
-    dateCell.alignment = { horizontal: 'left', vertical: 'middle' };
-    currentRow++;
-
-    // Professional report metadata section
-    if (filters.from && filters.to) {
-      const rangeCell = worksheet.getCell(`A${currentRow}`);
-      const periodPrefix = defaultOptions.removeEmojis ? 'Report Period:' : '📅 Report Period:';
-      rangeCell.value = `${periodPrefix} ${format(new Date(filters.from), 'MMM dd, yyyy')} to ${format(new Date(filters.to), 'MMM dd, yyyy')}`;
-      rangeCell.font = { 
-        size: 10, 
-        bold: true, 
-        color: { argb: '1565C0' },
-        name: 'Calibri'
-      };
-      rangeCell.alignment = { horizontal: 'left', vertical: 'middle' };
-      currentRow++;
-    }
-
-    // Enhanced active filters display
-    const activeFilters = Object.entries(filters)
-      .filter(([key, value]) => !['from', 'to', 'format', 'reportType'].includes(key) && value)
-      .map(([key, value]) => `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${value}`);
-    
-    if (activeFilters.length > 0) {
-      const filtersCell = worksheet.getCell(`A${currentRow}`);
-      const filterPrefix = defaultOptions.removeEmojis ? 'Applied Filters:' : '🔍 Applied Filters:';
-      filtersCell.value = `${filterPrefix} ${activeFilters.join(' | ')}`;
-      filtersCell.font = { 
-        size: 10, 
-        color: { argb: '5D4037' },
-        name: 'Calibri'
-      };
-      filtersCell.alignment = { horizontal: 'left', vertical: 'middle' };
-      currentRow++;
-    }
-
-    currentRow += 2; // Add spacing
-
-    // Skip executive summary for ticket analytics reports and industrial-data reports
-    // Executive summary removed as per user requirements for machine reports
-
-    // Professional data section header
-    const dataTitle = worksheet.getCell(`A${currentRow}`);
-    const dataTitleText = defaultOptions.removeEmojis ? 'DETAILED REPORT DATA' : '📊 DETAILED REPORT DATA';
-    dataTitle.value = dataTitleText;
-    dataTitle.font = { 
-      size: 16, 
-      bold: true, 
-      color: { argb: '1F4E79' },
-      name: 'Calibri'
-    };
-    dataTitle.alignment = { horizontal: 'left', vertical: 'middle' };
-    
-    // Add background color to data title
-    dataTitle.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'E3F2FD' }
-    };
-    
-    // Add border to data title
-    dataTitle.border = {
-      bottom: { style: 'thick', color: { argb: '1F4E79' } }
-    };
-    
-    currentRow++;
-
-    const recordCount = worksheet.getCell(`A${currentRow}`);
-    const recordPrefix = defaultOptions.removeEmojis ? 'Total Records:' : '📈 Total Records:';
-    recordCount.value = `${recordPrefix} ${data.length} | Export Format: Excel (.xlsx)`;
-    recordCount.font = { 
-      size: 10, 
-      bold: true, 
-      color: { argb: '2E7D32' },
-      name: 'Calibri'
-    };
-    recordCount.alignment = { horizontal: 'left', vertical: 'middle' };
-    currentRow += 2;
-
-    // Create data table headers
-    const headerRowIndex = currentRow;
-    const headerRow = worksheet.getRow(currentRow);
-    columns.forEach((column, index) => {
-      const cell = headerRow.getCell(index + 1);
-      cell.value = column.header;
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: defaultStyle.headerBg }
-      };
-      cell.font = { 
-        bold: true, 
-        color: { argb: defaultStyle.headerFont },
-        size: defaultStyle.fontSize 
-      };
-      cell.alignment = { 
-        horizontal: 'center', 
-        vertical: 'middle',
-        wrapText: defaultStyle.wrapText 
-      };
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-      
-      // Set column width
-      worksheet.getColumn(index + 1).width = column.width || 15;
-    });
-    
-    currentRow++;
-
-    // Add data rows with enhanced features
-    const dataStartRow = currentRow;
-    
-    // Validate data before processing
-    if (!data || !Array.isArray(data)) {
-      throw new Error('Invalid data provided for Excel generation');
-    }
-    
-    data.forEach((item, rowIndex) => {
-      const dataRow = worksheet.getRow(currentRow + rowIndex);
-      
-      columns.forEach((column, colIndex) => {
-        const cell = dataRow.getCell(colIndex + 1);
-        const rawValue = getNestedValue(item, column.key);
-        const formattedValue = formatExcelValue(rawValue, column, item);
-        
-        cell.value = formattedValue;
-        
-        // Apply data type specific formatting
-        switch (column.dataType) {
-          case 'currency':
-            cell.numFmt = '$#,##0.00';
-            break;
-          case 'percentage':
-            cell.numFmt = '0.00%';
-            break;
-          case 'date':
-            cell.numFmt = 'yyyy-mm-dd hh:mm';
-            break;
-          case 'number':
-            cell.numFmt = '#,##0.00';
-            break;
-        }
-        
-        // Add borders
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
+        // Helper to convert column number to Excel letter (1=A, 27=AA, etc.)
+        const getColumnLetter = (colNum: number): string => {
+            let letter = '';
+            while (colNum > 0) {
+                const mod = (colNum - 1) % 26;
+                letter = String.fromCharCode(65 + mod) + letter;
+                colNum = Math.floor((colNum - 1) / 26);
+            }
+            return letter;
         };
-        
-        // Alternate row coloring
-        if (rowIndex % 2 === 1) {
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: defaultStyle.alternateRowBg }
-          };
-        }
-        
-        // Text alignment
-        cell.alignment = { 
-          vertical: 'middle',
-          wrapText: defaultStyle.wrapText 
-        };
-      });
-    });
 
-    // Add advanced Excel features
-    const dataEndRow = currentRow + data.length - 1;
-    
-    // Add freeze panes for header rows
-    if (defaultOptions.enableFreezePanes && data.length > 0) {
-      worksheet.views = [{
-        state: 'frozen',
-        xSplit: 0,
-        ySplit: headerRowIndex
-      }];
-    }
-    
-    // Add auto-filter to data columns
-    if (defaultOptions.enableAutoFilter && data.length > 0) {
-      const lastColumn = String.fromCharCode(64 + columns.length);
-      worksheet.autoFilter = `A${headerRowIndex}:${lastColumn}${dataEndRow}`;
-    }
-    
-    // Add conditional formatting for performance metrics
-    // Disabled due to ExcelJS dataBar type incompatibility issues
-    /*
-    if (defaultOptions.enableConditionalFormatting) {
-      columns.forEach((column, colIndex) => {
-        if (column.header.toLowerCase().includes('rate') || 
-            column.header.toLowerCase().includes('score') ||
-            column.header.toLowerCase().includes('percentage')) {
-          const columnLetter = String.fromCharCode(65 + colIndex);
-          const range = `${columnLetter}${dataStartRow}:${columnLetter}${dataEndRow}`;
-          
-          try {
-            worksheet.addConditionalFormatting({
-              ref: range,
-              rules: [{
-                type: 'dataBar',
-                priority: 1,
-                cfvo: [
-                  { type: 'min' },
-                  { type: 'max' }
-                ],
-                showValue: true,
-                gradient: false
-              }]
-            });
-          } catch (error) {
+        // Ensure we have valid columns
+        const validColumns = columns.length > 0 ? columns : getExcelColumns('default');
+        const colCount = validColumns.length;
+        const lastColLetter = getColumnLetter(colCount);
+
+        let currentRow = 1;
+
+        // ==================================================
+        // HEADER SECTION - Logo and Company Info
+        // ==================================================
+
+        // Try to add logo
+        const logoPath = path.join(__dirname, '..', 'assets', 'kardex-logo.png');
+        const frontendLogoPath = path.join(__dirname, '..', '..', '..', 'frontend', 'public', 'kardex.png');
+
+        let logoAdded = false;
+        for (const logoFile of [logoPath, frontendLogoPath]) {
+            if (fs.existsSync(logoFile)) {
+                try {
+                    const imageId = workbook.addImage({
+                        filename: logoFile,
+                        extension: 'png',
+                    });
+                    worksheet.addImage(imageId, {
+                        tl: { col: 0, row: 0 },
+                        ext: { width: 150, height: 45 }
+                    });
+                    logoAdded = true;
+                    break;
+                } catch (e) {
+                    console.log('Could not add logo to Excel:', e);
+                }
             }
         }
-      });
-    }
-    */
 
-    // Set workbook properties
-    workbook.creator = 'Kardex Remstar Professional Suite';
-    workbook.lastModifiedBy = 'Kardex Remstar Excel Generator';
-    workbook.created = new Date();
-    workbook.modified = new Date();
-    workbook.lastPrinted = new Date();
-    
-    // Set response headers
-    const timestamp_filename = format(new Date(), 'yyyy-MM-dd_HHmm');
-    const sanitizedTitle = title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
-    const filename = `kardex-remstar-${sanitizedTitle}-${timestamp_filename}.xlsx`;
-    
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
+        // Company name (if logo not added)
+        worksheet.getRow(currentRow).height = 35;
+        worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+        const companyCell = worksheet.getCell(`A${currentRow}`);
+        if (!logoAdded) {
+            companyCell.value = 'KARDEX REMSTAR';
+            companyCell.font = { size: 20, bold: true, color: { argb: COLORS.brandPrimary } };
+        }
+        companyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        currentRow++;
 
-    // Write the Excel file to response
-    await workbook.xlsx.write(res);
-    res.end();
-    
-  } catch (error) {
-    // Check if headers have already been sent
-    if (!res.headersSent) {
-      res.status(500).json({ 
-        error: 'Failed to generate Excel report',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-    } else {
-      // Headers already sent, just end the response
-      res.end();
+        // Tagline with generation date
+        worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+        const taglineCell = worksheet.getCell(`A${currentRow}`);
+        taglineCell.value = `Service Management System | Generated: ${format(new Date(), 'dd MMM yyyy, HH:mm')}`;
+        taglineCell.font = { size: 10, color: { argb: COLORS.textMedium }, italic: true };
+        taglineCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        currentRow += 2;
+
+        // ==================================================
+        // REPORT TITLE SECTION
+        // ==================================================
+        worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+        const titleCell = worksheet.getCell(`A${currentRow}`);
+        titleCell.value = title.toUpperCase();
+        titleCell.font = { size: 16, bold: true, color: { argb: COLORS.titleText } };
+        titleCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: COLORS.titleBg }
+        };
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        titleCell.border = {
+            top: { style: 'medium', color: { argb: COLORS.brandPrimary } },
+            bottom: { style: 'medium', color: { argb: COLORS.brandPrimary } }
+        };
+        worksheet.getRow(currentRow).height = 28;
+        currentRow += 2;
+
+        // ==================================================
+        // FILTERS SECTION
+        // ==================================================
+        if (filters.from && filters.to) {
+            const fromDate = format(new Date(filters.from), 'dd MMM yyyy');
+            const toDate = format(new Date(filters.to), 'dd MMM yyyy');
+            worksheet.getCell(`A${currentRow}`).value = 'Report Period:';
+            worksheet.getCell(`A${currentRow}`).font = { size: 10, bold: true, color: { argb: COLORS.textMedium } };
+            worksheet.getCell(`B${currentRow}`).value = `${fromDate} to ${toDate}`;
+            worksheet.getCell(`B${currentRow}`).font = { size: 10, color: { argb: COLORS.brandPrimary } };
+            currentRow++;
+        }
+
+        if (filters.zoneName || filters.zone) {
+            worksheet.getCell(`A${currentRow}`).value = 'Zone:';
+            worksheet.getCell(`A${currentRow}`).font = { size: 10, bold: true, color: { argb: COLORS.textMedium } };
+            worksheet.getCell(`B${currentRow}`).value = filters.zoneName || filters.zone || 'All Zones';
+            worksheet.getCell(`B${currentRow}`).font = { size: 10, color: { argb: COLORS.textDark } };
+            currentRow++;
+        }
+
+        if (filters.reportType) {
+            worksheet.getCell(`A${currentRow}`).value = 'Report Type:';
+            worksheet.getCell(`A${currentRow}`).font = { size: 10, bold: true, color: { argb: COLORS.textMedium } };
+            worksheet.getCell(`B${currentRow}`).value = filters.reportType.replace(/-/g, ' ').toUpperCase();
+            worksheet.getCell(`B${currentRow}`).font = { size: 10, color: { argb: COLORS.textDark } };
+            currentRow++;
+        }
+        currentRow++;
+
+        // ==================================================
+        // DATA TABLE SECTION
+        // ==================================================
+
+        // Table title
+        worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+        const tableHeader = worksheet.getCell(`A${currentRow}`);
+        tableHeader.value = `DATA (${data.length} Records)`;
+        tableHeader.font = { size: 11, bold: true, color: { argb: COLORS.headerText } };
+        tableHeader.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: COLORS.headerBg }
+        };
+        tableHeader.alignment = { horizontal: 'center', vertical: 'middle' };
+        worksheet.getRow(currentRow).height = 22;
+        currentRow++;
+
+        // Column headers
+        const headerRowNum = currentRow;
+        const headerRow = worksheet.getRow(currentRow);
+        headerRow.height = 26;
+
+        validColumns.forEach((column, index) => {
+            const cell = headerRow.getCell(index + 1);
+            cell.value = column.header;
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: COLORS.tableHeader }
+            };
+            cell.font = { bold: true, color: { argb: COLORS.tableHeaderText }, size: 10 };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = {
+                top: { style: 'thin', color: { argb: COLORS.headerBg } },
+                left: { style: 'thin', color: { argb: COLORS.headerBg } },
+                bottom: { style: 'thin', color: { argb: COLORS.headerBg } },
+                right: { style: 'thin', color: { argb: COLORS.headerBg } }
+            };
+
+            // Set column width
+            const col = worksheet.getColumn(index + 1);
+            col.width = column.width || 15;
+        });
+        currentRow++;
+
+        // Data rows
+        if (data.length === 0) {
+            worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+            const noDataCell = worksheet.getCell(`A${currentRow}`);
+            noDataCell.value = 'No data available for the selected criteria';
+            noDataCell.font = { size: 11, color: { argb: COLORS.textMedium }, italic: true };
+            noDataCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            noDataCell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: COLORS.rowEven }
+            };
+            worksheet.getRow(currentRow).height = 30;
+            currentRow++;
+        } else {
+            data.forEach((item, rowIndex) => {
+                const dataRow = worksheet.getRow(currentRow);
+                dataRow.height = 20;
+                const isEven = rowIndex % 2 === 0;
+
+                validColumns.forEach((column, colIndex) => {
+                    const cell = dataRow.getCell(colIndex + 1);
+                    const rawValue = getNestedValue(item, column.key);
+                    const formattedValue = formatExcelValue(rawValue, column, item);
+
+                    cell.value = formattedValue;
+
+                    // Background color
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: isEven ? COLORS.rowEven : COLORS.rowOdd }
+                    };
+
+                    // Number formatting
+                    switch (column.dataType) {
+                        case 'currency':
+                            cell.numFmt = '"₹"#,##0.00';
+                            break;
+                        case 'percentage':
+                            cell.numFmt = '0.00%';
+                            break;
+                        case 'date':
+                            cell.numFmt = 'dd-mmm-yyyy';
+                            break;
+                        case 'number':
+                            cell.numFmt = '#,##0.00';
+                            break;
+                    }
+
+                    // Borders
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: COLORS.borderLight } },
+                        left: { style: 'thin', color: { argb: COLORS.borderLight } },
+                        bottom: { style: 'thin', color: { argb: COLORS.borderLight } },
+                        right: { style: 'thin', color: { argb: COLORS.borderLight } }
+                    };
+
+                    // Alignment based on data type
+                    cell.alignment = {
+                        horizontal: column.dataType === 'currency' || column.dataType === 'number' ? 'right' :
+                            column.dataType === 'date' ? 'center' :
+                                colIndex === 0 ? 'left' : 'center',
+                        vertical: 'middle'
+                    };
+
+                    cell.font = { size: 9, color: { argb: COLORS.textDark } };
+                });
+                currentRow++;
+            });
+        }
+
+        // ==================================================
+        // FOOTER SECTION
+        // ==================================================
+        currentRow++;
+        worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+        const footerCell = worksheet.getCell(`A${currentRow}`);
+        footerCell.value = `© ${new Date().getFullYear()} Kardex Remstar India Pvt. Ltd. | This report is confidential.`;
+        footerCell.font = { size: 8, color: { argb: COLORS.textLight }, italic: true };
+        footerCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // ==================================================
+        // EXCEL FEATURES
+        // ==================================================
+
+        // Freeze panes - freeze row AFTER the column headers (headerRowNum is the header, freeze at headerRowNum + 1)
+        // This keeps the column headers visible when scrolling
+        worksheet.views = [{
+            state: 'frozen',
+            ySplit: headerRowNum,  // Freeze after this row
+            xSplit: 0,             // Don't freeze any columns horizontally
+            topLeftCell: 'A' + (headerRowNum + 1),
+            activeCell: 'A' + (headerRowNum + 1)
+        }];
+
+        // Auto-filter on the column header row only
+        if (data.length > 0) {
+            worksheet.autoFilter = {
+                from: { row: headerRowNum, column: 1 },
+                to: { row: headerRowNum, column: validColumns.length }
+            };
+        }
+
+        // Print settings
+        worksheet.headerFooter.oddFooter = '&C&8Page &P of &N | Generated by KardexCare';
+
+        // Set response headers
+        const filename = `KardexCare-${title.replace(/[^a-zA-Z0-9]/g, '-')}-${format(new Date(), 'yyyyMMdd-HHmm')}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('Excel generation error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to generate Excel report' });
+        }
     }
-  }
 };
 
-// Enhanced column definitions with data types for better Excel compatibility
+// Column definitions for all report types
 export const getExcelColumns = (reportType: string): ColumnDefinition[] => {
-  switch (reportType) {
-    case 'ticket-summary':
-      return [
-        { key: 'id', header: 'Ticket ID', dataType: 'text', width: 12 },
-        { key: 'title', header: 'Title', dataType: 'text', width: 30 },
-        { key: 'customer.companyName', header: 'Customer Name', dataType: 'text', width: 25 },
-        { key: 'asset.serialNo', header: 'Machine Serial No', dataType: 'text', width: 18 },
-        { key: 'customer.address', header: 'Place (Address)', dataType: 'text', width: 30 },
-        { key: 'status', header: 'Status', dataType: 'text', width: 15 },
-        { key: 'priority', header: 'Priority', dataType: 'text', width: 12 },
-        { key: 'assignedTo.name', header: 'Assigned To', dataType: 'text', width: 20 },
-        { key: 'createdAt', header: 'Ticket Date and Time', dataType: 'date', width: 20 },
-        { key: 'callType', header: 'Call Type', dataType: 'text', width: 20, format: (value) => {
-          if (!value) return 'N/A';
-          return value === 'UNDER_MAINTENANCE_CONTRACT' ? 'Under Contract' : 'Not Under Contract';
-        }},
-        { key: 'title', header: 'Error (Ticket Title)', dataType: 'text', width: 30 },
-        { key: 'zone.name', header: 'Service Zone', dataType: 'text', width: 20 },
-        { key: 'responseTime', header: 'Response Time (Business Hours)', dataType: 'text', width: 25, format: (value) => value ? `${Math.floor(value / 60)}h ${value % 60}m` : 'N/A' },
-        { key: 'travelTime', header: 'Travel Time (Real-time)', dataType: 'text', width: 22, format: (value) => (value !== null && value !== undefined) ? `${Math.floor(value / 60)}h ${value % 60}m` : 'N/A' },
-        { key: 'onsiteWorkingTime', header: 'Onsite Time (Business Hours)', dataType: 'text', width: 28, format: (value) => (value !== null && value !== undefined) ? `${Math.floor(value / 60)}h ${value % 60}m` : 'N/A' },
-        { key: 'totalResolutionTime', header: 'Total Resolution Time (Business Hours)', dataType: 'text', width: 32, format: (value) => value ? `${Math.floor(value / 60)}h ${value % 60}m` : 'N/A' },
-        { key: 'reportsCount', header: 'Reports', dataType: 'number', width: 10 },
-        { key: 'machineDowntime', header: 'Machine Downtime (Business Hours)', dataType: 'text', width: 30, format: (value) => value ? `${Math.floor(value / 60)}h ${value % 60}m` : 'N/A' },
-        { key: 'totalResponseHours', header: 'Total Response (Hours from Open to Closed)', dataType: 'number', width: 30, format: (value) => value ? `${value.toFixed(2)} hours` : 'N/A' }
-      ];
-    
-    case 'customer-satisfaction':
-      return [
-        { key: 'id', header: 'Feedback ID', dataType: 'text', width: 15 },
-        { key: 'rating', header: 'Rating', dataType: 'number', width: 10 },
-        { key: 'comment', header: 'Customer Comments', dataType: 'text', width: 40 },
-        { key: 'ticket.id', header: 'Ticket ID', dataType: 'text', width: 12 },
-        { key: 'ticket.customer.companyName', header: 'Customer', dataType: 'text', width: 25 },
-        { key: 'submittedAt', header: 'Feedback Date', dataType: 'date', width: 18 }
-      ];
-    
-    case 'industrial-data':
-      return [
-        { key: 'customer', header: 'Customer', dataType: 'text', width: 25 },
-        { key: 'model', header: 'Machine Model', dataType: 'text', width: 20 },
-        { key: 'serialNo', header: 'Serial Number', dataType: 'text', width: 18 },
-        { key: 'totalDowntimeHours', header: 'Total Downtime (hrs)', dataType: 'number', width: 18 },
-        { key: 'avgDowntimeHours', header: 'Avg Downtime (hrs)', dataType: 'number', width: 18 },
-        { key: 'incidents', header: 'Total Incidents', dataType: 'number', width: 15 },
-        { key: 'openIncidents', header: 'Open Incidents', dataType: 'number', width: 15 },
-        { key: 'resolvedIncidents', header: 'Resolved Incidents', dataType: 'number', width: 18 }
-      ];
-    
-    case 'zone-performance':
-      return [
-        { key: 'zoneName', header: 'Service Zone', dataType: 'text', width: 25 },
-        { key: 'totalTickets', header: 'Total Tickets', dataType: 'number', width: 15 },
-        { key: 'resolvedTickets', header: 'Resolved Tickets', dataType: 'number', width: 18 },
-        { key: 'openTickets', header: 'Open Tickets', dataType: 'number', width: 15 },
-        { key: 'resolutionRate', header: 'Resolution Rate', dataType: 'percentage', width: 18 },
-        { key: 'averageResolutionTime', header: 'Avg Resolution Time (Min)', dataType: 'number', width: 25 },
-        { key: 'servicePersons', header: 'Service Personnel Count', dataType: 'number', width: 25 },
-        { key: 'customerCount', header: 'Customer Count', dataType: 'number', width: 18 }
-      ];
-    
-    case 'agent-productivity':
-      return [
-        { key: 'agentName', header: 'Service Person / Zone User', dataType: 'text', width: 25 },
-        { key: 'email', header: 'Email', dataType: 'text', width: 30 },
-        { key: 'totalTickets', header: 'Total Tickets', dataType: 'number', width: 15 },
-        { key: 'resolvedTickets', header: 'Resolved Tickets', dataType: 'number', width: 18 },
-        { key: 'openTickets', header: 'Open Tickets', dataType: 'number', width: 15 },
-        { key: 'resolutionRate', header: 'Resolution Rate', dataType: 'percentage', width: 18 },
-        { key: 'averageResolutionTime', header: 'Avg Resolution Time (Min)', dataType: 'number', width: 25 },
-        { key: 'zones', header: 'Service Zones', dataType: 'text', width: 30, format: (zones) => Array.isArray(zones) ? zones.join(', ') : zones }
-      ];
-    
-    
-    case 'service-person-performance':
-      return [
-        { key: 'name', header: 'Service Person Name', dataType: 'text', width: 25 },
-        { key: 'email', header: 'Email Address', dataType: 'text', width: 30 },
-        { key: 'zones', header: 'Service Zones', dataType: 'text', width: 25, format: (zones) => Array.isArray(zones) ? zones.join(', ') : zones || 'N/A' },
-        { key: 'summary.totalWorkingDays', header: 'Working Days', dataType: 'number', width: 15, format: (value) => value || 0 },
-        { key: 'summary.totalHours', header: 'Total Hours', dataType: 'text', width: 18, format: (value) => value ? `${Number(value).toFixed(1)}h` : '0h' },
-        { key: 'summary.totalTickets', header: 'Total Tickets', dataType: 'number', width: 15 },
-        { key: 'summary.ticketsResolved', header: 'Tickets Resolved', dataType: 'number', width: 18 },
-        { key: 'resolutionRate', header: 'Resolution Rate (%)', dataType: 'text', width: 18, format: (value, item) => {
-          const total = item?.summary?.totalTickets || 0;
-          const resolved = item?.summary?.ticketsResolved || 0;
-          return total > 0 ? `${Math.round((resolved / total) * 100)}%` : '0%';
-        }},
-        { key: 'summary.averageResolutionTimeHours', header: 'Avg Resolution Time', dataType: 'text', width: 20, format: (value) => value && value > 0 ? `${Number(value).toFixed(1)}h` : 'N/A' },
-        { key: 'summary.averageTravelTimeHours', header: 'Avg Travel Time', dataType: 'text', width: 18, format: (value) => value && value > 0 ? `${Number(value).toFixed(1)}h` : 'N/A' },
-        { key: 'summary.averageOnsiteTimeHours', header: 'Avg Onsite Time', dataType: 'text', width: 18, format: (value) => value && value > 0 ? `${Number(value).toFixed(1)}h` : 'N/A' },
-        { key: 'summary.performanceScore', header: 'Performance Score (%)', dataType: 'text', width: 20, format: (value) => value ? `${value}%` : '0%' }
-      ];
-    
-    case 'service-person-attendance':
-      return [
-        { key: 'name', header: 'Service Person Name', dataType: 'text', width: 25 },
-        { key: 'email', header: 'Email Address', dataType: 'text', width: 30 },
-        { key: 'zones', header: 'Service Zones', dataType: 'text', width: 25, format: (zones) => Array.isArray(zones) ? zones.join(', ') : zones || 'N/A' },
-        { key: 'summary.totalWorkingDays', header: 'Present Days', dataType: 'number', width: 15, format: (value) => value || 0 },
-        { key: 'summary.absentDays', header: 'Absent Days', dataType: 'number', width: 15 },
-        { key: 'summary.totalHours', header: 'Total Hours', dataType: 'text', width: 18, format: (value) => value ? `${Number(value).toFixed(1)}h` : '0h' },
-        { key: 'summary.averageHoursPerDay', header: 'Avg Hours/Day', dataType: 'text', width: 18, format: (value) => value ? `${Number(value).toFixed(1)}h` : '0h' },
-        { key: 'summary.totalActivities', header: 'Activities', dataType: 'number', width: 15, format: (value, item) => item?.summary?.totalActivities || item?.summary?.activitiesLogged || 0 },
-        { key: 'summary.autoCheckouts', header: 'Auto Checkouts', dataType: 'number', width: 18 }
-      ];
-    
-    case 'her-analysis':
-      return [
-        { key: 'id', header: 'Ticket ID', dataType: 'text', width: 12 },
-        { key: 'title', header: 'Title', dataType: 'text', width: 30 },
-        { key: 'customer', header: 'Customer Name', dataType: 'text', width: 25 },
-        { key: 'serialNo', header: 'Machine Serial No', dataType: 'text', width: 18 },
-        { key: 'address', header: 'Place (Address)', dataType: 'text', width: 30 },
-        { key: 'status', header: 'Status', dataType: 'text', width: 15 },
-        { key: 'priority', header: 'Priority', dataType: 'text', width: 12 },
-        { key: 'assignedTo', header: 'Assigned To', dataType: 'text', width: 20 },
-        { key: 'createdAt', header: 'Ticket Date and Time', dataType: 'date', width: 20 },
-        { key: 'zone', header: 'Service Zone', dataType: 'text', width: 20 },
-        { key: 'herHours', header: 'SLA Business Hours (Allowed)', dataType: 'number', width: 22 },
-        { key: 'businessHoursUsed', header: 'Business Hours Used', dataType: 'number', width: 20 },
-        { key: 'isHerBreached', header: 'SLA Breached', dataType: 'text', width: 15 },
-        { key: 'resolvedAt', header: 'Resolved Date and Time', dataType: 'date', width: 20 }
-      ];
-    
-    default:
-      // Fallback to basic columns
-      return [
-        { key: 'id', header: 'ID', dataType: 'text', width: 12 },
-        { key: 'name', header: 'Name', dataType: 'text', width: 25 },
-        { key: 'value', header: 'Value', dataType: 'text', width: 20 },
-        { key: 'createdAt', header: 'Created Date', dataType: 'date', width: 18 }
-      ];
-  }
-};
+    const columns: Record<string, ColumnDefinition[]> = {
+        'offer-summary': [
+            { key: 'offerReferenceNumber', header: 'Offer Ref #', width: 16 },
+            { key: 'offerReferenceDate', header: 'Offer Date', width: 12, dataType: 'date' },
+            { key: 'company', header: 'Company', width: 22 },
+            { key: 'location', header: 'Location', width: 16 },
+            { key: 'department', header: 'Department', width: 14 },
+            { key: 'contactPersonName', header: 'Contact Person', width: 16 },
+            { key: 'contactNumber', header: 'Contact No.', width: 14 },
+            { key: 'email', header: 'Email', width: 22 },
+            { key: 'productType', header: 'Product Type', width: 14 },
+            { key: 'machineSerialNumber', header: 'Machine S/N', width: 16 },
+            { key: 'lead', header: 'Lead', width: 10 },
+            { key: 'stage', header: 'Stage', width: 14 },
+            { key: 'status', header: 'Status', width: 12 },
+            { key: 'priority', header: 'Priority', width: 10 },
+            { key: 'offerValue', header: 'Offer Value (₹)', width: 14, dataType: 'currency' },
+            { key: 'offerMonth', header: 'Offer Month', width: 12 },
+            { key: 'probabilityPercentage', header: 'Probability %', width: 12, dataType: 'percentage' },
+            { key: 'poExpectedMonth', header: 'PO Expected', width: 12 },
+            { key: 'poNumber', header: 'PO Number', width: 16 },
+            { key: 'poDate', header: 'PO Date', width: 12, dataType: 'date' },
+            { key: 'poValue', header: 'PO Value (₹)', width: 14, dataType: 'currency' },
+            { key: 'poReceivedMonth', header: 'PO Received', width: 12 },
+            { key: 'zone.name', header: 'Zone', width: 12 },
+            { key: 'assignedTo.name', header: 'Assigned To', width: 16 },
+            { key: 'createdBy.name', header: 'Created By', width: 16 },
+            { key: 'openFunnel', header: 'Open Funnel', width: 10 },
+            { key: 'remarks', header: 'Remarks', width: 25 },
+            { key: 'bookingDateInSap', header: 'SAP Booking', width: 12, dataType: 'date' },
+            { key: 'createdAt', header: 'Created', width: 12, dataType: 'date' },
+            { key: 'updatedAt', header: 'Updated', width: 12, dataType: 'date' },
+        ],
+        'ticket-summary': [
+            { key: 'customer.companyName', header: 'Company Name', width: 22 },
+            { key: 'asset.location', header: 'Place', width: 16 },
+            { key: 'id', header: 'Ticket ID', width: 10, dataType: 'number' },
+            { key: 'createdAt', header: 'Date', width: 12, dataType: 'date' },
+            { key: 'asset.serialNo', header: 'Machine S/N', width: 16 },
+            { key: 'callType', header: 'Call Type', width: 14 },
+            { key: 'description', header: 'Error/Issue', width: 28 },
+            { key: 'assignedTo.name', header: 'Responsible', width: 16 },
+            { key: 'zone.name', header: 'Zone', width: 10 },
+            { key: 'visitPlannedDate', header: 'Scheduled', width: 12, dataType: 'date' },
+            { key: 'visitCompletedDate', header: 'Closed', width: 12, dataType: 'date' },
+            { key: 'travelTime', header: 'Travel', width: 10, dataType: 'duration' },
+            { key: 'onsiteWorkingTime', header: 'Onsite', width: 10, dataType: 'duration' },
+            { key: 'actualResolutionTime', header: 'Res Time', width: 12, dataType: 'duration' },
+            { key: 'status', header: 'Status', width: 12 },
+        ],
+        'target-report': [
+            { key: 'zone.name', header: 'Zone', width: 16 },
+            { key: 'userName', header: 'User', width: 18 },
+            { key: 'targetPeriod', header: 'Period', width: 12 },
+            { key: 'periodType', header: 'Type', width: 10 },
+            { key: 'targetValue', header: 'Target', width: 14, dataType: 'currency' },
+            { key: 'actualValue', header: 'Actual', width: 14, dataType: 'currency' },
+            { key: 'achievement', header: 'Achievement', width: 12, dataType: 'percentage' },
+        ],
+        'zone-performance': [
+            { key: 'name', header: 'Zone', width: 16 },
+            { key: 'totalTickets', header: 'Total Tickets', width: 12, dataType: 'number' },
+            { key: 'resolvedTickets', header: 'Resolved', width: 12, dataType: 'number' },
+            { key: 'pendingTickets', header: 'Pending', width: 12, dataType: 'number' },
+            { key: 'resolutionRate', header: 'Resolution %', width: 12, dataType: 'percentage' },
+            { key: 'avgResolutionTime', header: 'Avg Time (hrs)', width: 14, dataType: 'number' },
+        ],
+        'agent-productivity': [
+            { key: 'name', header: 'Agent Name', width: 20 },
+            { key: 'email', header: 'Email', width: 24 },
+            { key: 'totalTickets', header: 'Total Tickets', width: 12, dataType: 'number' },
+            { key: 'resolvedTickets', header: 'Resolved', width: 12, dataType: 'number' },
+            { key: 'avgResolutionTime', header: 'Avg Time (hrs)', width: 14, dataType: 'number' },
+            { key: 'performanceScore', header: 'Score', width: 10, dataType: 'percentage' },
+        ],
+        'customer-performance': [
+            { key: 'companyName', header: 'Customer', width: 24 },
+            { key: 'totalTickets', header: 'Total Tickets', width: 12, dataType: 'number' },
+            { key: 'totalOfferValue', header: 'Offer Value', width: 14, dataType: 'currency' },
+            { key: 'totalPOValue', header: 'PO Value', width: 14, dataType: 'currency' },
+            { key: 'zone.name', header: 'Zone', width: 12 },
+        ],
+        'product-type-analysis': [
+            { key: 'productType', header: 'Product Type', width: 18 },
+            { key: 'offerCount', header: 'Offers', width: 10, dataType: 'number' },
+            { key: 'totalOfferValue', header: 'Offer Value', width: 14, dataType: 'currency' },
+            { key: 'poCount', header: 'POs', width: 10, dataType: 'number' },
+            { key: 'totalPOValue', header: 'PO Value', width: 14, dataType: 'currency' },
+            { key: 'conversionRate', header: 'Conversion %', width: 12, dataType: 'percentage' },
+        ],
+        'default': [
+            { key: 'id', header: 'ID', width: 10 },
+            { key: 'name', header: 'Name', width: 20 },
+            { key: 'status', header: 'Status', width: 12 },
+            { key: 'value', header: 'Value', width: 14, dataType: 'currency' },
+            { key: 'createdAt', header: 'Created', width: 12, dataType: 'date' },
+        ]
+    };
 
-// Export the main function for backward compatibility
-export default generateExcel;
+    return columns[reportType] || columns['default'];
+};

@@ -14,7 +14,7 @@ router.use(authenticate);
 router.get(
   '/',
   validateRequest,
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_MANAGER', 'ZONE_USER', 'EXPERT_HELPDESK']),
   getDashboardData
 );
 
@@ -22,7 +22,7 @@ router.get(
 router.get(
   '/status-distribution',
   validateRequest,
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_MANAGER', 'ZONE_USER', 'EXPERT_HELPDESK']),
   getStatusDistribution
 );
 
@@ -33,7 +33,7 @@ router.get(
     query('days').optional().isInt({ min: 1, max: 365 }).toInt(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_MANAGER', 'ZONE_USER', 'EXPERT_HELPDESK']),
   getTicketTrendsData
 );
 
@@ -49,7 +49,7 @@ router.get(
     query('servicePerson').optional().isString(),
     validateRequest
   ],
-  requireRole(['ADMIN']),
+  requireRole(['ADMIN', 'EXPERT_HELPDESK']),
   exportDashboardReport
 );
 

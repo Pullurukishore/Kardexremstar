@@ -30,6 +30,7 @@ interface TicketClientProps {
     limit?: string;
     view?: 'all' | 'unassigned' | 'assigned-to-zone' | 'assigned-to-service-person';
   };
+  basePath?: string; // e.g., '/admin/tickets' or '/expert/tickets'
 }
 
 function getStatusBadgeVariant(status: TicketStatus) {
@@ -82,7 +83,8 @@ const TicketClient = memo(function TicketClient({
   initialTickets,
   initialStats,
   initialPagination,
-  searchParams
+  searchParams,
+  basePath = '/admin/tickets'
 }: TicketClientProps) {
   const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
   const [stats, setStats] = useState<TicketStats>(initialStats);
@@ -424,11 +426,11 @@ const TicketClient = memo(function TicketClient({
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3 flex-1">
-                        <Link href={`/admin/tickets/${ticket.id}/list`} className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-xs hover:from-blue-600 hover:to-purple-700 transition-colors duration-200">
+                        <Link href={`${basePath}/${ticket.id}/list`} className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-xs hover:from-blue-600 hover:to-purple-700 transition-colors duration-200">
                           #{ticket.id}
                         </Link>
                         <div className="flex-1 min-w-0">
-                          <Link href={`/admin/tickets/${ticket.id}/list`} className="font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200 text-sm block truncate">
+                          <Link href={`${basePath}/${ticket.id}/list`} className="font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200 text-sm block truncate">
                             {ticket.title}
                           </Link>
                           <div className="text-xs text-gray-500 mt-1 line-clamp-2">
@@ -459,7 +461,7 @@ const TicketClient = memo(function TicketClient({
                     </div>
                     
                     <div className="mt-3 pt-3 border-t border-gray-100">
-                      <Link href={`/admin/tickets/${ticket.id}/list`} className="block">
+                      <Link href={`${basePath}/${ticket.id}/list`} className="block">
                         <button className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 touch-manipulation">
                           <Eye className="h-4 w-4 mr-2" />
                           View Ticket
@@ -489,11 +491,11 @@ const TicketClient = memo(function TicketClient({
                     <tr key={ticket.id} className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 transition-all duration-200">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <Link href={`/admin/tickets/${ticket.id}/list`} className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold hover:from-blue-600 hover:to-purple-700 transition-colors duration-200">
+                          <Link href={`${basePath}/${ticket.id}/list`} className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold hover:from-blue-600 hover:to-purple-700 transition-colors duration-200">
                             #{ticket.id}
                           </Link>
                           <div>
-                            <Link href={`/admin/tickets/${ticket.id}/list`} className="font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200">
+                            <Link href={`${basePath}/${ticket.id}/list`} className="font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200">
                               {ticket.title}
                             </Link>
                             <div className="text-sm text-gray-500 max-w-xs truncate">
@@ -521,7 +523,7 @@ const TicketClient = memo(function TicketClient({
                         {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}
                       </td>
                       <td className="py-4 px-6 text-right">
-                        <Link href={`/admin/tickets/${ticket.id}/list`}>
+                        <Link href={`${basePath}/${ticket.id}/list`}>
                           <button className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                             <Eye className="h-4 w-4 mr-1" />
                             View

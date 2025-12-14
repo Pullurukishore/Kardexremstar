@@ -52,7 +52,6 @@ export const TicketStatus = {
   WORK_IN_PROGRESS: 'WORK_IN_PROGRESS', // Alternative underscore format
   WAITING_CUSTOMER: 'WAITING_CUSTOMER',
   ONSITE_VISIT: 'ONSITE_VISIT',
-  ONSITE_VISIT_PLANNED: 'ONSITE_VISIT_PLANNED',
   ONSITE_VISIT_STARTED: 'ONSITE_VISIT_STARTED',
   ONSITE_VISIT_REACHED: 'ONSITE_VISIT_REACHED',
   ONSITE_VISIT_IN_PROGRESS: 'ONSITE_VISIT_IN_PROGRESS',
@@ -84,7 +83,6 @@ export type TicketStatusType =
   | 'WORK_IN_PROGRESS'
   | 'WAITING_CUSTOMER'
   | 'ONSITE_VISIT'
-  | 'ONSITE_VISIT_PLANNED'
   | 'ONSITE_VISIT_STARTED'
   | 'ONSITE_VISIT_REACHED'
   | 'ONSITE_VISIT_IN_PROGRESS'
@@ -178,14 +176,8 @@ const validTransitions: Record<TicketStatusType, TicketStatusType[]> = {
   
   // Onsite visit flow - comprehensive lifecycle
   [TicketStatus.ONSITE_VISIT]: [
-    TicketStatus.ONSITE_VISIT_PLANNED, 
+    TicketStatus.ONSITE_VISIT_STARTED, 
     TicketStatus.IN_PROGRESS, 
-    TicketStatus.CANCELLED
-  ],
-  
-  [TicketStatus.ONSITE_VISIT_PLANNED]: [
-    TicketStatus.ONSITE_VISIT_STARTED,
-    TicketStatus.IN_PROGRESS,
     TicketStatus.CANCELLED
   ],
   
@@ -546,7 +538,6 @@ export function StatusChangeDialog({
       [TicketStatus.CLOSED]: { label: 'Closed', shortLabel: 'Closed', category: 'Completion', description: 'Ticket is closed and complete' },
       [TicketStatus.CLOSED_PENDING]: { label: 'Pending Closure', shortLabel: 'Pending Close', category: 'Completion', description: 'Awaiting admin approval to close' },
       [TicketStatus.ONSITE_VISIT]: { label: 'Onsite Visit', shortLabel: 'Onsite', category: 'Onsite', description: 'Requires onsite visit' },
-      [TicketStatus.ONSITE_VISIT_PLANNED]: { label: 'Visit Planned', shortLabel: 'Visit Planned', category: 'Onsite', description: 'Onsite visit is scheduled' },
       [TicketStatus.ONSITE_VISIT_STARTED]: { label: 'Visit Started', shortLabel: 'Visit Started', category: 'Onsite', description: 'Technician started journey' },
       [TicketStatus.ONSITE_VISIT_REACHED]: { label: 'Visit Reached', shortLabel: 'Reached Site', category: 'Onsite', description: 'Technician reached location (auto-transitions to In Progress)' },
       [TicketStatus.ONSITE_VISIT_IN_PROGRESS]: { label: 'Visit In Progress', shortLabel: 'Work Onsite', category: 'Onsite', description: 'Work in progress at site' },
@@ -580,7 +571,7 @@ export function StatusChangeDialog({
         category: displayInfo.category,
         description: displayInfo.description,
         isDestructive: ['CANCELLED', 'CLOSED', 'ESCALATED'].includes(status),
-        requiresComment: ['CANCELLED', 'CLOSED', 'CLOSED_PENDING', 'RESOLVED', 'ESCALATED', 'ON_HOLD', 'ONSITE_VISIT_PLANNED'].includes(status)
+        requiresComment: ['CANCELLED', 'CLOSED', 'CLOSED_PENDING', 'RESOLVED', 'ESCALATED', 'ON_HOLD'].includes(status)
       };
     });
   }, [currentStatus, userRole]);
@@ -1032,8 +1023,8 @@ export function StatusChangeDialog({
                  selectedStatus === TicketStatus.ESCALATED ? 'Escalation Details' :
                  selectedStatus === TicketStatus.RESOLVED ? 'Resolution Summary' :
                  selectedStatus === TicketStatus.ON_HOLD ? 'Hold Reason' :
-                 selectedStatus === TicketStatus.ONSITE_VISIT_PLANNED ? 'Visit Planning Details' : 'Additional Notes'}
-                {(selectedStatus === TicketStatus.CLOSED || selectedStatus === TicketStatus.CLOSED_PENDING || selectedStatus === TicketStatus.RESOLVED || selectedStatus === TicketStatus.ONSITE_VISIT_PLANNED) && (
+                 'Additional Notes'}
+                {(selectedStatus === TicketStatus.CLOSED || selectedStatus === TicketStatus.CLOSED_PENDING || selectedStatus === TicketStatus.RESOLVED) && (
                   <Badge variant="destructive" className="text-xs">Required</Badge>
                 )}
               </Label>
@@ -1052,15 +1043,13 @@ export function StatusChangeDialog({
                     ? 'Provide escalation details and next steps...'
                     : selectedStatus === TicketStatus.ON_HOLD
                     ? 'Explain why this ticket is being put on hold...'
-                    : selectedStatus === TicketStatus.ONSITE_VISIT_PLANNED
-                    ? 'Provide visit planning details: When is the visit scheduled? Who will visit? What equipment/parts are needed? Customer contact details? Special instructions or access requirements?'
                     : 'Add any relevant notes or comments...'
                 }
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 rows={4}
                 className="w-full resize-none"
-                required={selectedStatus === TicketStatus.CLOSED || selectedStatus === TicketStatus.CLOSED_PENDING || selectedStatus === TicketStatus.RESOLVED || selectedStatus === TicketStatus.ONSITE_VISIT_PLANNED}
+                required={selectedStatus === TicketStatus.CLOSED || selectedStatus === TicketStatus.CLOSED_PENDING || selectedStatus === TicketStatus.RESOLVED}
               />
               <p className="text-xs text-muted-foreground">
                 {comments.length}/500 characters
@@ -1124,7 +1113,7 @@ export function StatusChangeDialog({
           <Button 
             onClick={handleStatusChange}
             disabled={!selectedStatus || isSubmitting || (showComments && !comments.trim()) || 
-              ((selectedStatus === TicketStatus.CLOSED || selectedStatus === TicketStatus.CLOSED_PENDING || selectedStatus === TicketStatus.RESOLVED || selectedStatus === TicketStatus.ONSITE_VISIT_PLANNED) && !comments.trim()) ||
+              ((selectedStatus === TicketStatus.CLOSED || selectedStatus === TicketStatus.CLOSED_PENDING || selectedStatus === TicketStatus.RESOLVED) && !comments.trim()) ||
               (requiresLocation(selectedStatus) && !currentLocation) ||
               (requiresPhoto(selectedStatus) && capturedPhotos.length === 0)}
             variant={selectedOption?.isDestructive ? 'destructive' : 'default'}

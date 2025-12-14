@@ -19,8 +19,8 @@ export const canManageCustomers = (req: Request, res: Response, next: NextFuncti
 
     const { role } = user;
 
-    // Only ADMIN can manage customers
-    if (role === 'ADMIN') {
+    // ADMIN and EXPERT_HELPDESK can manage customers
+    if (role === 'ADMIN' || role === 'EXPERT_HELPDESK') {
       return next();
     }
 
@@ -61,8 +61,8 @@ export const canManageContacts = (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    // ADMIN can manage contacts for any customer
-    if (role === 'ADMIN') {
+    // ADMIN and EXPERT_HELPDESK can manage contacts for any customer
+    if (role === 'ADMIN' || role === 'EXPERT_HELPDESK') {
       return next();
     }
 
@@ -107,13 +107,13 @@ export const canViewCustomers = (req: Request, res: Response, next: NextFunction
 
     const { role } = user;
 
-    // ADMIN and SERVICE_PERSON can view all customers
-    if (role === 'ADMIN' || role === 'SERVICE_PERSON') {
+    // ADMIN, EXPERT_HELPDESK, and SERVICE_PERSON can view all customers
+    if (role === 'ADMIN' || role === 'EXPERT_HELPDESK' || role === 'SERVICE_PERSON') {
       return next();
     }
 
-    // ZONE_USER can view customers in their assigned zones
-    if (role === 'ZONE_USER') {
+    // ZONE_USER and ZONE_MANAGER can view customers in their assigned zones
+    if (role === 'ZONE_USER' || role === 'ZONE_MANAGER') {
       return next();
     }
 

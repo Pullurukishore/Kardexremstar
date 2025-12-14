@@ -64,11 +64,43 @@ export function ServicePersonAttendanceReport({ reportData }: ServicePersonAtten
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<{[key: string]: boolean}>({});
 
+  // Safety check - if no report data, show loading state
+  if (!reportData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Loading Service Person Attendance Report...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">Please wait while we load the data.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const toggleDay = (dayKey: string) => {
     setExpandedDays(prev => ({ ...prev, [dayKey]: !prev[dayKey] }));
   };
 
-  const reports = Array.isArray(reportData.reports) ? reportData.reports : [];
+  const reports = Array.isArray(reportData?.reports) ? reportData.reports : [];
+  
+  // Additional safety check - if reports is empty, show empty state
+  if (!reports || reports.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Person Attendance Report</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-12">
+            <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-600 mb-2">No Reports Found</h3>
+            <p className="text-gray-500">No service person reports available for the selected period.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   // Create safe summary object with proper type conversion
   const safeSummary = {
@@ -233,9 +265,14 @@ export function ServicePersonAttendanceReport({ reportData }: ServicePersonAtten
                           <div>
                             <div className="font-medium text-gray-900">{person.name}</div>
                             <div className="text-sm text-gray-600">{person.email}</div>
-                            {person.zones.length > 0 && (
+                            {person.zones && person.zones.length > 0 && (
                               <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded mt-1">
-                                {person.zones.join(', ')}
+                                {person.zones.map((zone, idx) => (
+                                  <span key={idx}>
+                                    {zone.name}
+                                    {idx < person.zones.length - 1 && ', '}
+                                  </span>
+                                ))}
                               </div>
                             )}
                           </div>
@@ -411,7 +448,7 @@ export function ServicePersonAttendanceReport({ reportData }: ServicePersonAtten
                           <div className="flex gap-2 mt-2">
                             {selectedPerson.zones.map((zone, idx) => (
                               <Badge key={idx} variant="outline" className="bg-white">
-                                {zone}
+                                {zone.name}
                               </Badge>
                             ))}
                           </div>

@@ -8,9 +8,9 @@ import prisma from '../config/db';
 // Get all users with optional role filter
 export const getUsers = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Check if user is admin
-    if (req.user?.role !== 'ADMIN') {
-      return res.status(403).json({ message: 'Access denied. Admin role required.' });
+    // Check if user is admin or expert helpdesk
+    if (req.user?.role !== 'ADMIN' && req.user?.role !== 'EXPERT_HELPDESK') {
+      return res.status(403).json({ message: 'Access denied. Admin or Expert Helpdesk role required.' });
     }
 
     const { role, page = 1, limit = 50, search } = req.query;
@@ -91,7 +91,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Validate role
-    const validRoles: UserRole[] = ['ADMIN', 'ZONE_USER', 'SERVICE_PERSON', 'EXTERNAL_USER'];
+    const validRoles: UserRole[] = ['ADMIN', 'ZONE_USER', 'SERVICE_PERSON', 'EXTERNAL_USER', 'EXPERT_HELPDESK', 'ZONE_MANAGER'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }

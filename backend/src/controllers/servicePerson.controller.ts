@@ -25,7 +25,7 @@ type ServicePersonRequest = Request & {
   };
 };
 
-export const listServicePersons = async (req: Request, res: Response) => {
+export const listServicePersons = async (req: Request & { user?: AuthUser }, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 30;
@@ -34,6 +34,22 @@ export const listServicePersons = async (req: Request, res: Response) => {
 
     // Build where clause for search
     const where: any = { role: 'SERVICE_PERSON' };
+    
+    // For ZONE_USER and ZONE_MANAGER, only show service persons from their zones
+    if (req.user?.role === 'ZONE_USER' || req.user?.role === 'ZONE_MANAGER') {
+      where.serviceZones = {
+        some: {
+          serviceZone: {
+            servicePersons: {
+              some: {
+                userId: req.user.id
+              }
+            }
+          }
+        }
+      };
+    }
+    
     if (search) {
       where.OR = [
         { email: { contains: search, mode: 'insensitive' } },

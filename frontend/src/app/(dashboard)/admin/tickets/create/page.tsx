@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 // Removed apiClient usage to avoid auth/shape mismatch for zones fetch
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { Form } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 import api from '@/lib/api/axios';
@@ -59,7 +59,6 @@ type AssetFormValues = z.infer<typeof assetSchema>;
 
 export default function CreateTicketPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
@@ -133,11 +132,7 @@ export default function CreateTicketPage() {
         const zonesData: ZoneType[] = response.data?.data || [];
         setZones(zonesData);
       } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to load service zones. Please try again.',
-          variant: 'destructive',
-        });
+        toast.error('Failed to load service zones. Please try again.');
         setZones([]);
       } finally {
         setIsLoading(false);
@@ -189,13 +184,9 @@ export default function CreateTicketPage() {
         setContacts([]);
         setAssets([]);
       } catch (error) {
-        toast({
-          title: 'Error',
-          description: zoneId === 'all' 
-            ? 'Failed to load customers from all zones. Please try again.'
-            : 'Failed to load customers for selected zone. Please try again.',
-          variant: 'destructive',
-        });
+        toast.error(zoneId === 'all' 
+          ? 'Failed to load customers from all zones. Please try again.'
+          : 'Failed to load customers for selected zone. Please try again.');
         setCustomers([]);
       } finally {
         setIsLoadingCustomers(false);
@@ -260,22 +251,14 @@ export default function CreateTicketPage() {
     try {
       updateCustomerData();
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update customer data. Please try again.',
-        variant: 'destructive',
-      });
+      toast.error('Failed to update customer data. Please try again.');
     }
-  }, [customerId, form, customers, toast]);
+  }, [customerId, form, customers]);
 
   // Handle asset creation
   const handleCreateAsset = async (values: AssetFormValues) => {
     if (!customerId) {
-      toast({
-        title: 'Error',
-        description: 'Please select a customer first',
-        variant: 'destructive',
-      });
+      toast.error('Please select a customer first');
       return;
     }
 
@@ -307,21 +290,14 @@ export default function CreateTicketPage() {
       assetForm.reset();
       setIsAddAssetOpen(false);
       
-      toast({
-        title: 'Success',
-        description: `Asset "${newAsset.model}" has been created and selected.`,
-      });
+      toast.success(`Asset "${newAsset.model}" has been created and selected.`);
     } catch (error: any) {
       let errorMessage = 'Failed to create asset. Please try again.';
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
       
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast.error(errorMessage);
     } finally {
       setIsCreatingAsset(false);
     }
@@ -330,11 +306,7 @@ export default function CreateTicketPage() {
   // Handle contact creation
   const handleCreateContact = async (values: ContactFormValues) => {
     if (!customerId) {
-      toast({
-        title: 'Error',
-        description: 'Please select a customer first',
-        variant: 'destructive',
-      });
+      toast.error('Please select a customer first');
       return;
     }
 
@@ -366,21 +338,14 @@ export default function CreateTicketPage() {
       contactForm.reset();
       setIsAddContactOpen(false);
       
-      toast({
-        title: 'Success',
-        description: `Contact "${newContact.name}" has been created and selected.`,
-      });
+      toast.success(`Contact "${newContact.name}" has been created and selected.`);
     } catch (error: any) {
       let errorMessage = 'Failed to create contact. Please try again.';
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
       
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast.error(errorMessage);
     } finally {
       setIsCreatingContact(false);
     }
@@ -416,6 +381,9 @@ export default function CreateTicketPage() {
 
       const ticketData = response.data;
       
+      // Log the response for debugging
+      console.log('Ticket creation response:', ticketData);
+      
       // Get customer and zone names for better success message
       const selectedCustomer = customers.find(c => c.id === parseInt(values.customerId));
       let zoneName = 'selected zone';
@@ -427,22 +395,32 @@ export default function CreateTicketPage() {
         zoneName = selectedZone?.name || 'selected zone';
       }
       
-      toast({
-        title: '🎉 Ticket Created Successfully!',
-        description: `Ticket #${ticketData.id || 'New'} has been created for ${selectedCustomer?.companyName || 'customer'} in ${zoneName}. Redirecting to tickets page...`,
-        duration: 3000,
-      });
+      // Extract ticket details from response
+      const ticketId = ticketData?.id;
+      const ticketTitle = ticketData?.title;
+      const customerName = ticketData?.customer?.companyName || selectedCustomer?.companyName || 'customer';
+      const ticketZone = ticketData?.zone?.name || zoneName;
+      
+      console.log('Showing success toast with:', { ticketId, ticketTitle, customerName, ticketZone });
+      
+      // Show success message
+      const successMessage = `✅ Ticket Created Successfully!\n\nTicket #${ticketId}: ${ticketTitle}\nCustomer: ${customerName}\nZone: ${ticketZone}\n\nRedirecting to tickets page...`;
+      console.log('Success message:', successMessage);
+      
+      // Show toast notification (like login)
+      toast.success('🎉 Ticket Created Successfully!\nWelcome! Redirecting to tickets page...');
       
       // Reset form to allow creating another ticket if needed
       form.reset({
         priority: 'MEDIUM',
       });
       
-      // Wait for user to see the success message, then redirect
+      // Wait longer for user to see the success message, then redirect
       setTimeout(() => {
+        console.log('Redirecting to /admin/tickets');
         router.push('/admin/tickets');
         router.refresh(); // Ensure the page updates with the new data
-      }, 1500);
+      }, 3000);
     } catch (error: any) {
       let errorMessage = 'Failed to create ticket. Please try again.';
       if (error.response?.data?.message) {
@@ -453,12 +431,7 @@ export default function CreateTicketPage() {
         errorMessage = error.message;
       }
       
-      toast({
-        title: '❌ Error Creating Ticket',
-        description: errorMessage,
-        variant: 'destructive',
-        duration: 5000,
-      });
+      toast.error(`❌ Error Creating Ticket: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }

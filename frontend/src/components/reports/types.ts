@@ -36,7 +36,7 @@ export interface ServicePersonReport {
   name: string;
   email: string;
   phone?: string;
-  zones: string[];
+  zones: Array<{ id: number; name: string }>;
   summary: {
     totalWorkingDays?: number; // Legacy field for compatibility
     presentDays?: number; // New field from backend

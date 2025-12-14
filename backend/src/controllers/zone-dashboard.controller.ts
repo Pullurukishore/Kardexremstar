@@ -89,6 +89,7 @@ function calculateBusinessHoursInMinutes(startDate: Date, endDate: Date): number
   const BUSINESS_START_HOUR = 9;
   const BUSINESS_END_HOUR = 17;
   const BUSINESS_END_MINUTE = 30;
+  const BUSINESS_MINUTES_PER_DAY = (BUSINESS_END_HOUR - BUSINESS_START_HOUR) * 60 + BUSINESS_END_MINUTE; // 510 minutes (8.5 hours)
 
   while (currentDate < finalDate) {
     const dayOfWeek = getDay(currentDate); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -355,14 +356,14 @@ async function calculateTechnicianEfficiency(zoneId: number): Promise<number> {
       SELECT AVG(efficiency) as avg_efficiency
       FROM (
         SELECT 
-          t.assigned_to_id,
+          t."assignedToId",
           COUNT(DISTINCT CASE WHEN t.status = 'RESOLVED' THEN t.id END) * 100.0 / 
           NULLIF(COUNT(DISTINCT t.id), 0) as efficiency
         FROM "Ticket" t
         JOIN "Customer" c ON t."customerId" = c.id
         WHERE c."serviceZoneId" = ${zoneId}
         AND t."createdAt" >= NOW() - INTERVAL '30 days'
-        GROUP BY t.assigned_to_id
+        GROUP BY t."assignedToId"
       ) as tech_efficiency
     `;
     return Number(result[0]?.avg_efficiency) || 0;
@@ -469,13 +470,17 @@ async function calculatePartsAvailability(zoneId: number): Promise<number> {
 
 async function calculateEquipmentUptime(zoneId: number): Promise<number> {
   try {
-    const result = await prisma.$queryRaw<Array<{ avg_uptime: number | null }>>`
-      SELECT AVG("uptimePercentage") as avg_uptime
+    // Calculate uptime based on ticket resolution rate for assets
+    const result = await prisma.$queryRaw<Array<{ uptime_percentage: number | null }>>`
+      SELECT 
+        COUNT(CASE WHEN t.status IN ('RESOLVED', 'CLOSED') THEN 1 END) * 100.0 /
+        NULLIF(COUNT(*), 0) as uptime_percentage
       FROM "Asset" a
+      JOIN "Ticket" t ON a.id = t."assetId"
       JOIN "Customer" c ON a."customerId" = c.id
       WHERE c."serviceZoneId" = ${zoneId}
     `;
-    return Number(result[0]?.avg_uptime) || 0;
+    return Number(result[0]?.uptime_percentage) || 0;
   } catch (error) {
     return 0;
   }
@@ -510,12 +515,12 @@ async function calculateFirstCallResolutionRate(zoneId: number): Promise<number>
 async function calculateCustomerSatisfactionScore(zoneId: number): Promise<number> {
   try {
     const result = await prisma.$queryRaw<Array<{ avg_satisfaction_score: number | null }>>`
-      SELECT AVG("rating") as avg_satisfaction_score
-      FROM "ServiceFeedback" sf
-      JOIN "Ticket" t ON sf."ticketId" = t.id
+      SELECT AVG(f."rating") as avg_satisfaction_score
+      FROM "TicketFeedback" f
+      JOIN "Ticket" t ON f."ticketId" = t.id
       JOIN "Customer" c ON t."customerId" = c.id
       WHERE c."serviceZoneId" = ${zoneId}
-      AND sf."createdAt" >= NOW() - INTERVAL '30 days'
+      AND f."submittedAt" >= NOW() - INTERVAL '30 days'
     `;
     // Convert to percentage (assuming rating is 1-5 scale)
     const score = result[0]?.avg_satisfaction_score;
@@ -626,6 +631,12 @@ export const getZoneDashboardData = async (req: Request, res: Response) => {
     // Check if user is associated with a customer that has a zone
     else if (userWithZone.customer && userWithZone.customer.serviceZone) {
       zone = userWithZone.customer.serviceZone;
+    }
+    // Check if user has a direct zoneId assignment (for ZONE_MANAGER)
+    else if (userWithZone.zoneId) {
+      zone = await prisma.serviceZone.findUnique({
+        where: { id: parseInt(userWithZone.zoneId.toString()) }
+      });
     }
     
     if (!zone) {

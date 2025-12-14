@@ -51,8 +51,8 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
     
     if (userRole === 'ADMIN') {
       // Admin can view all customers
-    } else if (userRole === 'ZONE_USER') {
-      // Zone users can only view customers in their assigned zones
+    } else if (userRole === 'ZONE_USER' || userRole === 'ZONE_MANAGER') {
+      // Zone users and zone managers can only view customers in their assigned zones
       const userWithZones = await prisma.user.findUnique({
         where: { id: userId },
         include: {
@@ -198,8 +198,8 @@ export const getCustomer = async (req: AuthenticatedRequest, res: Response) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
     
-    if (userRole === 'ZONE_USER') {
-      // Allow ZONE_USER to view customers in their assigned service zones
+    if (userRole === 'ZONE_USER' || userRole === 'ZONE_MANAGER') {
+      // Allow ZONE_USER and ZONE_MANAGER to view customers in their assigned service zones
       const userWithZones = await prisma.user.findUnique({
         where: { id: userId },
         include: { serviceZones: { select: { serviceZoneId: true } } }

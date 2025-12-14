@@ -31,6 +31,7 @@ model User {
   role                           UserRole                 @default(ZONE_USER)
   name                           String?
   phone                          String?
+  shortForm                      String?                  @db.VarChar(5) // User short form for offer IDs
   zoneId                         String?
   createdAt                      DateTime                 @default(now())
   updatedAt                      DateTime                 @updatedAt
@@ -78,6 +79,23 @@ model User {
   ticketReports                  TicketReport[]           @relation("UserTicketReports")
   statusHistoryChanges           TicketStatusHistory[]    @relation("UserStatusChanges")
   customer                       Customer?                @relation("UserCustomer", fields: [customerId], references: [id])
+  
+  // Offer Funnel Relations
+  createdOffers                   Offer[]                  @relation("OfferCreatedBy")
+  updatedOffers                   Offer[]                  @relation("OfferUpdatedBy")
+  assignedOffers                  Offer[]                  @relation("OfferAssignedTo")
+  createdSpareParts               SparePart[]              @relation("SparePartCreatedBy")
+  updatedSpareParts               SparePart[]              @relation("SparePartUpdatedBy")
+  userTargets                     UserTarget[]             @relation("UserTargets")
+  createdZoneTargets              ZoneTarget[]             @relation("ZoneTargetCreatedBy")
+  updatedZoneTargets              ZoneTarget[]             @relation("ZoneTargetUpdatedBy")
+  createdUserTargets              UserTarget[]             @relation("UserTargetCreatedBy")
+  updatedUserTargets              UserTarget[]             @relation("UserTargetUpdatedBy")
+  stageRemarks                    StageRemark[]            @relation("StageRemarkCreatedBy")
+  
+  // Activity Scheduling Relations
+  scheduledActivities             ActivitySchedule[]       @relation("ScheduledActivities")
+  createdSchedules                ActivitySchedule[]       @relation("CreatedSchedules")
 
   @@index([role])
   @@index([isActive])
@@ -106,25 +124,32 @@ model Customer {
   ratings       Rating[]    @relation("CustomerRatings")
   tickets       Ticket[]    @relation("CustomerTickets")
   users         User[]      @relation("UserCustomer")
+  offers        Offer[]     @relation("CustomerOffers")
+  activitySchedules ActivitySchedule[] @relation("CustomerActivitySchedules")
 }
 
 model Contact {
-  id           Int         @id @default(autoincrement())
-  name         String
-  email        String?
-  phone        String
-  role         ContactRole @default(CONTACT)
-  customerId   Int
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  passwordHash String?
-  customer     Customer    @relation("CustomerContacts", fields: [customerId], references: [id])
-  tickets      Ticket[]    @relation("ContactTickets")
+  id                Int         @id @default(autoincrement())
+  name              String
+  contactPersonName String?     // For Offer Funnel compatibility
+  email             String?
+  phone             String
+  contactNumber     String?     // Alias for phone for Offer Funnel compatibility
+  role              ContactRole @default(CONTACT)
+  isActive          Boolean     @default(true) // For Offer Funnel compatibility
+  customerId        Int
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  passwordHash      String?
+  customer          Customer    @relation("CustomerContacts", fields: [customerId], references: [id])
+  tickets           Ticket[]    @relation("ContactTickets")
+  offers            Offer[]     @relation("ContactOffers")
 }
 
 model ServiceZone {
   id             Int                 @id @default(autoincrement())
   name           String
+  shortForm      String              @default("X") @db.VarChar(3) // Zone abbreviation for offer IDs
   description    String?
   isActive       Boolean             @default(true)
   createdAt      DateTime            @default(now())
@@ -132,6 +157,9 @@ model ServiceZone {
   customers      Customer[]
   servicePersons ServicePersonZone[] @relation("ServiceZonePersons")
   tickets        Ticket[]            @relation("TicketZone")
+  offers         Offer[]             @relation("OfferZone")
+  zoneTargets    ZoneTarget[]        @relation("ZoneTargets")
+  activitySchedules ActivitySchedule[] @relation("ZoneActivitySchedules")
 }
 
 model ServicePersonZone {
@@ -156,6 +184,7 @@ model Asset {
   customer       Customer         @relation("CustomerAssets", fields: [customerId], references: [id])
   serviceHistory ServiceHistory[] @relation("TicketServiceHistory")
   tickets        Ticket[]         @relation("AssetTickets")
+  offerAssets    OfferAsset[]     @relation("AssetToOffers")
 }
 
 model Ticket {
@@ -227,6 +256,7 @@ model Ticket {
   notes                   TicketNote[]          @relation("TicketNotes")
   reports                 TicketReport[]        @relation("TicketReports")
   statusHistory           TicketStatusHistory[] @relation("TicketStatusHistory")
+  scheduledActivities     ActivitySchedule[]    @relation("ScheduledTickets")
 
   @@index([status, assignedToId])
   @@index([customerId, status])
@@ -329,6 +359,8 @@ model AuditLog {
   performedBy                User?    @relation("UserAuditLogs", fields: [performedById], references: [id])
   ticket                     Ticket?  @relation("TicketAuditLogs", fields: [ticketId], references: [id], onDelete: Cascade)
   User_AuditLog_userIdToUser User?    @relation("AuditLog_userIdToUser", fields: [userId], references: [id])
+  offer                      Offer?   @relation("OfferAuditLogs", fields: [offerId], references: [id])
+  offerId                    Int?     // Direct reference to offer for easier querying
 
   @@index([performedById])
   @@index([performedAt])
@@ -337,6 +369,7 @@ model AuditLog {
   @@index([entityType, entityId], map: "AuditLog_entity_idx")
   @@index([ticketId])
   @@index([userId])
+  @@index([offerId])
 }
 
 model SLAPolicy {
@@ -498,7 +531,7 @@ model DailyActivityLog {
   userId        Int
   ticketId      Int?
   activityType  ActivityType
-  title         String
+  title         String?
   description   String?
   startTime     DateTime
   endTime       DateTime?
@@ -517,6 +550,54 @@ model DailyActivityLog {
   @@index([userId, startTime])
   @@index([ticketId])
   @@index([activityType])
+}
+
+model ActivitySchedule {
+  id                Int              @id @default(autoincrement())
+  servicePersonId   Int
+  servicePerson     User             @relation("ScheduledActivities", fields: [servicePersonId], references: [id], onDelete: Cascade)
+  scheduledById      Int
+  scheduledBy       User             @relation("CreatedSchedules", fields: [scheduledById], references: [id])
+  
+  // Activity Details
+  description       String?
+  activityType      ActivityType
+  priority          SchedulePriority @default(MEDIUM)
+  
+  // Scheduling
+  scheduledDate     DateTime
+  estimatedDuration Float?           // Duration in hours
+  location          String?
+  
+  // Status
+  status            ScheduleStatus   @default(PENDING)
+  acceptedAt        DateTime?
+  rejectedAt        DateTime?
+  rejectionReason   String?
+  completedAt       DateTime?
+  
+  // Relations
+  ticketId          Int?
+  ticket            Ticket?          @relation("ScheduledTickets", fields: [ticketId], references: [id], onDelete: SetNull)
+  zoneId            Int?
+  zone              ServiceZone?     @relation("ZoneActivitySchedules", fields: [zoneId], references: [id], onDelete: SetNull)
+  customerId        Int?
+  customer          Customer?        @relation("CustomerActivitySchedules", fields: [customerId], references: [id], onDelete: SetNull)
+  
+  // Assets (multiple assets can be associated)
+  assetIds          Json?            // Array of asset IDs
+  
+  // Metadata
+  notes             String?
+  metadata          Json?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([servicePersonId, scheduledDate])
+  @@index([scheduledById])
+  @@index([status])
+  @@index([scheduledDate])
+  @@index([ticketId])
 }
 
 model ActivityStage {
@@ -560,11 +641,242 @@ model ActivityReport {
   @@index([createdAt])
 }
 
+// Offer Funnel Models
+model Offer {
+  id                    Int              @id @default(autoincrement())
+  
+  // Basic Information
+  offerReferenceNumber  String           @unique // offer reference number
+  offerReferenceDate    DateTime?        // offer reference date
+  title                 String?
+  description           String?
+  productType           ProductType?     // product type
+  lead                  LeadStatus?      // lead
+  
+  // Customer Information (duplicated for easy access)
+  registrationDate      DateTime?        // reg date
+  company               String?          // company
+  location              String?          // location
+  department            String?          // department
+  
+  // Contact Information (duplicated for easy access)
+  contactPersonName     String?          // contact person name
+  contactNumber         String?          // contact number
+  email                 String?          // email
+  
+  // Asset Information (duplicated for easy access)
+  machineSerialNumber   String?          // machine serial number
+  
+  // Status & Progress
+  status                OfferStatus      @default(OPEN)
+  stage                 OfferStage       @default(INITIAL)
+  priority              Priority         @default(MEDIUM)
+  
+  // Customer & Contact
+  customerId            Int
+  contactId             Int
+  
+  // Financial Information
+  offerValue            Decimal?         @db.Decimal(12, 2) // Updated field name as per your requirement
+  offerMonth            String?          // Added as per your requirement (format: "YYYY-MM")
+  poExpectedMonth       String?          // Added as per your requirement (format: "YYYY-MM")
+  probabilityPercentage Int?             @db.SmallInt // Added as per your requirement (0-100)
+  
+  // PO Information
+  poNumber              String?          // Added as per your requirement
+  poDate                DateTime?        // Added as per your requirement
+  poValue               Decimal?         @db.Decimal(12, 2) // Added as per your requirement
+  poReceivedMonth       String?          // Added as per your requirement (format: "YYYY-MM")
+  
+  // Business Information
+  openFunnel            Boolean          @default(true) // Added as per your requirement
+  remarks               String?          // Added as per your requirement
+  
+  // System Dates
+  bookingDateInSap      DateTime?        // Added as per your requirement
+  offerEnteredInCrm     DateTime?        // Added as per your requirement
+  offerClosedInCrm      DateTime?        // Added as per your requirement
+  
+  // Assignment
+  zoneId                Int
+  assignedToId          Int?
+  
+  // Tracking
+  createdById           Int
+  updatedById           Int
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  
+  // Relations
+  customer              Customer         @relation("CustomerOffers", fields: [customerId], references: [id])
+  contact               Contact          @relation("ContactOffers", fields: [contactId], references: [id])
+  zone                  ServiceZone     @relation("OfferZone", fields: [zoneId], references: [id])
+  assignedTo            User?            @relation("OfferAssignedTo", fields: [assignedToId], references: [id])
+  createdBy             User             @relation("OfferCreatedBy", fields: [createdById], references: [id])
+  updatedBy             User             @relation("OfferUpdatedBy", fields: [updatedById], references: [id])
+  
+  // Many-to-many relationship with assets
+  offerAssets           OfferAsset[]     @relation("OfferToAssets")
+  // Many-to-many relationship with spare parts
+  offerSpareParts       OfferSparePart[] @relation("OfferToSpareParts")
+  auditLogs             AuditLog[]       @relation("OfferAuditLogs")
+  stageRemarks          StageRemark[]    @relation("OfferStageRemarks")
+  
+  @@index([customerId])
+  @@index([zoneId])
+  @@index([status])
+  @@index([stage])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@index([offerReferenceNumber])
+  @@index([poNumber])
+  @@index([zoneId, stage]) // Composite index for zone-wise performance queries
+  @@index([createdById, createdAt]) // Composite index for user performance queries
+  @@index([customerId, stage]) // Composite index for customer performance queries
+}
+
+// Junction table for Offer-Asset many-to-many relationship
+model OfferAsset {
+  id        Int      @id @default(autoincrement())
+  offerId   Int
+  assetId   Int
+  createdAt DateTime @default(now())
+  
+  // Relations
+  offer     Offer    @relation("OfferToAssets", fields: [offerId], references: [id], onDelete: Cascade)
+  asset     Asset    @relation("AssetToOffers", fields: [assetId], references: [id], onDelete: Cascade)
+  
+  @@unique([offerId, assetId])
+  @@index([offerId])
+  @@index([assetId])
+}
+
+// Stage-wise remarks tracking for offers
+model StageRemark {
+  id          Int         @id @default(autoincrement())
+  offerId     Int
+  stage       OfferStage  // The stage when this remark was added
+  remarks     String      // The remark content
+  createdById Int
+  createdAt   DateTime    @default(now())
+  
+  // Relations
+  offer       Offer       @relation("OfferStageRemarks", fields: [offerId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation("StageRemarkCreatedBy", fields: [createdById], references: [id])
+  
+  @@index([offerId])
+  @@index([stage])
+  @@index([createdAt])
+}
+
+// Spare Parts model for SSP product type
+model SparePart {
+  id              Int               @id @default(autoincrement())
+  name            String            // Spare part name
+  partNumber      String            @unique // Unique part number
+  description     String?           // Description of the spare part
+  category        String?           // Category (e.g., "Hardware", "Software", "Consumables")
+  basePrice       Decimal           @db.Decimal(10, 2) // Base price in INR
+  imageUrl        String?           // URL to spare part image
+  specifications  String?           // JSON string for technical specifications
+  status          SparePartStatus   @default(ACTIVE)
+  
+  // Tracking
+  createdById     Int
+  updatedById     Int
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relations
+  createdBy       User              @relation("SparePartCreatedBy", fields: [createdById], references: [id])
+  updatedBy       User              @relation("SparePartUpdatedBy", fields: [updatedById], references: [id])
+  offerSpareParts OfferSparePart[]  @relation("SparePartToOffers")
+  
+  @@index([partNumber])
+  @@index([category])
+  @@index([status])
+  @@index([name])
+}
+
+// Junction table for Offer-SparePart relationship with custom pricing
+model OfferSparePart {
+  id          Int       @id @default(autoincrement())
+  offerId     Int
+  sparePartId Int
+  quantity    Int       @default(1)
+  unitPrice   Decimal   @db.Decimal(10, 2) // Custom price for this offer (can override base price)
+  totalPrice  Decimal   @db.Decimal(10, 2) // quantity * unitPrice
+  notes       String?   // Any specific notes for this spare part in this offer
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  offer       Offer     @relation("OfferToSpareParts", fields: [offerId], references: [id], onDelete: Cascade)
+  sparePart   SparePart @relation("SparePartToOffers", fields: [sparePartId], references: [id], onDelete: Cascade)
+  
+  @@unique([offerId, sparePartId])
+  @@index([offerId])
+  @@index([sparePartId])
+}
+
+// Target Management Models for Director/Admin
+model ZoneTarget {
+  id                 Int          @id @default(autoincrement())
+  serviceZoneId      Int
+  targetPeriod       String       // Format: "YYYY-MM" for monthly or "YYYY" for yearly
+  periodType         PeriodType   @default(MONTHLY)
+  productType        ProductType? // Optional: target for specific product type
+  targetValue        Decimal      @db.Decimal(12, 2) // Target revenue value
+  targetOfferCount   Int?         // Target number of offers (optional)
+  createdById        Int
+  updatedById        Int
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  
+  serviceZone        ServiceZone  @relation("ZoneTargets", fields: [serviceZoneId], references: [id])
+  createdBy          User         @relation("ZoneTargetCreatedBy", fields: [createdById], references: [id])
+  updatedBy          User         @relation("ZoneTargetUpdatedBy", fields: [updatedById], references: [id])
+  
+  @@unique([serviceZoneId, targetPeriod, periodType, productType])
+  @@index([serviceZoneId])
+  @@index([targetPeriod])
+  @@index([productType])
+}
+
+model UserTarget {
+  id                 Int          @id @default(autoincrement())
+  userId             Int
+  targetPeriod       String       // Format: "YYYY-MM" for monthly or "YYYY" for yearly
+  periodType         PeriodType   @default(MONTHLY)
+  productType        ProductType? // Optional: target for specific product type
+  targetValue        Decimal      @db.Decimal(12, 2) // Target revenue value
+  targetOfferCount   Int?         // Target number of offers (optional)
+  createdById        Int
+  updatedById        Int
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  
+  user               User         @relation("UserTargets", fields: [userId], references: [id])
+  createdBy          User         @relation("UserTargetCreatedBy", fields: [createdById], references: [id])
+  updatedBy          User         @relation("UserTargetUpdatedBy", fields: [updatedById], references: [id])
+  
+  @@unique([userId, targetPeriod, periodType, productType])
+  @@index([userId])
+  @@index([targetPeriod])
+  @@index([productType])
+}
+
+enum LeadStatus {
+  YES
+  NO
+}
+
 enum UserRole {
   ADMIN
+  ZONE_MANAGER
   ZONE_USER
   SERVICE_PERSON
   EXTERNAL_USER
+  EXPERT_HELPDESK
 }
 
 enum ContactRole {
@@ -695,8 +1007,70 @@ enum StageType {
   CLEANUP
 }
 
+enum ScheduleStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum SchedulePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 enum ReportType {
   COMPLETION
   CLOSURE
   SUMMARY
+}
+
+// Offer Funnel Enums
+enum OfferStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  QUOTED
+  NEGOTIATION
+  WON
+  LOST
+  ON_HOLD
+  CANCELLED
+}
+
+enum OfferStage {
+  INITIAL
+  PROPOSAL_SENT
+  NEGOTIATION
+  FINAL_APPROVAL
+  PO_RECEIVED
+  ORDER_BOOKED
+  WON
+  LOST
+}
+
+enum ProductType {
+  RELOCATION
+  CONTRACT
+  SPP
+  UPGRADE_KIT
+  SOFTWARE
+  BD_CHARGES
+  BD_SPARE
+  MIDLIFE_UPGRADE
+  RETROFIT_KIT
+}
+
+enum PeriodType {
+  MONTHLY
+  YEARLY
+}
+
+enum SparePartStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
 }

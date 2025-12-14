@@ -155,10 +155,6 @@ export default function TicketWorkDashboard({
       const response = await apiClient.patch(`/tickets/${ticketId}/status`, updateData);
       
       if (response.data) {
-        toast({
-          title: "Status Updated",
-          description: `Ticket status updated to ${newStatus}`
-        });
         setSelectedTicket(null);
         setStatusComment('');
         onRefreshTickets();

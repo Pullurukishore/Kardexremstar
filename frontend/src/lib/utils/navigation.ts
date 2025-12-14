@@ -4,6 +4,8 @@ export function getRoleBasedRedirect(role?: UserRole): string {
   switch (role) {
     case UserRole.ADMIN:
       return '/admin/dashboard';
+    case UserRole.EXPERT_HELPDESK:
+      return '/expert/dashboard';
     case UserRole.SERVICE_PERSON:
       return '/service-person/dashboard';
     case UserRole.ZONE_USER:
@@ -25,9 +27,11 @@ export function isRouteAccessible(route: string, userRole?: UserRole): boolean {
 
   // Role-based route access
   const roleRoutes: Record<UserRole, string[]> = {
-    [UserRole.ADMIN]: ['/admin', '/api/admin', '/admin/FSA', '/api/assets', '/api/customers'],
+    [UserRole.ADMIN]: ['/admin', '/api/admin', '/admin/FSA', '/api/assets', '/api/customers', '/api/zone-users'],
+    [UserRole.ZONE_MANAGER]: ['/zone-manager', '/api/zone-manager'],
     [UserRole.SERVICE_PERSON]: ['/service-person', '/api/service-person'],
     [UserRole.ZONE_USER]: ['/zone', '/api/zone'],
+    [UserRole.EXPERT_HELPDESK]: ['/expert', '/api/expert', '/api/tickets', '/api/offers'],
     [UserRole.EXTERNAL_USER]: ['/external', '/api/external', '/dashboard'],
   };
 

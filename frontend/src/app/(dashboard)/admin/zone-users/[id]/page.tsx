@@ -183,7 +183,7 @@ export default function ZoneUserDetailsPage() {
               className="text-white hover:bg-white/20 hover:text-white"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Zone Users
+              Back to Zone Users & Managers
             </Button>
             <div className="flex items-center space-x-3">
               <Badge 
@@ -222,7 +222,7 @@ export default function ZoneUserDetailsPage() {
               <h1 className="text-3xl font-bold mb-2">{user.name || user.email}</h1>
               <p className="text-cyan-100 flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Zone User Details & Management
+                Zone User & Manager Details
               </p>
             </div>
           </div>
@@ -239,7 +239,7 @@ export default function ZoneUserDetailsPage() {
             className="text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            Back to List
           </Button>
           <div className="flex items-center gap-2">
             <Link href={`/admin/zone-users/${user.id}/edit`}>

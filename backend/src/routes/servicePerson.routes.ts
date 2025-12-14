@@ -17,7 +17,7 @@ router.use(authenticate);
 // Get all service persons
 router.get(
   '/',
-  requireRole(['ADMIN', 'ZONE_USER', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'ZONE_USER', 'ZONE_MANAGER', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   listServicePersons
 );
 
@@ -28,7 +28,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid service person ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'ZONE_USER']),
+  requireRole(['ADMIN', 'ZONE_USER', 'ZONE_MANAGER', 'EXPERT_HELPDESK']),
   getServicePerson
 );
 
@@ -44,7 +44,7 @@ router.post(
     body('serviceZoneIds.*').optional().isInt().withMessage('Each service zone ID must be an integer'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'ZONE_USER']),
+  requireRole(['ADMIN', 'ZONE_USER', 'ZONE_MANAGER', 'EXPERT_HELPDESK']),
   createServicePerson
 );
 
@@ -59,7 +59,7 @@ router.put(
     body('serviceZoneIds.*').optional().isInt().withMessage('Each service zone ID must be an integer'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'ZONE_USER']),
+  requireRole(['ADMIN', 'ZONE_USER', 'ZONE_MANAGER', 'EXPERT_HELPDESK']),
   updateServicePerson
 );
 
@@ -70,7 +70,7 @@ router.delete(
     param('id').isInt().toInt().withMessage('Invalid service person ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'ZONE_USER']),
+  requireRole(['ADMIN', 'ZONE_USER', 'ZONE_MANAGER', 'EXPERT_HELPDESK']),
   deleteServicePerson
 );
 

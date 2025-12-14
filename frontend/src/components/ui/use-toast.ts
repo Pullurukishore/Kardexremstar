@@ -1,5 +1,6 @@
 import * as React from "react"
 import { type ToastActionElement, type ToastProps } from "@/components/ui/toast"
+import { toast as sonnerToast } from "sonner"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -138,10 +139,12 @@ type Toast = Omit<ToasterToast, "id">
 function toast({ ...props }: Toast) {
   const id = genId()
 
-  const update = (props: ToasterToast) =>
+  // Keep existing reducer/dispatch behavior (for compatibility),
+  // but also forward the message to Sonner so it actually shows.
+  const update = (updateProps: ToasterToast) =>
     dispatch({
       type: "UPDATE_TOAST",
-      toast: { ...props, id },
+      toast: { ...updateProps, id },
     })
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
@@ -157,8 +160,23 @@ function toast({ ...props }: Toast) {
     },
   })
 
+  // Build a simple text message from title + description for Sonner
+  const { title, description, variant } = props as ToasterToast & { variant?: string }
+  const parts: string[] = []
+  if (title) parts.push(typeof title === "string" ? title : String(title))
+  if (description) parts.push(typeof description === "string" ? description : String(description))
+  const message = parts.join("\n")
+
+  if (message) {
+    if (variant === "destructive") {
+      sonnerToast.error(message)
+    } else {
+      sonnerToast(message)
+    }
+  }
+
   return {
-    id: id,
+    id,
     dismiss,
     update,
   }

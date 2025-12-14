@@ -44,7 +44,11 @@ export default function RootLayout({
                 <PinGuard>
                   {children}
                 </PinGuard>
-                <Toaster position="top-center" richColors closeButton />
+                <Toaster 
+                  position="top-center" 
+                  closeButton
+                  theme="light"
+                />
               </NavigationProvider>
             </QueryProvider>
           </AuthProvider>

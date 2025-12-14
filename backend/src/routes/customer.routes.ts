@@ -79,7 +79,7 @@ router.post(
     body('status').optional().isIn(['ACTIVE', 'MAINTENANCE', 'INACTIVE']).withMessage('Invalid status'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'ZONE_USER']),
+  requireRole(['ADMIN', 'ZONE_USER', 'EXPERT_HELPDESK']),
   (req: Request, res: Response, next: NextFunction) => {
     // Set the customerId from the URL parameter
     req.body.customerId = parseInt(req.params.id);

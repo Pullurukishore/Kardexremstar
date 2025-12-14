@@ -40,7 +40,7 @@ export async function getCurrentUser(): Promise<AuthResponseUser | null> {
 
     const userData = await response.json();
     return userData;
-  } catch (error) {
-    return null;
+  } catch (error: any) {
+    throw error;
   }
 }

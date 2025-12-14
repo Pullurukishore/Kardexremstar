@@ -62,9 +62,9 @@ export default async function ZoneUsersPage({ searchParams }: ZoneUsersPageProps
         <div className="absolute inset-0 bg-black/20"></div>
         <div className="relative flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Zone Users</h1>
+            <h1 className="text-3xl font-bold mb-2">Zone Users & Managers</h1>
             <p className="text-cyan-100">
-              Manage users assigned to service zones and their permissions
+              Manage zone users and zone managers assigned to service zones and their permissions
             </p>
           </div>
           <Link href="/admin/zone-users/new">
@@ -79,8 +79,8 @@ export default async function ZoneUsersPage({ searchParams }: ZoneUsersPageProps
       {/* Mobile Header */}
       <div className="md:hidden">
         <MobilePageHeader
-          title="Zone Users"
-          description="Manage users assigned to service zones and their permissions"
+          title="Zone Users & Managers"
+          description="Manage zone users and managers assigned to service zones"
           action={
             <Link href="/admin/zone-users/new">
               <Button className="bg-cyan-600 hover:bg-cyan-700 text-white shadow-lg">

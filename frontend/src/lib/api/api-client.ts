@@ -43,12 +43,20 @@ const removeToken = (): void => {
   }
 };
 
+export interface PaginationInfo {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   message?: string;
   error?: string;
   statusCode?: number;
+  pagination?: PaginationInfo;
 }
 
 export interface ApiError {

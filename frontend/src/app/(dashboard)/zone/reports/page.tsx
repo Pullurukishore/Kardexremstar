@@ -1,76 +1,53 @@
-import { subDays, parse, format } from 'date-fns';
-import { getZones, getCustomers, getAssets, generateReport, getUserZone } from '@/lib/server/reports';
 import ReportsClient from '@/components/reports/ReportsClient';
-import type { ReportFilters as ReportFiltersType } from '@/components/reports/types';
+import type { ReportFilters } from '@/types/reports';
+import { subDays } from 'date-fns';
+import { getZones, getCustomers, getUserZone } from '@/lib/server/reports';
 
-interface ReportsPageProps {
-  searchParams: {
-    from?: string;
-    to?: string;
-    zoneId?: string;
-    customerId?: string;
-    assetId?: string;
-    reportType?: string;
-  };
-}
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
-export default async function ZoneReportsPage({ searchParams }: ReportsPageProps) {
-  // Get zone user's assigned zone
-  const userZone = await getUserZone();
+export default async function ReportsPage() {
+  // Fetch zone user's zone and customers for that zone
+  let userZone: { id: number; name: string } | null = null;
+  let zones: { id: number; name: string }[] = [];
+  let customers: any[] = [];
   
-  // If no zone found, show error
-  if (!userZone) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-red-800 mb-2">No Zone Assigned</h2>
-            <p className="text-red-700">You are not assigned to any service zone. Please contact your administrator.</p>
-          </div>
-        </div>
-      </div>
-    );
+  try {
+    userZone = await getUserZone();
+    zones = userZone ? [userZone] : [];
+    customers = userZone ? await getCustomers(userZone.id.toString()) : [];
+  } catch (error) {
+    console.error('Error fetching zone data:', error);
+    // Return empty data if zone fetch fails
+    zones = [];
+    customers = [];
   }
+  
+  // Convert customer types from string id to number id
+  const customersData = customers.map(c => ({
+    id: typeof c.id === 'string' ? parseInt(c.id) : c.id,
+    companyName: c.companyName
+  }));
 
-  // Parse search params to create filters - always use user's zone
-  const filters: ReportFiltersType = {
+  const initialFilters: ReportFilters = {
     dateRange: {
-      from: searchParams.from 
-        ? parse(searchParams.from, 'yyyy-MM-dd', new Date())
-        : subDays(new Date(), 30),
-      to: searchParams.to 
-        ? parse(searchParams.to, 'yyyy-MM-dd', new Date())
-        : new Date(),
+      from: subDays(new Date(), 90),
+      to: new Date(),
     },
-    reportType: searchParams.reportType || 'ticket-summary',
-    zoneId: String(userZone.id), // Force zone to user's zone
-    customerId: searchParams.customerId,
-    assetId: searchParams.assetId,
+    reportType: 'ticket-summary',
+    zoneId: userZone?.id.toString(),
   };
-
-  // Fetch data filtered for user's zone only
-  const [customers, assets] = await Promise.all([
-    filters.reportType === 'industrial-data' ? getCustomers(String(userZone.id)) : Promise.resolve([]),
-    filters.customerId ? getAssets(filters.customerId) : Promise.resolve([])
-  ]);
-  
-  // Only pass user's zone (not all zones)
-  const zones = [{ id: String(userZone.id), name: userZone.name }];
-  
-  // Don't auto-generate - let client handle it with proper logic for all report types
-  const reportData = null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4 sm:p-6 lg:p-8">
-      {/* Client Component for API calls - isZoneUser flag enables zone-specific endpoints */}
-      <ReportsClient 
-        initialFilters={filters}
-        initialReportData={reportData}
+    <div className="container mx-auto py-6 px-4">
+      <ReportsClient
+        initialFilters={initialFilters}
+        initialReportData={null}
         zones={zones}
-        customers={customers}
-        assets={assets}
+        customers={customersData}
         isZoneUser={true}
       />
     </div>
   );
 }
+

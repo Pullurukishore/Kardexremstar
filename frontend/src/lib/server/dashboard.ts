@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import type { DashboardData, StatusDistribution, TrendsData } from '@/components/dashboard/types';
+import { API_BASE_URL } from '@/lib/constants';
 
 // Zone dashboard types
 export interface ZoneDashboardData {
@@ -63,7 +64,7 @@ export interface ZoneDashboardData {
   }>;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5003/api';
+
 
 async function makeServerRequest(endpoint: string) {
   const cookieStore = cookies();

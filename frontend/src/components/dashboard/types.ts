@@ -35,7 +35,10 @@ export interface DashboardData {
       name: string;
       totalTickets: number;
       servicePersonCount: number;
+      zoneManagerCount: number;
+      zoneUserCount: number;
       customerCount: number;
+      assetCount: number;
       avgResolutionTimeHours: number;
     }>;
   };

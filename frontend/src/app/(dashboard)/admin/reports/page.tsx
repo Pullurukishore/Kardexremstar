@@ -1,7 +1,7 @@
 import { subDays, parse, format } from 'date-fns';
 import { getZones, getCustomers, getAssets, generateReport } from '@/lib/server/reports';
 import ReportsClient from '@/components/reports/ReportsClient';
-import type { ReportFilters as ReportFiltersType } from '@/components/reports/types';
+import type { ReportFilters as ReportFiltersType } from '@/types/reports';
 
 interface ReportsPageProps {
   searchParams: {
@@ -28,7 +28,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     reportType: searchParams.reportType || 'ticket-summary',
     zoneId: searchParams.zoneId,
     customerId: searchParams.customerId,
-    assetId: searchParams.assetId,
   };
 
   // Fetch all required data server-side
@@ -47,9 +46,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       <ReportsClient 
         initialFilters={filters}
         initialReportData={reportData}
-        zones={zones}
-        customers={customers}
-        assets={assets}
+        zones={zones.map(z => ({ id: parseInt(z.id), name: z.name }))}
+        customers={customers.map(c => ({ id: parseInt(c.id), companyName: c.companyName }))}
+        isZoneUser={false}
       />
     </div>
   );

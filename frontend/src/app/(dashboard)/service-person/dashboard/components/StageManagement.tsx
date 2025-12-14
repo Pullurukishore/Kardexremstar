@@ -227,10 +227,6 @@ export default function StageManagement({ activity, onEndActivity, getCurrentLoc
       if (response.data) {
         await fetchActivityStages();
         setStageNotes('');
-        toast({
-          title: "Stage Updated",
-          description: `Moved to ${STAGE_CONFIG[nextStageType as keyof typeof STAGE_CONFIG]?.label} stage`
-        });
       }
     } catch (error) {
       toast({

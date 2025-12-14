@@ -84,6 +84,16 @@ export const listServiceZones = async (req: ServiceZoneRequest, res: Response) =
     const skip = (pageNum - 1) * limitNum;
 
     const where: Prisma.ServiceZoneWhereInput = {};
+    
+    // For ZONE_USER and ZONE_MANAGER, only show their assigned zones
+    if (req.user?.role === 'ZONE_USER' || req.user?.role === 'ZONE_MANAGER') {
+      where.servicePersons = {
+        some: {
+          userId: req.user.id
+        }
+      };
+    }
+    
     if (search) {
       where.OR = [
         { name: { contains: search as string, mode: 'insensitive' } },

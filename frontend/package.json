@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/dev-optimization.js && next dev",
-    "dev:fast": "next dev --turbo",
+    "dev": "next dev -p 3000",
+    "dev:fast": "next -c next.config.dev.js dev -p 3000",
+    "dev:turbo": "next dev --turbo -p 3000",
+    "dev:optimized": "node scripts/dev-optimization.js && next -c next.config.dev.js dev -p 3000",
     "dev:prod": "npm run build && npm run dev",
     "build": "next build",
     "build:standalone": "BUILD_STANDALONE=true next build",
@@ -69,7 +71,9 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "^0.18.5",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "docx": "^9.5.1",
+    "file-saver": "^2.0.5"
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^15.5.4",

@@ -31,7 +31,7 @@ router.get(
     query('search').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'ZONE_MANAGER', 'EXTERNAL_USER', 'EXPERT_HELPDESK']),
   (req: Request, res: Response) => listServiceZones(req as unknown as ServiceZoneRequest, res)
 );
 
@@ -42,7 +42,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid service zone ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'ZONE_MANAGER', 'EXPERT_HELPDESK']),
   (req: Request, res: Response) => getServiceZone(req as unknown as ServiceZoneRequest, res)
 );
 
@@ -53,7 +53,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid service zone ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   (req: Request, res: Response) => getServiceZoneStats(req as unknown as ServiceZoneRequest, res)
 );
 
@@ -66,7 +66,7 @@ router.post(
     body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
     validateRequest
   ],
-  requireRole(['ADMIN']),
+  requireRole(['ADMIN', 'EXPERT_HELPDESK']),
   (req: Request, res: Response) => createServiceZone(req as unknown as ServiceZoneRequest, res)
 );
 
@@ -85,7 +85,7 @@ router.put(
     body('servicePersonIds.*').optional().isInt().withMessage('Each service person ID must be an integer'),
     validateRequest
   ],
-  requireRole(['ADMIN']),
+  requireRole(['ADMIN', 'EXPERT_HELPDESK']),
   (req: Request, res: Response) => updateServiceZone(req as unknown as ServiceZoneRequest, res)
 );
 
@@ -96,7 +96,7 @@ router.delete(
     param('id').isInt().toInt().withMessage('Invalid service zone ID'),
     validateRequest
   ],
-  requireRole(['ADMIN']),
+  requireRole(['ADMIN', 'EXPERT_HELPDESK']),
   (req: Request, res: Response) => deleteServiceZone(req as unknown as ServiceZoneRequest, res)
 );
 

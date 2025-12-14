@@ -40,7 +40,7 @@ export const servicePersonReportsController = {
         return res.status(401).json({ success: false, error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'ZONE_MANAGER', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ success: false, error: 'Insufficient permissions' });
       }
 
@@ -81,8 +81,8 @@ export const servicePersonReportsController = {
         servicePersonWhere.id = userId;
       }
 
-      // Zone filtering for ZONE_USER
-      if (userRole === 'ZONE_USER' || zoneId) {
+      // Zone filtering for ZONE_USER and ZONE_MANAGER
+      if (userRole === 'ZONE_USER' || userRole === 'ZONE_MANAGER' || zoneId) {
         const zoneFilter = zoneId || (req.user as AuthUser)?.zoneIds?.[0];
         if (zoneFilter) {
           servicePersonWhere.serviceZones = {
@@ -93,7 +93,7 @@ export const servicePersonReportsController = {
         }
       }
 
-      // Service person filtering (only for ADMIN and ZONE_USER)
+      // Service person filtering (only for ADMIN, ZONE_USER, and ZONE_MANAGER)
       if (userRole !== 'SERVICE_PERSON' && servicePersonIds && servicePersonIds !== 'all') {
         const personIds = Array.isArray(servicePersonIds)
           ? (servicePersonIds as string[]).map((id) => parseInt(id as string))
@@ -395,7 +395,7 @@ export const servicePersonReportsController = {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'ZONE_MANAGER', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -408,7 +408,7 @@ export const servicePersonReportsController = {
       // Build where clause based on user role and filters
       let userWhereClause: any = {};
       
-      if (userRole === 'ZONE_USER') {
+      if (userRole === 'ZONE_USER' || userRole === 'ZONE_MANAGER') {
         const zoneUser = await prisma.user.findUnique({
           where: { id: userId },
           include: { serviceZones: true },
@@ -635,14 +635,14 @@ export const servicePersonReportsController = {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'ZONE_MANAGER', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
       // Build where clause based on user role
       let whereClause: any = { role: 'SERVICE_PERSON' };
       
-      if (userRole === 'ZONE_USER') {
+      if (userRole === 'ZONE_USER' || userRole === 'ZONE_MANAGER') {
         const zoneUser = await prisma.user.findUnique({
           where: { id: userId },
           include: { serviceZones: true },
@@ -711,13 +711,13 @@ export const servicePersonReportsController = {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'ZONE_MANAGER', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
       let whereClause: any = {};
       
-      if (userRole === 'ZONE_USER') {
+      if (userRole === 'ZONE_USER' || userRole === 'ZONE_MANAGER') {
         const zoneUser = await prisma.user.findUnique({
           where: { id: userId },
           include: { serviceZones: true },
@@ -787,7 +787,7 @@ export const servicePersonReportsController = {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'ZONE_MANAGER', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -811,8 +811,8 @@ export const servicePersonReportsController = {
         servicePersonWhere.id = userId;
       }
 
-      // Zone filtering for ZONE_USER
-      if (userRole === 'ZONE_USER' || zoneId) {
+      // Zone filtering for ZONE_USER and ZONE_MANAGER
+      if (userRole === 'ZONE_USER' || userRole === 'ZONE_MANAGER' || zoneId) {
         const zoneFilter = zoneId || (req.user as AuthUser)?.zoneIds?.[0];
         if (zoneFilter) {
           servicePersonWhere.serviceZones = {
@@ -823,7 +823,7 @@ export const servicePersonReportsController = {
         }
       }
 
-      // Service person filtering (only for ADMIN and ZONE_USER)
+      // Service person filtering (only for ADMIN, ZONE_USER, and ZONE_MANAGER)
       if (userRole !== 'SERVICE_PERSON' && servicePersonIds && servicePersonIds !== 'all') {
         const personIds = Array.isArray(servicePersonIds) 
           ? servicePersonIds.map(id => parseInt(id as string))
@@ -995,7 +995,7 @@ export const servicePersonReportsController = {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'ZONE_MANAGER', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 

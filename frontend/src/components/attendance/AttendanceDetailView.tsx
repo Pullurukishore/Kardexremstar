@@ -247,24 +247,12 @@ const getActivityConfig = (activityType: string) => {
   return ACTIVITY_TYPE_CONFIG[activityType as keyof typeof ACTIVITY_TYPE_CONFIG] || ACTIVITY_TYPE_CONFIG.OTHER;
 };
 
-// Helper function to shorten long addresses
+// Helper function to display full addresses
 const shortenAddress = (address: string | undefined): string => {
   if (!address) return '';
   
-  // Split by comma and get first 2-3 parts (area, city)
-  const parts = address.split(',').map(p => p.trim());
-  
-  // Return first 2 parts or first 3 if they're short
-  if (parts.length <= 2) return address;
-  
-  const shortened = parts.slice(0, 2).join(', ');
-  
-  // If shortened is still too long (>50 chars), just take first part
-  if (shortened.length > 50) {
-    return parts[0];
-  }
-  
-  return shortened;
+  // Return the full address without truncation
+  return address;
 };
 
 const TICKET_STATUS_CONFIG = {
@@ -770,21 +758,33 @@ export default function AttendanceDetailView({
                                             <span>{shortenAddress(stage.location)}</span>
                                           </div>
                                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                            {stage.locationSource === 'manual' && (
-                                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                                                ✓ Manual
-                                              </Badge>
-                                            )}
-                                            {stage.accuracy && stage.accuracy <= 100 && stage.locationSource === 'gps' && (
-                                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
-                                                ✓ Accurate ({Number(stage.accuracy).toFixed(0)}m)
-                                              </Badge>
-                                            )}
-                                            {stage.accuracy && stage.accuracy > 100 && stage.locationSource === 'gps' && (
-                                              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
-                                                ⚠ Low Accuracy ({Number(stage.accuracy).toFixed(0)}m)
-                                              </Badge>
-                                            )}
+                                            {(() => {
+                                              const locationSource = (stage as any).locationSource || (stage as any).metadata?.locationSource;
+                                              const accuracy = (stage as any).accuracy ?? (stage as any).metadata?.accuracy;
+                                              return locationSource === 'manual' && (
+                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                                  ✓ Manual
+                                                </Badge>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const locationSource = (stage as any).locationSource || (stage as any).metadata?.locationSource;
+                                              const accuracy = (stage as any).accuracy ?? (stage as any).metadata?.accuracy;
+                                              return accuracy && accuracy <= 100 && locationSource === 'gps' && (
+                                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                                  ✓ Accurate ({Number(accuracy).toFixed(0)}m)
+                                                </Badge>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const locationSource = (stage as any).locationSource || (stage as any).metadata?.locationSource;
+                                              const accuracy = (stage as any).accuracy ?? (stage as any).metadata?.accuracy;
+                                              return accuracy && accuracy > 100 && locationSource === 'gps' && (
+                                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
+                                                  ⚠ Low Accuracy ({Number(accuracy).toFixed(0)}m)
+                                                </Badge>
+                                              );
+                                            })()}
                                           </div>
                                         </div>
                                       )}
@@ -794,6 +794,35 @@ export default function AttendanceDetailView({
                                           <div className="flex items-center gap-1 text-xs text-gray-500">
                                             <MapPin className="h-3 w-3" />
                                             <span>{typeof stage.latitude === 'number' ? stage.latitude.toFixed(6) : stage.latitude}, {typeof stage.longitude === 'number' ? stage.longitude.toFixed(6) : stage.longitude}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            {(() => {
+                                              const locationSource = (stage as any).locationSource || (stage as any).metadata?.locationSource;
+                                              const accuracy = (stage as any).accuracy ?? (stage as any).metadata?.accuracy;
+                                              return locationSource === 'manual' && (
+                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                                  ✓ Manual
+                                                </Badge>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const locationSource = (stage as any).locationSource || (stage as any).metadata?.locationSource;
+                                              const accuracy = (stage as any).accuracy ?? (stage as any).metadata?.accuracy;
+                                              return accuracy && accuracy <= 100 && locationSource === 'gps' && (
+                                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                                  ✓ Accurate ({Number(accuracy).toFixed(0)}m)
+                                                </Badge>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const locationSource = (stage as any).locationSource || (stage as any).metadata?.locationSource;
+                                              const accuracy = (stage as any).accuracy ?? (stage as any).metadata?.accuracy;
+                                              return accuracy && accuracy > 100 && locationSource === 'gps' && (
+                                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
+                                                  ⚠ Low Accuracy ({Number(accuracy).toFixed(0)}m)
+                                                </Badge>
+                                              );
+                                            })()}
                                           </div>
                                         </div>
                                       )}
@@ -1248,11 +1277,18 @@ export default function AttendanceDetailView({
                                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                                           {stage.photos.slice(0, 6).map((photo: any, photoIndex: number) => (
                                             <div key={photo.id} className="group relative">
-                                              <div className="aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                                              <div className="aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center">
                                                 <img
-                                                  src={photo.thumbnailUrl || photo.cloudinaryUrl}
+                                                  src={photo.thumbnailUrl || photo.cloudinaryUrl || photo.url || ''}
                                                   alt={`Stage photo ${photoIndex + 1}`}
                                                   className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                                  onError={(e) => {
+                                                    // Fallback to a placeholder if image fails to load
+                                                    const img = e.target as HTMLImageElement;
+                                                    if (!img.src.includes('data:')) {
+                                                      img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f3f4f6" width="100" height="100"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="12"%3ENo Image%3C/text%3E%3C/svg%3E';
+                                                    }
+                                                  }}
                                                 />
                                               </div>
                                               
@@ -1263,7 +1299,7 @@ export default function AttendanceDetailView({
                                                     size="sm"
                                                     variant="secondary"
                                                     className="h-8 w-8 p-0 bg-white/90 hover:bg-white"
-                                                    onClick={() => window.open(photo.cloudinaryUrl, '_blank')}
+                                                    onClick={() => window.open(photo.cloudinaryUrl || photo.url || photo.thumbnailUrl || photo.dataUrl, '_blank')}
                                                   >
                                                     <ExternalLink className="h-3 w-3" />
                                                   </Button>
@@ -1273,19 +1309,40 @@ export default function AttendanceDetailView({
                                                     className="h-8 w-8 p-0 bg-white/90 hover:bg-white"
                                                     onClick={async () => {
                                                       try {
-                                                        const response = await fetch(photo.cloudinaryUrl);
+                                                        const imageUrl = photo.cloudinaryUrl || photo.url || photo.thumbnailUrl || photo.dataUrl;
+                                                        if (!imageUrl) {
+                                                          console.warn('No image URL available');
+                                                          return;
+                                                        }
+                                                        
+                                                        // Handle dataUrl directly (already base64)
+                                                        if (imageUrl.startsWith('data:')) {
+                                                          const link = document.createElement('a');
+                                                          link.href = imageUrl;
+                                                          link.download = photo.filename || 'photo';
+                                                          document.body.appendChild(link);
+                                                          link.click();
+                                                          document.body.removeChild(link);
+                                                          return;
+                                                        }
+                                                        
+                                                        const response = await fetch(imageUrl);
                                                         const blob = await response.blob();
                                                         const downloadUrl = window.URL.createObjectURL(blob);
                                                         const link = document.createElement('a');
                                                         link.href = downloadUrl;
-                                                        link.download = photo.filename;
+                                                        link.download = photo.filename || 'photo';
                                                         document.body.appendChild(link);
                                                         link.click();
                                                         document.body.removeChild(link);
                                                         window.URL.revokeObjectURL(downloadUrl);
                                                       } catch (error) {
+                                                        console.error('Download failed:', error);
                                                         // Fallback to direct link
-                                                        window.open(photo.cloudinaryUrl, '_blank');
+                                                        const imageUrl = photo.cloudinaryUrl || photo.url || photo.thumbnailUrl || photo.dataUrl;
+                                                        if (imageUrl) {
+                                                          window.open(imageUrl, '_blank');
+                                                        }
                                                       }
                                                     }}
                                                   >

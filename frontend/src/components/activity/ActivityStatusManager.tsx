@@ -205,6 +205,7 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showStageDialog, setShowStageDialog] = useState(false);
+  const [showStageConfirmDialog, setShowStageConfirmDialog] = useState(false);
   const [selectedStage, setSelectedStage] = useState<string>('');
   const [stageNotes, setStageNotes] = useState<string>('');
   const [isUpdatingStage, setIsUpdatingStage] = useState(false);
@@ -323,11 +324,6 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
       lng: location.longitude,
       address: location.address
     });
-    
-    toast({
-      title: "Location Set",
-      description: `${location.source === 'manual' ? 'Manual' : 'GPS'} location captured successfully.`,
-    });
   }, []);
 
   // Legacy GPS capture function (kept for compatibility)
@@ -346,6 +342,17 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
     if (!selectedActivity || !selectedStage) {
       return;
     }
+
+    // Show confirmation dialog before updating
+    setShowStageConfirmDialog(true);
+  };
+
+  const confirmStageUpdate = async () => {
+    if (!selectedActivity || !selectedStage) {
+      return;
+    }
+
+    setShowStageConfirmDialog(false);
 
     // Check if location is required but not captured (using enhanced location)
     if (requiresLocation(selectedStage) && !enhancedStageLocation) {
@@ -406,22 +413,13 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
     try {
       setIsUpdatingStage(true);
 
-      // End current stage if exists
-      const currentStage = getCurrentStage(selectedActivity);
-      if (currentStage && selectedActivity.ActivityStage) {
-        const activeStageObj = selectedActivity.ActivityStage.find(s => !s.endTime);
-        if (activeStageObj) {
-          await apiClient.put(`/activities/${selectedActivity.id}/stages/${activeStageObj.id}`, {
-            endTime: new Date().toISOString()
-          });
-        }
-      }
+      const startTime = new Date().toISOString();
 
       // Create stage data with enhanced location and photos if available
       const stageData = {
         stage: selectedStage,
         notes: stageNotes || undefined,
-        startTime: new Date().toISOString(),
+        startTime,
         ...(enhancedStageLocation && {
           latitude: enhancedStageLocation.latitude,
           longitude: enhancedStageLocation.longitude,
@@ -439,15 +437,11 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
         })
       };
 
-      // Create new stage
-      await apiClient.post(`/activities/${selectedActivity.id}/stages`, stageData);
+      // Create new stage - backend will automatically end any existing active stage
+      const createResponse = await apiClient.post(`/activities/${selectedActivity.id}/stages`, stageData);
+      console.log('Successfully created new stage:', createResponse.data?.id);
 
-      toast({
-        title: "Stage Updated",
-        description: `Activity stage changed to ${STAGE_DEFINITIONS[selectedStage]?.label || selectedStage}`,
-      });
-
-      // Close dialog and refresh
+      // Close dialog and reset state
       setShowStageDialog(false);
       setSelectedActivity(null);
       setSelectedStage('');
@@ -456,14 +450,38 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
       setEnhancedStageLocation(null);
       setCapturedPhotos([]);
 
-      // Refresh data
-      if (onActivityChange) {
-        onActivityChange();
+      // Delay to ensure backend processes the changes
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Refresh data - ensure it completes
+      try {
+        if (onActivityChange) {
+          await onActivityChange();
+          console.log('Activity change callback completed');
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing activities:', refreshError);
+        // Still show success toast even if refresh fails
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error updating activity stage:', error);
+      
+      // Provide specific error messages based on error type
+      let errorMessage = "Failed to update activity stage. Please try again.";
+      
+      if (error.response?.status === 404) {
+        errorMessage = "Activity not found or already ended. Please refresh and try again.";
+      } else if (error.response?.status === 409) {
+        errorMessage = "Time slot conflict. Please try again.";
+      } else if (error.message?.includes('timeout') || error.message?.includes('Timeout')) {
+        errorMessage = "Request timed out. Please check your connection and try again.";
+      } else if (error.message?.includes('Network')) {
+        errorMessage = "Network error. Please check your connection.";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to update activity stage. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -478,25 +496,8 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
 
     try {
       setIsUpdatingStage(true);
-
-      // End current stage if exists
-      const currentStage = getCurrentStage(selectedActivity);
-      if (currentStage && selectedActivity.ActivityStage) {
-        const activeStageObj = selectedActivity.ActivityStage.find(s => !s.endTime);
-        if (activeStageObj) {
-          await apiClient.put(`/activities/${selectedActivity.id}/stages/${activeStageObj.id}`, {
-            endTime: new Date().toISOString()
-          });
-        }
-      }
-
-      // Create new stage with pending data
+      // Create new stage with pending data - backend will end any existing active stage
       await apiClient.post(`/activities/${selectedActivity.id}/stages`, pendingStageData);
-
-      toast({
-        title: "Activity Completed",
-        description: "Activity marked as completed with report uploaded",
-      });
 
       // Close dialogs and reset
       setShowReportDialog(false);
@@ -560,10 +561,6 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
 
       // Update ticket status using the same endpoint as admin/zone users
       const response = await apiClient.patch(`/tickets/${selectedActivity.ticketId}/status`, requestData);
-      toast({
-        title: "Status Updated",
-        description: `Ticket status changed to ${status}`,
-      });
 
       // Close dialog and refresh data
       setShowStatusDialog(false);
@@ -675,10 +672,20 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
                           setSelectedActivity(activity);
                           setShowStatusDialog(true);
                         }}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-xs font-semibold h-9 active:scale-95 transition-transform touch-manipulation"
+                        disabled={isUpdatingStage}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-xs font-semibold h-9 active:scale-95 transition-transform touch-manipulation"
                       >
-                        <Settings className="h-3 w-3 mr-1" />
-                        Update Status
+                        {isUpdatingStage ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <Settings className="h-3 w-3 mr-1" />
+                            Update Status
+                          </>
+                        )}
                       </Button>
                     )}
                     
@@ -690,10 +697,20 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
                           setSelectedActivity(activity);
                           setShowStageDialog(true);
                         }}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-xs font-semibold h-9 active:scale-95 transition-transform touch-manipulation"
+                        disabled={isUpdatingStage}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed text-xs font-semibold h-9 active:scale-95 transition-transform touch-manipulation"
                       >
-                        <ArrowRight className="h-3 w-3 mr-1" />
-                        Update Stage
+                        {isUpdatingStage ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <ArrowRight className="h-3 w-3 mr-1" />
+                            Update Stage
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>
@@ -897,6 +914,49 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
               }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Stage Confirmation Dialog */}
+      <Dialog open={showStageConfirmDialog} onOpenChange={setShowStageConfirmDialog}>
+        <DialogContent className="sm:max-w-[400px] mx-3">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Confirm Stage Change</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-700">
+                Are you sure you want to move to <span className="font-semibold">"{STAGE_DEFINITIONS[selectedStage]?.label || selectedStage}"</span> stage?
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                This will change the stage for this activity.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowStageConfirmDialog(false)}
+                disabled={isUpdatingStage}
+                className="flex-1 h-10"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmStageUpdate}
+                disabled={isUpdatingStage}
+                className="flex-1 h-10 bg-blue-600 hover:bg-blue-700"
+              >
+                {isUpdatingStage ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'OK'
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

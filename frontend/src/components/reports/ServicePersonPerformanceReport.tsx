@@ -45,7 +45,44 @@ const FLAG_CONFIG = {
 };
 
 export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerformanceReportProps) {
-  const reports = Array.isArray(reportData.reports) ? reportData.reports : [];
+  // Safety check - if no report data, show loading state
+  if (!reportData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Loading Service Person Performance Report...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">Please wait while we load the data.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const reports = Array.isArray(reportData?.reports) ? reportData.reports : [];
+  
+  // Debug logging to help identify data structure issues
+  console.log('ServicePersonPerformanceReport - reportData:', reportData);
+  console.log('ServicePersonPerformanceReport - reports:', reports);
+  console.log('ServicePersonPerformanceReport - first report structure:', reports[0]);
+  
+  // Additional safety check - if reports is empty, show empty state
+  if (!reports || reports.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Person Performance Report</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-12">
+            <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-600 mb-2">No Reports Found</h3>
+            <p className="text-gray-500">No service person reports available for the selected period.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   // Create safe summary object with proper type conversion
   const safeSummary = {
@@ -98,7 +135,7 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {reports.reduce((sum, person) => sum + (person.summary.totalTickets || 0), 0)}
+                {reports.reduce((sum, person) => sum + ((person.summary || {}).totalTickets || 0), 0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Across all service persons
@@ -113,7 +150,7 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {reports.reduce((sum, person) => sum + (person.summary.ticketsResolved || 0), 0)}
+                {reports.reduce((sum, person) => sum + ((person.summary || {}).ticketsResolved || 0), 0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Successfully completed
@@ -130,10 +167,10 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
               <div className="text-2xl font-bold text-blue-600">
                 {(() => {
                   const totalHours = reports.reduce((sum, person) => {
-                    const hours = person.summary.averageResolutionTimeHours || 0;
+                    const hours = (person.summary || {}).averageResolutionTimeHours || 0;
                     return sum + (hours > 0 ? hours : 0);
                   }, 0);
-                  const validReports = reports.filter(p => (p.summary.averageResolutionTimeHours || 0) > 0).length;
+                  const validReports = reports.filter(p => ((p.summary || {}).averageResolutionTimeHours || 0) > 0).length;
                   const avgHours = validReports > 0 ? (totalHours / validReports) : 0;
                   return avgHours > 0 ? `${avgHours.toFixed(1)}h` : '0h';
                 })()} 
@@ -153,10 +190,10 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
               <div className="text-2xl font-bold text-orange-600">
                 {(() => {
                   const totalHours = reports.reduce((sum, person) => {
-                    const hours = person.summary.averageTravelTimeHours || 0;
+                    const hours = (person.summary || {}).averageTravelTimeHours || 0;
                     return sum + (hours > 0 ? hours : 0);
                   }, 0);
-                  const validReports = reports.filter(p => (p.summary.averageTravelTimeHours || 0) > 0).length;
+                  const validReports = reports.filter(p => ((p.summary || {}).averageTravelTimeHours || 0) > 0).length;
                   const avgHours = validReports > 0 ? (totalHours / validReports) : 0;
                   return avgHours > 0 ? `${avgHours.toFixed(1)}h` : '0h';
                 })()} 
@@ -176,10 +213,10 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
               <div className="text-2xl font-bold text-purple-600">
                 {(() => {
                   const totalHours = reports.reduce((sum, person) => {
-                    const hours = person.summary.averageOnsiteTimeHours || 0;
+                    const hours = (person.summary || {}).averageOnsiteTimeHours || 0;
                     return sum + (hours > 0 ? hours : 0);
                   }, 0);
-                  const validReports = reports.filter(p => (p.summary.averageOnsiteTimeHours || 0) > 0).length;
+                  const validReports = reports.filter(p => ((p.summary || {}).averageOnsiteTimeHours || 0) > 0).length;
                   const avgHours = validReports > 0 ? (totalHours / validReports) : 0;
                   return avgHours > 0 ? `${avgHours.toFixed(1)}h` : '0h';
                 })()} 
@@ -237,7 +274,10 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                   </tr>
                 </thead>
                 <tbody>
-                  {reports.map((person) => (
+                  {reports.map((person) => {
+                    // Ensure person.summary exists to prevent undefined errors
+                    const personSummary = person.summary || {};
+                    return (
                     <tr key={person.id} className="border-b hover:bg-gray-50 transition-colors">
                       {/* Service Person */}
                       <td className="p-3">
@@ -245,9 +285,14 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                           <div>
                             <div className="font-medium text-gray-900">{person.name}</div>
                             <div className="text-sm text-gray-600">{person.email}</div>
-                            {person.zones.length > 0 && (
+                            {person.zones && person.zones.length > 0 && (
                               <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded mt-1">
-                                {person.zones.join(', ')}
+                                {person.zones.map((zone, idx) => (
+                                  <span key={idx}>
+                                    {zone.name}
+                                    {idx < person.zones.length - 1 && ', '}
+                                  </span>
+                                ))}
                               </div>
                             )}
                           </div>
@@ -258,7 +303,7 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                       <td className="p-3">
                         <div className="flex items-center gap-1 text-sm font-medium">
                           <Calendar className="h-3 w-3 text-green-600" />
-                          {person.summary.presentDays || person.summary.totalWorkingDays || 0}
+                          {personSummary.presentDays || personSummary.totalWorkingDays || 0}
                         </div>
                       </td>
 
@@ -266,7 +311,7 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                       <td className="p-3">
                         <div className="flex items-center gap-1 text-sm font-medium">
                           <Clock className="h-3 w-3 text-blue-600" />
-                          {Number(person.summary.totalHours).toFixed(1)}h
+                          {Number(personSummary.totalHours || 0).toFixed(1)}h
                         </div>
                       </td>
 
@@ -275,10 +320,10 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-1 text-sm font-medium">
                             <Ticket className="h-3 w-3 text-blue-600" />
-                            {person.summary.totalTickets || 0}
+                            {personSummary.totalTickets || 0}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {person.summary.ticketsResolved || 0} resolved
+                            {personSummary.ticketsResolved || 0} resolved
                           </div>
                         </div>
                       </td>
@@ -287,8 +332,8 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                       <td className="p-3">
                         <div className="flex items-center gap-1 text-sm font-medium">
                           {(() => {
-                            const total = person.summary.totalTickets || 0;
-                            const resolved = person.summary.ticketsResolved || 0;
+                            const total = personSummary.totalTickets || 0;
+                            const resolved = personSummary.ticketsResolved || 0;
                             const rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
                             const color = rate >= 80 ? 'text-green-600' : rate >= 60 ? 'text-yellow-600' : 'text-red-600';
                             return (
@@ -306,7 +351,7 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                         <div className="flex items-center gap-1 text-sm font-medium">
                           <Clock4 className="h-3 w-3 text-blue-600" />
                           {(() => {
-                            const hours = person.summary.averageResolutionTimeHours || 0;
+                            const hours = personSummary.averageResolutionTimeHours || 0;
                             return hours > 0 ? `${hours.toFixed(1)}h` : 'N/A';
                           })()} 
                         </div>
@@ -317,7 +362,7 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                         <div className="flex items-center gap-1 text-sm font-medium">
                           <TravelIcon className="h-3 w-3 text-orange-600" />
                           {(() => {
-                            const hours = person.summary.averageTravelTimeHours || 0;
+                            const hours = personSummary.averageTravelTimeHours || 0;
                             return hours > 0 ? `${hours.toFixed(1)}h` : 'N/A';
                           })()} 
                         </div>
@@ -328,7 +373,7 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                         <div className="flex items-center gap-1 text-sm font-medium">
                           <Wrench className="h-3 w-3 text-purple-600" />
                           {(() => {
-                            const hours = person.summary.averageOnsiteTimeHours || 0;
+                            const hours = personSummary.averageOnsiteTimeHours || 0;
                             return hours > 0 ? `${hours.toFixed(1)}h` : 'N/A';
                           })()} 
                         </div>
@@ -338,7 +383,7 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           {(() => {
-                            const score = person.summary.performanceScore || 0;
+                            const score = personSummary.performanceScore || 0;
                             let color = 'bg-gray-100 text-gray-800';
                             
                             if (score >= 80) {
@@ -360,7 +405,8 @@ export function ServicePersonPerformanceReport({ reportData }: ServicePersonPerf
                       </td>
 
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

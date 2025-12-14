@@ -72,6 +72,17 @@ interface ActivityLog {
     name: string;
     email: string;
   };
+  ActivityStage?: Array<{
+    id: number;
+    stage: string;
+    startTime: string;
+    endTime?: string;
+    duration?: number;
+    location?: string;
+    latitude?: number;
+    longitude?: number;
+    notes?: string;
+  }>;
 }
 
 const ACTIVITY_TYPES = [
@@ -261,6 +272,7 @@ function ActivityLoggerComponent({
     activityType: "",
     title: "",
     ticketId: "",
+    activityScheduleId: "",
   });
 
   // Location state for activity logging
@@ -285,6 +297,19 @@ function ActivityLoggerComponent({
     }[]
   >([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
+
+  // Accepted schedules state for dropdown
+  const [acceptedSchedules, setAcceptedSchedules] = useState<
+    {
+      id: number;
+      description?: string;
+      activityType: string;
+      scheduledDate: string;
+      location?: string;
+      priority?: string;
+    }[]
+  >([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
 
   // Get current location for activity logging with enhanced features
   const getCurrentLocationForActivity = async () => {
@@ -311,7 +336,7 @@ function ActivityLoggerComponent({
       const { latitude, longitude } = position.coords;
       const accuracy = position.coords.accuracy || 999999;
       
-      // Provide detailed accuracy feedback
+      // Provide accuracy feedback only for clearly problematic cases
       if (accuracy > 1000) {
         toast({
           title: "Very Poor GPS Signal",
@@ -324,18 +349,7 @@ function ActivityLoggerComponent({
           description: `GPS accuracy is poor (±${Math.round(accuracy)}m). Location may be less precise. Try moving to an open area.`,
           variant: "destructive",
         });
-      } else if (accuracy > 50) {
-        toast({
-          title: "Fair GPS Accuracy",
-          description: `GPS accuracy is fair (±${Math.round(accuracy)}m). Location should be reasonably accurate.`,
-        });
-      } else if (accuracy <= 10) {
-        toast({
-          title: "Excellent GPS Signal",
-          description: `GPS accuracy is excellent (±${Math.round(accuracy)}m). Perfect for location tracking.`,
-        });
-      } else {
-        }
+      }
 
       // Try to get address from coordinates using backend geocoding service
       let address = '';
@@ -357,11 +371,6 @@ function ActivityLoggerComponent({
       
       setActivityLocation(locationData);
       setLocationError(null);
-
-      toast({
-        title: "Location Captured",
-        description: address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-      });
 
       return locationData;
     } catch (error: any) {
@@ -406,10 +415,21 @@ function ActivityLoggerComponent({
     try {
       setLoading(true);
 
-      const responseData = await apiClient.get("/activities");
+      const responseData = await apiClient.get("/activities?includeStages=true&includeTicket=true&limit=50");
 
       // Handle the response structure - could be direct data or wrapped in ApiResponse
       const activitiesData = (responseData as any)?.activities || responseData || [];
+      
+      // Debug logging to help diagnose stage issues
+      console.log('Fetched activities:', activitiesData.length);
+      activitiesData.forEach((activity: any) => {
+        console.log(`Activity ${activity.id}: ${activity.activityType}, endTime: ${activity.endTime}, stages: ${activity.ActivityStage?.length || 0}`);
+        if (activity.ActivityStage) {
+          activity.ActivityStage.forEach((stage: any) => {
+            console.log(`  Stage ${stage.id}: ${stage.stage}, endTime: ${stage.endTime}`);
+          });
+        }
+      });
 
       // Update activities state - force update even if same data
       setActivities([...activitiesData]);
@@ -478,12 +498,47 @@ function ActivityLoggerComponent({
     }
   }, []);
 
+  // Fetch accepted schedules for dropdown
+  const fetchAcceptedSchedules = useCallback(async () => {
+    try {
+      setSchedulesLoading(true);
+
+      const response = await apiClient.get("/activity-schedule?status=ACCEPTED&limit=50");
+
+      // Parse schedules from response
+      const responseData = response.data || response;
+      let schedulesData = [];
+
+      if (Array.isArray(responseData)) {
+        schedulesData = responseData;
+      } else if (responseData?.data && Array.isArray(responseData.data)) {
+        schedulesData = responseData.data;
+      }
+
+      setAcceptedSchedules(schedulesData);
+    } catch (error: any) {
+      // Don't show error toast for schedules as it's not critical
+      setAcceptedSchedules([]);
+    } finally {
+      setSchedulesLoading(false);
+    }
+  }, []);
+
   // Start new activity
   const handleStartActivity = async () => {
-    if (!formData.activityType || !formData.title) {
+    if (!formData.activityType) {
       toast({
         title: "Error",
-        description: "Please fill in required fields (Activity Type and Title)",
+        description: "Please select an Activity Type",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.activityScheduleId) {
+      toast({
+        title: "Error",
+        description: "Please select a Scheduled Activity",
         variant: "destructive",
       });
       return;
@@ -511,7 +566,7 @@ function ActivityLoggerComponent({
       }
 
       // Prepare activity data for backend - use enhanced location if available
-      const activityData = {
+      const activityData: any = {
         activityType: formData.activityType,
         title: formData.title,
         latitude: enhancedLocationData?.latitude || locationData?.lat,
@@ -523,6 +578,11 @@ function ActivityLoggerComponent({
         startTime: new Date().toISOString(),
       };
 
+      // Include schedule ID if selected
+      if (formData.activityScheduleId) {
+        activityData.activityScheduleId = parseInt(formData.activityScheduleId);
+      }
+
       // Create activity via backend API
       const response = await apiClient.post("/activities", activityData);
 
@@ -531,6 +591,7 @@ function ActivityLoggerComponent({
         activityType: "",
         title: "",
         ticketId: "",
+        activityScheduleId: "",
       });
       setActivityLocation(null);
       setEnhancedLocation(null);
@@ -573,7 +634,7 @@ function ActivityLoggerComponent({
     }
   };
 
-  // End active activity
+  // End active activity (simple: end current stage, let backend handle activity end)
   const handleEndActivity = async () => {
     if (!activeActivity) {
       toast({
@@ -584,77 +645,83 @@ function ActivityLoggerComponent({
       return;
     }
 
-    try {
-      setSubmitting(true);
+    // Find the active stage (stage without endTime)
+    const activeStage = activeActivity.ActivityStage?.find((stage: any) => !stage.endTime);
 
-      // Store activity info for success message
-      const activityToEnd = { ...activeActivity };
+    // If no active stage, fall back to ending the activity itself
+    if (!activeStage) {
+      try {
+        setSubmitting(true);
 
-      // Make API call to end the activity
-      const response = await apiClient.put(`/activities/${activeActivity.id}`, {
-        endTime: new Date().toISOString(),
-      });
+        await apiClient.put(`/activities/${activeActivity.id}/complete`, {
+          endTime: new Date().toISOString(),
+        });
 
-      // Get updated activity data from response
-      // Handle different response structures from apiClient
-      const responseData = response as any;
-      const updatedActivity = responseData.activity || responseData.data?.activity || responseData.data || responseData;
-      
-      // Immediately update local state for instant UI feedback
-      const endTime = new Date().toISOString();
-      const updatedActivityWithEndTime = {
-        ...activityToEnd,
-        endTime: endTime,
-        duration:
-          updatedActivity.duration ||
-          Math.round(
-            (new Date(endTime).getTime() -
-              new Date(activityToEnd.startTime).getTime()) /
-              (1000 * 60)
-          ),
-      };
+        toast({
+          title: "Activity Ended",
+          description: "Activity has been ended.",
+        });
 
-      // Set flag to prevent fetch from overriding local state
-      justEndedActivity.current = true;
+        setActiveActivity(null);
 
-      // Clear active activity immediately
-      setActiveActivity(null);
-
-      // Update activities list immediately - replace the ended activity
-      setActivities((prevActivities) => {
-        const updatedActivities = prevActivities.map((activity) =>
-          activity.id === activeActivity.id
-            ? updatedActivityWithEndTime
-            : activity
-        );
-        return [...updatedActivities]; // Create new array to force re-render
-      });
-
-      // Reset fetch cooldown to allow immediate refresh
-      lastFetchTime.current = 0;
-
-      // Reset flag after a delay to allow for proper state updates
-      setTimeout(() => {
-        justEndedActivity.current = false;
-      }, 2500);
-
-      // Show success message with duration if available
-      const durationText = updatedActivity.duration
-        ? `${updatedActivity.duration} minutes`
-        : "completed";
-      toast({
-        title: "Activity Completed",
-        description: `"${activityToEnd.title}" - ${durationText}`,
-      });
-
-      // Notify parent to refresh dashboard data with a small delay to ensure backend processing
-      setTimeout(async () => {
         if (onActivityChange) {
           await onActivityChange();
         }
-      }, 300);
+      } catch (error: any) {
+        let errorMessage = "Failed to end activity";
+
+        if (error.response) {
+          errorMessage =
+            error.response.data?.error ||
+            error.response.data?.message ||
+            errorMessage;
+
+          if (error.response.status === 404) {
+            errorMessage = "Activity not found or already ended";
+          } else if (error.response.status === 400) {
+            errorMessage = "Invalid request - activity may already be ended";
+          } else if (error.response.status >= 500) {
+            errorMessage = "Server error. Please try again later.";
+          }
+        } else if (error.request) {
+          errorMessage =
+            "Network error. Please check your connection and try again.";
+        }
+
+        toast({
+          title: "Error Ending Activity",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } finally {
+        setSubmitting(false);
+      }
+
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      await apiClient.put(
+        `/activities/${activeActivity.id}/stages/${activeStage.id}`,
+        {
+          endTime: new Date().toISOString(),
+        }
+      );
+
+      toast({
+        title: "Activity Stage Ended",
+        description: "Current activity stage has been ended.",
+      });
+
+      // Backend will automatically set activity endTime when last stage ends
+      setActiveActivity(null);
+
+      if (onActivityChange) {
+        await onActivityChange();
+      }
     } catch (error: any) {
-      // Determine appropriate error message
       let errorMessage = "Failed to end activity";
 
       if (error.response) {
@@ -666,7 +733,7 @@ function ActivityLoggerComponent({
         if (error.response.status === 404) {
           errorMessage = "Activity not found or already ended";
         } else if (error.response.status === 400) {
-          errorMessage = "Invalid request - activity may already be completed";
+          errorMessage = "Invalid request - activity may already be ended";
         } else if (error.response.status >= 500) {
           errorMessage = "Server error. Please try again later.";
         }
@@ -886,8 +953,9 @@ function ActivityLoggerComponent({
                 onOpenChange={(open) => {
                   setDialogOpen(open);
                   if (open) {
-                    // Fetch workable tickets when dialog opens
+                    // Fetch workable tickets and accepted schedules when dialog opens
                     fetchWorkableTickets();
+                    fetchAcceptedSchedules();
                   } else {
                     // Reset location state when dialog closes
                     setActivityLocation(null);
@@ -919,6 +987,7 @@ function ActivityLoggerComponent({
                             ...prev,
                             activityType: value,
                             ticketId: "",
+                            activityScheduleId: "",
                           }))
                         }
                       >
@@ -938,91 +1007,71 @@ function ActivityLoggerComponent({
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="title" className={isMobile ? "text-sm font-medium" : ""}>Title *</Label>
-                      <Input
-                        id="title"
-                        value={formData.title}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            title: e.target.value,
-                          }))
-                        }
-                        placeholder="Brief description of the activity"
-                        className={isMobile ? "h-12 text-base" : "h-10"}
-                      />
-                    </div>
 
-                    {/* Show tickets dropdown only for Ticket Work */}
-                    {formData.activityType === "TICKET_WORK" && (
+
+                    {/* Show scheduled activity dropdown - filtered by activity type */}
+                    {formData.activityType && (
                       <div className="space-y-2">
-                        <Label htmlFor="ticketId" className={isMobile ? "text-sm font-medium" : ""}>Ticket</Label>
+                        <Label htmlFor="activityScheduleId" className={isMobile ? "text-sm font-medium" : ""}>Scheduled Activity *</Label>
                         <Select
-                          value={formData.ticketId}
+                          value={formData.activityScheduleId}
                           onValueChange={(value) =>
                             setFormData((prev) => ({
                               ...prev,
-                              ticketId: value,
+                              activityScheduleId: value,
                             }))
                           }
                         >
                           <SelectTrigger className={isMobile ? "h-12 text-base" : "h-10"}>
-                            <SelectValue placeholder="Select ticket" />
+                            <SelectValue placeholder="Select scheduled activity" />
                           </SelectTrigger>
                           <SelectContent>
-                            {allTickets.length === 0 ? (
+                            {acceptedSchedules.filter(
+                              (schedule) => schedule.activityType === formData.activityType
+                            ).length === 0 ? (
                               <SelectItem value="" disabled>
-                                No tickets available
+                                No schedules available for this activity type
                               </SelectItem>
                             ) : (
-                              allTickets.map((ticket) => (
-                                <SelectItem
-                                  key={ticket.id}
-                                  value={ticket.id.toString()}
-                                >
-                                  <div className="flex flex-col">
-                                    <span>
-                                      #{ticket.id} - {ticket.title}
-                                    </span>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                      <Badge
-                                        className={`text-xs ${
-                                          ticket.status === "OPEN"
-                                            ? "bg-blue-100 text-blue-800"
-                                            : ticket.status === "IN_PROGRESS"
-                                            ? "bg-yellow-100 text-yellow-800"
-                                            : ticket.status === "ASSIGNED"
-                                            ? "bg-purple-100 text-purple-800"
-                                            : ticket.status === "RESOLVED"
-                                            ? "bg-green-100 text-green-800"
-                                            : "bg-gray-100 text-gray-800"
-                                        }`}
-                                      >
-                                        {ticket.status || "OPEN"}
-                                      </Badge>
-                                      <Badge
-                                        className={`text-xs ${
-                                          ticket.priority === "CRITICAL"
-                                            ? "bg-red-100 text-red-800"
-                                            : ticket.priority === "HIGH"
-                                            ? "bg-orange-100 text-orange-800"
-                                            : ticket.priority === "MEDIUM"
-                                            ? "bg-blue-100 text-blue-800"
-                                            : "bg-gray-100 text-gray-800"
-                                        }`}
-                                      >
-                                        {ticket.priority || "MEDIUM"}
-                                      </Badge>
-                                      {ticket.customer?.companyName && (
-                                        <span>
-                                          {ticket.customer.companyName}
-                                        </span>
-                                      )}
+                              acceptedSchedules
+                                .filter(
+                                  (schedule) => schedule.activityType === formData.activityType
+                                )
+                                .map((schedule) => (
+                                  <SelectItem
+                                    key={schedule.id}
+                                    value={schedule.id.toString()}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span>
+                                        {schedule.description || `${schedule.activityType} - ${new Date(schedule.scheduledDate).toLocaleDateString()}`}
+                                      </span>
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Badge variant="secondary" className="text-xs">
+                                          {schedule.activityType}
+                                        </Badge>
+                                        {schedule.priority && (
+                                          <Badge
+                                            className={`text-xs ${
+                                              schedule.priority === "HIGH"
+                                                ? "bg-red-100 text-red-800"
+                                                : schedule.priority === "MEDIUM"
+                                                ? "bg-yellow-100 text-yellow-800"
+                                                : "bg-green-100 text-green-800"
+                                            }`}
+                                          >
+                                            {schedule.priority}
+                                          </Badge>
+                                        )}
+                                        {schedule.location && (
+                                          <span className="truncate">
+                                            📍 {schedule.location}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                </SelectItem>
-                              ))
+                                  </SelectItem>
+                                ))
                             )}
                           </SelectContent>
                         </Select>
@@ -1144,7 +1193,6 @@ function ActivityLoggerComponent({
                         disabled={
                           submitting || 
                           !formData.activityType || 
-                          !formData.title || 
                           (!activityLocation && !enhancedLocation)
                         }
                         className={`${isMobile ? 'w-full h-12 text-base order-1 touch-manipulation' : ''}`}

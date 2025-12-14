@@ -205,13 +205,15 @@ export function TicketBasicInfoForm({ control, zones, isSubmitting, hideZoneSele
                       <SelectContent>
                         {Array.isArray(zones) && zones.length > 0 ? (
                           <>
-                            <SelectItem key="all" value="all">
-                              <div className="flex items-center space-x-2">
-                                <MapPin className="h-3 w-3 text-green-500" />
-                                <span className="font-medium">All Zones</span>
-                                <span className="text-xs text-gray-500 ml-1">(Show all customers)</span>
-                              </div>
-                            </SelectItem>
+                            {zones.length > 1 && (
+                              <SelectItem key="all" value="all">
+                                <div className="flex items-center space-x-2">
+                                  <MapPin className="h-3 w-3 text-green-500" />
+                                  <span className="font-medium">All Zones</span>
+                                  <span className="text-xs text-gray-500 ml-1">(Show all customers)</span>
+                                </div>
+                              </SelectItem>
+                            )}
                             {zones.filter(zone => zone.isActive).map((zone) => (
                               <SelectItem key={zone.id} value={zone.id.toString()}>
                                 <div className="flex items-center space-x-2">

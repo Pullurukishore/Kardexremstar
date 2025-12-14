@@ -56,7 +56,7 @@ const EnhancedLocationCapture: React.FC<EnhancedLocationCaptureProps> = ({
     locationQuality
   } = useEnhancedLocation({
     maxAccuracy: 100, // Reduced to 100m for better coordinate validation
-    maxRetries: 5, // 5 GPS attempts before manual entry
+    maxRetries: 3, // 3 GPS attempts before manual entry
     timeout: 15000,
     autoCapture,
     enableJumpDetection,

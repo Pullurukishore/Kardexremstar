@@ -61,15 +61,17 @@ export default async function ZoneDashboardPage() {
     const userRole = cookieStore.get('userRole')?.value;
     const accessToken = cookieStore.get('accessToken')?.value;
     const token = cookieStore.get('token')?.value;
+    const apiHref = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     
     // Check if user is authenticated
     if (!userRole || (!accessToken && !token)) {
       redirect('/auth/login');
     }
 
-    // Check if user has access to zone dashboard - ONLY ZONE_USER should access this
+    // Check if user has access to zone dashboard - ZONE_USER, ZONE_MANAGER, or ADMIN can access
     const normalizedUserRole = userRole.toUpperCase();
-    if (normalizedUserRole !== 'ZONE_USER') {
+    
+    if (normalizedUserRole !== 'ZONE_USER' && normalizedUserRole !== 'ZONE_MANAGER' && normalizedUserRole !== 'ADMIN') {
       // Return a client-side redirect component instead of server-side redirect
       // This prevents NEXT_REDIRECT errors during prefetching
       return <ClientRedirect role={normalizedUserRole} />;
@@ -77,15 +79,10 @@ export default async function ZoneDashboardPage() {
 
     // Fetch initial data on the server
     const { zoneDashboardData } = await getAllZoneDashboardData();
-    // Log the actual data received from backend
-    if (zoneDashboardData) {
-      } else {
-      }
 
     // Pass the actual data from backend (or null to trigger client-side fetch)
-    // Don't use dummy data - let the client component fetch real data
-    const safeZoneDashboardData: ZoneDashboardData | null = zoneDashboardData;
-
+    const safeZoneDashboardData: ZoneDashboardData | null = zoneDashboardData || null;
+    
     return (
       <>
         {/* Preload critical resources */}
@@ -96,8 +93,8 @@ export default async function ZoneDashboardPage() {
             __html: `
               // Preload critical dashboard resources
               const preloadLinks = [
-                { rel: 'preconnect', href: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000' },
-                { rel: 'dns-prefetch', href: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000' }
+                { rel: 'preconnect', href: '${apiHref}' },
+                { rel: 'dns-prefetch', href: '${apiHref}' }
               ];
               preloadLinks.forEach(link => {
                 const linkEl = document.createElement('link');

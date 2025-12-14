@@ -74,7 +74,7 @@ function calculateBusinessHoursInMinutes(startDate: Date, endDate: Date): number
 
   while (currentDate < finalDate) {
     const dayOfWeek = getDay(currentDate); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    
+
     // Skip Sundays (dayOfWeek === 0)
     if (dayOfWeek !== 0) {
       // Create business hours for this day
@@ -104,7 +104,7 @@ function calculateBusinessHoursInMinutes(startDate: Date, endDate: Date): number
         // Ensure we don't go outside business hours
         if (dayStart < businessStart) dayStart = businessStart;
         if (dayEnd > businessEnd) dayEnd = businessEnd;
-        
+
         if (dayStart < dayEnd) {
           totalMinutes += differenceInMinutes(dayEnd, dayStart);
         }
@@ -134,7 +134,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
     // Previous period (not meaningful for all-time; use zeros later for change)
     const previousPeriodStart = isAllRange ? new Date(0) : sixtyDaysAgo;
     const previousPeriodEnd = isAllRange ? new Date(0) : thirtyDaysAgo;
-    
+
     // Execute all queries in parallel for better performance
     const [
       // Current period counts
@@ -143,34 +143,34 @@ export const getDashboardData = async (req: Request, res: Response) => {
       inProgressTicketsCurrent,
       monthlyTicketsCurrent,
       activeMachinesCurrent,
-      
+
       // Previous period counts for comparison
       openTicketsPrevious,
       unassignedTicketsPrevious,
       inProgressTicketsPrevious,
       monthlyTicketsPrevious,
       activeMachinesPrevious,
-      
+
       // Time-based metrics
       responseTimeData,
       resolutionTimeData,
       downtimeData,
       travelTimeData,
       onsiteResolutionTimeData,
-      
+
       // Distribution data
       statusDistribution,
       priorityDistribution,
-      
+
       // Admin stats
       totalCustomers,
       totalServicePersons,
       totalServiceZones,
       zoneWiseData,
-      
+
       // Recent tickets
       recentTickets,
-      
+
       // Additional metrics for KPIs
       totalTicketsCount,
       slaCompliantTickets,
@@ -205,7 +205,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       prisma.ticket.count({
         where: {
           assignedToId: null,
@@ -229,7 +229,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       prisma.ticket.count({
         where: {
           status: {
@@ -246,7 +246,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       prisma.ticket.count({
         where: {
           createdAt: {
@@ -255,14 +255,14 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       // Get active machines count
       prisma.asset.count({
         where: {
           status: { in: ["ACTIVE", "active", "Active"] }
         }
       }),
-      
+
       // Previous period counts for comparison
       prisma.ticket.count({
         where: {
@@ -291,7 +291,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       prisma.ticket.count({
         where: {
           assignedToId: null,
@@ -315,7 +315,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       prisma.ticket.count({
         where: {
           status: {
@@ -332,7 +332,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       prisma.ticket.count({
         where: {
           createdAt: {
@@ -341,29 +341,29 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       // Get active machines count (previous period)
       prisma.asset.count({
         where: {
           status: { in: ["ACTIVE", "active", "Active"] }
         }
       }),
-      
+
       // Calculate average response time (ticket open to in progress)
       calculateAverageResponseTime(currentPeriodStart, currentPeriodEnd),
-      
+
       // Calculate average resolution time (ticket open to closed)
       calculateAverageResolutionTime(currentPeriodStart, currentPeriodEnd),
-      
+
       // Calculate average downtime
       calculateAverageDowntime(currentPeriodStart, currentPeriodEnd),
-      
+
       // Calculate average travel time
       calculateAverageTravelTime(currentPeriodStart, currentPeriodEnd),
-      
+
       // Calculate average onsite resolution time
       calculateAverageOnsiteResolutionTime(currentPeriodStart, currentPeriodEnd),
-      
+
       // Get status distribution
       prisma.ticket.groupBy({
         by: ['status'],
@@ -377,7 +377,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           status: true
         }
       }),
-      
+
       // Get priority distribution
       prisma.ticket.groupBy({
         by: ['priority'],
@@ -391,26 +391,26 @@ export const getDashboardData = async (req: Request, res: Response) => {
           priority: true
         }
       }),
-      
+
       // Admin stats
       prisma.customer.count({
         where: { isActive: true }
       }),
-      
+
       prisma.user.count({
-        where: { 
+        where: {
           role: 'SERVICE_PERSON',
-          isActive: true 
+          isActive: true
         }
       }),
-      
+
       prisma.serviceZone.count({
         where: { isActive: true }
       }),
-      
+
       // Zone-wise data
       getZoneWiseTicketData(),
-      
+
       // Recent tickets
       prisma.ticket.findMany({
         take: 10,
@@ -424,7 +424,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       // Total tickets count
       prisma.ticket.count({
         where: {
@@ -434,10 +434,10 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       // SLA compliant tickets
       calculateSLACompliance(currentPeriodStart, currentPeriodEnd),
-      
+
       // Active customers
       prisma.customer.count({
         where: {
@@ -473,7 +473,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
           }
         }
       }),
-      
+
       // Active service persons
       prisma.user.count({
         where: {
@@ -505,30 +505,30 @@ export const getDashboardData = async (req: Request, res: Response) => {
         }
       })
     ]);
-    
+
     // Calculate percentage changes
     const calculateChange = (current: number, previous: number): number => {
       if (previous === 0) return current > 0 ? 100 : 0;
       return Math.round(((current - previous) / previous) * 100);
     };
-    
+
     const openTicketsChange = isAllRange ? 0 : calculateChange(openTicketsCurrent, openTicketsPrevious);
     const inProgressTicketsChange = isAllRange ? 0 : calculateChange(inProgressTicketsCurrent, inProgressTicketsPrevious);
     const monthlyTicketsChange = isAllRange ? 0 : calculateChange(monthlyTicketsCurrent, monthlyTicketsPrevious);
     const activeMachinesChange = isAllRange ? 0 : calculateChange(activeMachinesCurrent, activeMachinesPrevious);
-    
+
     // Prepare status distribution
     const statusDistributionFormatted = statusDistribution.map((item: any) => ({
       name: item.status,
       value: item._count.status
     }));
-    
+
     // Prepare priority distribution
     const priorityDistributionFormatted = priorityDistribution.map((item: any) => ({
       name: item.priority,
       value: item._count.priority
     }));
-    
+
     // Prepare dashboard data
     const dashboardData: DashboardData = {
       stats: {
@@ -625,7 +625,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
         } : undefined
       }))
     };
-    
+
     res.json(dashboardData);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -660,38 +660,38 @@ async function calculateAverageResponseTime(startDate: Date, endDate: Date) {
         }
       }
     });
-    
+
     // Calculate response times (time from ticket creation to ASSIGNED - first response)
     const responseTimes = ticketsWithStatusHistory
       .map((ticket: any) => {
         const statusHistory = ticket.statusHistory;
-        
+
         // Find the ASSIGNED status record (first response/assignment)
         const assignedStatus = statusHistory.find((h: any) => h.status === 'ASSIGNED');
-        
+
         if (assignedStatus) {
           // Calculate business hours from ticket creation to ASSIGNED
           return calculateBusinessHoursInMinutes(ticket.createdAt, assignedStatus.changedAt);
         }
-        
+
         return null;
       })
       .filter((time: number | null): time is number => time !== null && time > 0);
-    
+
     if (responseTimes.length === 0) {
       // If no tickets with proper status transitions, return zeros
       return { hours: 0, minutes: 0, change: 0, isPositive: true };
     }
-    
+
     // Calculate average in minutes
     const averageMinutes = responseTimes.reduce((sum: number, time: number) => sum + time, 0) / responseTimes.length;
-    
+
     // Convert to hours and minutes
     const hours = Math.floor(averageMinutes / 60);
     const minutes = Math.round(averageMinutes % 60);
-    
+
     const isPositive = averageMinutes < 120; // Positive if less than 2 hours
-    
+
     return { hours, minutes, change: 0, isPositive };
   } catch (error) {
     return { hours: 0, minutes: 0, change: 0, isPositive: true }; // Return zeros on error
@@ -716,14 +716,14 @@ async function calculateAverageResolutionTime(startDate: Date, endDate: Date): P
         status: true
       }
     });
-    
+
     // Calculate resolution times (business hours from ticket open to CLOSED)
     const resolutionTimes = closedTickets
       .map((ticket: any) => {
         return calculateBusinessHoursInMinutes(ticket.createdAt, ticket.updatedAt);
       })
       .filter((time: any) => time > 0); // Filter out negative times
-    
+
     if (resolutionTimes.length === 0) {
       // If no resolved tickets, check for any tickets that might be resolved
       const allTickets = await prisma.ticket.findMany({
@@ -739,13 +739,13 @@ async function calculateAverageResolutionTime(startDate: Date, endDate: Date): P
           status: true
         }
       });
-      
+
       if (allTickets.length > 0) {
         // Use average age of all tickets as a baseline (business hours)
         const avgMinutes = allTickets.reduce((sum: any, ticket: any) => {
           return sum + calculateBusinessHoursInMinutes(ticket.createdAt, ticket.updatedAt);
         }, 0) / allTickets.length;
-        
+
         // Convert business minutes to business days (8 hours per business day)
         const businessHoursPerDay = 8 * 60; // 480 minutes per business day
         const days = Math.floor(avgMinutes / businessHoursPerDay);
@@ -753,25 +753,25 @@ async function calculateAverageResolutionTime(startDate: Date, endDate: Date): P
         const hours = Math.floor(remainingMinutesAfterDays / 60);
         const minutes = Math.round(remainingMinutesAfterDays % 60);
         const isPositive = avgMinutes < (2 * businessHoursPerDay); // Less than 2 business days
-        
+
         return { days, hours, minutes, change: 0, isPositive };
       }
-      
+
       return { days: 0, hours: 0, minutes: 0, change: 0, isPositive: true }; // Return zeros when no data
     }
-    
+
     // Calculate average in minutes
     const averageMinutes = resolutionTimes.reduce((sum: number, time: number) => sum + time, 0) / resolutionTimes.length;
-    
+
     // Convert business minutes to business days (8 hours per business day)
     const businessHoursPerDay = 8 * 60; // 480 minutes per business day
     const days = Math.floor(averageMinutes / businessHoursPerDay);
     const remainingMinutesAfterDays = averageMinutes % businessHoursPerDay;
     const hours = Math.floor(remainingMinutesAfterDays / 60);
     const minutes = Math.round(remainingMinutesAfterDays % 60);
-    
+
     const isPositive = averageMinutes < (2 * businessHoursPerDay); // Positive if less than 2 business days
-    
+
     return { days, hours, minutes, change: 0, isPositive };
   } catch (error) {
     return { days: 0, hours: 0, minutes: 0, change: 0, isPositive: true };
@@ -805,7 +805,7 @@ async function calculateAverageDowntime(startDate: Date, endDate: Date): Promise
         changedAt: 'asc'
       }
     });
-    
+
     if (closedStatusHistory.length === 0) {
       // If no closed tickets, calculate based on currently open tickets
       const openTickets = await prisma.ticket.findMany({
@@ -823,24 +823,24 @@ async function calculateAverageDowntime(startDate: Date, endDate: Date): Promise
           updatedAt: true
         }
       });
-      
+
       if (openTickets.length > 0) {
         // Use current age of open tickets as downtime (business hours)
         const now = new Date();
         const avgDowntime = openTickets.reduce((sum: any, ticket: any) => {
           return sum + calculateBusinessHoursInMinutes(ticket.createdAt, now);
         }, 0) / openTickets.length;
-        
+
         const hours = Math.floor(avgDowntime / 60);
         const minutes = Math.round(avgDowntime % 60);
         const isPositive = avgDowntime < 240; // Less than 4 hours is positive
-        
+
         return { hours, minutes, change: 0, isPositive };
       }
-      
+
       return { hours: 0, minutes: 0, change: 0, isPositive: true };
     }
-    
+
     // Group by ticket ID and find first closure time for each ticket
     const ticketClosureTimes = new Map<number, Date>();
     closedStatusHistory.forEach(history => {
@@ -848,26 +848,26 @@ async function calculateAverageDowntime(startDate: Date, endDate: Date): Promise
         ticketClosureTimes.set(history.ticketId, history.changedAt);
       }
     });
-    
+
     // Calculate downtime for each ticket (creation to first closure)
     const downtimes = Array.from(ticketClosureTimes.entries()).map(([ticketId, closedAt]) => {
       const ticket = closedStatusHistory.find(h => h.ticketId === ticketId)?.ticket;
       if (!ticket) return 0;
       return calculateBusinessHoursInMinutes(ticket.createdAt, closedAt);
     }).filter((time: number) => time > 0);
-    
+
     if (downtimes.length === 0) {
       return { hours: 0, minutes: 0, change: 0, isPositive: true };
     }
-    
+
     const averageMinutes = downtimes.reduce((sum: number, time: number) => sum + time, 0) / downtimes.length;
-    
+
     // Convert to hours and minutes
     const hours = Math.floor(averageMinutes / 60);
     const minutes = Math.round(averageMinutes % 60);
-    
+
     const isPositive = averageMinutes < 240; // Positive if less than 4 hours
-    
+
     return { hours, minutes, change: 0, isPositive };
   } catch (error) {
     return { hours: 0, minutes: 0, change: 0, isPositive: true };
@@ -889,23 +889,23 @@ async function calculateSLACompliance(startDate: Date, endDate: Date) {
         statusHistory: true
       }
     });
-    
+
     // SLA target: 1 business day (8.5 hours with 9 AM - 5:30 PM schedule)
     // In a real scenario, you would check against SLA policies based on priority
     const compliantTickets = tickets.filter((ticket: any) => {
       if (!['CLOSED', 'RESOLVED', 'CLOSED_PENDING'].includes(ticket.status)) return false;
-      
+
       const openedAt = ticket.createdAt;
       const closedAt = ticket.updatedAt;
       const resolutionTime = calculateBusinessHoursInMinutes(openedAt, closedAt);
-      
+
       return resolutionTime <= 510; // 1 business day = 8.5 hours * 60 = 510 minutes (9 AM - 5:30 PM)
     });
-    
-    const percentage = tickets.length > 0 
-      ? Math.round((compliantTickets.length / tickets.length) * 100) 
+
+    const percentage = tickets.length > 0
+      ? Math.round((compliantTickets.length / tickets.length) * 100)
       : 100;
-    
+
     return {
       count: compliantTickets.length,
       total: tickets.length,
@@ -957,15 +957,30 @@ async function getZoneWiseTicketData() {
         },
         servicePersons: {
           include: {
-            user: true
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                isActive: true
+              }
+            }
           }
         },
         customers: {
-          where: { isActive: true }
+          where: { isActive: true },
+          include: {
+            assets: {
+              where: {
+                status: 'ACTIVE'
+              }
+            }
+          }
         }
       }
     });
-    
+
     // Calculate average resolution time for each zone
     const zoneDataWithResolutionTime = await Promise.all(
       zones.map(async (zone: any) => {
@@ -984,15 +999,15 @@ async function getZoneWiseTicketData() {
             updatedAt: true
           }
         });
-        
+
         let avgResolutionTimeHours = 0;
-        
+
         if (closedTickets.length > 0) {
           // Calculate resolution times in business hours (time from creation to CLOSED)
-          const resolutionTimes = closedTickets.map((ticket: any) => 
+          const resolutionTimes = closedTickets.map((ticket: any) =>
             calculateBusinessHoursInMinutes(ticket.createdAt, ticket.updatedAt)
           ).filter(time => time > 0); // Filter out negative times
-          
+
           if (resolutionTimes.length > 0) {
             const avgMinutes = resolutionTimes.reduce((sum, time) => sum + time, 0) / resolutionTimes.length;
             // Convert to hours (keep decimal for proper display of sub-hour values)
@@ -1012,10 +1027,10 @@ async function getZoneWiseTicketData() {
               updatedAt: true
             }
           });
-          
+
           if (allZoneTickets.length > 0) {
             // Use average age of all tickets as estimation (business hours)
-            const avgAge = allZoneTickets.reduce((sum, ticket) => 
+            const avgAge = allZoneTickets.reduce((sum, ticket) =>
               sum + calculateBusinessHoursInMinutes(ticket.createdAt, ticket.updatedAt), 0
             ) / allZoneTickets.length;
             // Convert to hours (keep decimal for proper display of sub-hour values)
@@ -1025,18 +1040,67 @@ async function getZoneWiseTicketData() {
             avgResolutionTimeHours = 0;
           }
         }
-        
+
+        // Count users from ServicePersonZone junction table
+        const usersFromJunction = zone.servicePersons
+          .filter((sp: any) => sp.user?.isActive !== false)
+          .map((sp: any) => sp.user);
+
+        // Also count users who have zoneId field set to this zone
+        const usersFromZoneId = await prisma.user.findMany({
+          where: {
+            zoneId: String(zone.id),
+            isActive: true
+          },
+          select: {
+            id: true,
+            role: true
+          }
+        });
+
+        // Combine both sources and deduplicate by user id
+        const allUserIds = new Set<number>();
+        const allUsers: Array<{ id: number; role: string }> = [];
+
+        // Add junction users
+        usersFromJunction.forEach((user: any) => {
+          if (user && !allUserIds.has(user.id)) {
+            allUserIds.add(user.id);
+            allUsers.push({ id: user.id, role: user.role });
+          }
+        });
+
+        // Add zoneId users
+        usersFromZoneId.forEach((user: any) => {
+          if (!allUserIds.has(user.id)) {
+            allUserIds.add(user.id);
+            allUsers.push({ id: user.id, role: user.role });
+          }
+        });
+
+        // Count by role
+        const zoneManagerCount = allUsers.filter(u => u.role === 'ZONE_MANAGER').length;
+        const zoneUserCount = allUsers.filter(u => u.role === 'ZONE_USER').length;
+        const servicePersonCount = allUsers.filter(u => u.role === 'SERVICE_PERSON').length;
+
+        // Count total assets in zone
+        const assetCount = zone.customers.reduce((sum: number, customer: any) =>
+          sum + (customer.assets?.length || 0), 0);
+
         return {
           id: zone.id,
           name: zone.name,
           totalTickets: zone.tickets.length,
-          servicePersonCount: zone.servicePersons.length,
+          servicePersonCount: servicePersonCount,
+          zoneManagerCount: zoneManagerCount,
+          zoneUserCount: zoneUserCount,
           customerCount: zone.customers.length,
+          assetCount: assetCount,
           avgResolutionTimeHours
         };
       })
     );
-    
+
     return zoneDataWithResolutionTime;
   } catch (error) {
     return [];
@@ -1048,12 +1112,12 @@ async function getTicketTrends(days: number = 30) {
   try {
     const trends = [];
     const today = new Date();
-    
+
     for (let i = days - 1; i >= 0; i--) {
       const date = subDays(today, i);
       const start = startOfDay(date);
       const end = endOfDay(date);
-      
+
       const count = await prisma.ticket.count({
         where: {
           createdAt: {
@@ -1062,14 +1126,14 @@ async function getTicketTrends(days: number = 30) {
           }
         }
       });
-      
+
       trends.push({
         date: format(date, 'yyyy-MM-dd'),
         count,
         status: 'ALL' // You could break this down by status if needed
       });
     }
-    
+
     return trends;
   } catch (error) {
     return [];
@@ -1103,17 +1167,17 @@ async function calculateAverageTravelTime(startDate: Date, endDate: Date) {
         const returnEnd = statusHistory.find(h => h.status === 'ONSITE_VISIT_COMPLETED');
 
         let ticketTravelTime = 0;
-        
+
         // Going travel time
         if (goingStart && goingEnd && goingStart.changedAt < goingEnd.changedAt) {
           ticketTravelTime += differenceInMinutes(goingEnd.changedAt, goingStart.changedAt);
         }
-        
+
         // Return travel time
         if (returnStart && returnEnd && returnStart.changedAt < returnEnd.changedAt) {
           ticketTravelTime += differenceInMinutes(returnEnd.changedAt, returnStart.changedAt);
         }
-        
+
         if (ticketTravelTime > 0) {
           travelTimes.push(ticketTravelTime);
         }
@@ -1172,7 +1236,7 @@ async function calculateAverageOnsiteResolutionTime(startDate: Date, endDate: Da
         // Onsite work time: ONSITE_VISIT_IN_PROGRESS to ONSITE_VISIT_RESOLVED
         const onsiteStart = statusHistory.find(h => h.status === 'ONSITE_VISIT_IN_PROGRESS');
         const onsiteEnd = statusHistory.find(h => h.status === 'ONSITE_VISIT_RESOLVED');
-        
+
         if (onsiteStart && onsiteEnd && onsiteStart.changedAt < onsiteEnd.changedAt) {
           const onsiteTime = differenceInMinutes(onsiteEnd.changedAt, onsiteStart.changedAt);
           if (onsiteTime > 0) {
@@ -1229,14 +1293,16 @@ async function calculateAverageOnsiteResolutionTime_OLD(startDate: Date, endDate
         const fullLogs = await prisma.onsiteVisitLog.findMany({
           where: {
             ticketId: { in: ticketIdsForLogs },
-            event: { in: [
-              OnsiteVisitEvent.WORK_STARTED,
-              OnsiteVisitEvent.WORK_PAUSED,
-              OnsiteVisitEvent.WORK_RESUMED,
-              OnsiteVisitEvent.WORK_COMPLETED,
-              OnsiteVisitEvent.RESOLVED,
-              OnsiteVisitEvent.ENDED
-            ] }
+            event: {
+              in: [
+                OnsiteVisitEvent.WORK_STARTED,
+                OnsiteVisitEvent.WORK_PAUSED,
+                OnsiteVisitEvent.WORK_RESUMED,
+                OnsiteVisitEvent.WORK_COMPLETED,
+                OnsiteVisitEvent.RESOLVED,
+                OnsiteVisitEvent.ENDED
+              ]
+            }
           },
           orderBy: { createdAt: 'asc' }
         });
@@ -1279,7 +1345,7 @@ async function calculateAverageOnsiteResolutionTime_OLD(startDate: Date, endDate
           const hoursFromLogs = Math.floor(avgMinutesFromLogs / 60);
           const minutesFromLogs = avgMinutesFromLogs % 60;
           if (filteredOutliers > 0)
-          return { hours: hoursFromLogs, minutes: minutesFromLogs, change: 0, isPositive: true };
+            return { hours: hoursFromLogs, minutes: minutesFromLogs, change: 0, isPositive: true };
         }
       }
     } catch (e) {
@@ -1406,7 +1472,7 @@ async function calculateAverageOnsiteResolutionTime_OLD(startDate: Date, endDate
 export const getStatusDistribution = async (req: Request, res: Response) => {
   try {
     const thirtyDaysAgo = subDays(new Date(), 30);
-    
+
     const distribution = await prisma.ticket.groupBy({
       by: ['status'],
       where: {
@@ -1418,7 +1484,7 @@ export const getStatusDistribution = async (req: Request, res: Response) => {
         status: true
       }
     });
-    
+
     res.json({
       distribution: distribution.map((item: any) => ({
         status: item.status,
@@ -1435,7 +1501,7 @@ export const getTicketTrendsData = async (req: Request, res: Response) => {
   try {
     const days = parseInt(req.query.days as string) || 30;
     const trends = await getTicketTrends(days);
-    
+
     res.json({ trends });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch ticket trends' });

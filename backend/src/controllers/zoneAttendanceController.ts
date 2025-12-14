@@ -902,6 +902,31 @@ export const zoneAttendanceController = {
           },
         });
 
+        // Transform activity logs to extract photos and location data from metadata
+        const transformedActivityLogs = activityLogs.map((activity: any) => ({
+          ...activity,
+          ActivityStage: activity.ActivityStage?.map((stage: any) => ({
+            ...stage,
+            // Extract accuracy and locationSource from metadata if not present as direct fields
+            accuracy: stage.accuracy ?? stage.metadata?.accuracy,
+            locationSource: stage.locationSource ?? stage.metadata?.locationSource,
+            photos: (stage.metadata?.photos || []).map((photo: any) => {
+              // Handle different photo object structures
+              // Photos can come as dataUrl (base64), cloudinaryUrl, url, or thumbnailUrl
+              const photoUrl = photo.cloudinaryUrl || photo.url || photo.thumbnailUrl || photo.dataUrl || '';
+              return {
+                id: photo.id || Math.random(),
+                filename: photo.filename || photo.name || 'photo',
+                cloudinaryUrl: photoUrl,
+                url: photoUrl, // Include both for compatibility
+                thumbnailUrl: photo.thumbnailUrl || photoUrl,
+                dataUrl: photo.dataUrl, // Include dataUrl if available
+                createdAt: photo.createdAt || photo.timestamp || stage.createdAt || new Date().toISOString(),
+              };
+            }),
+          })) || [],
+        }));
+
         // Return synthetic absent record with activity data
         return res.json({
           success: true,
@@ -928,7 +953,7 @@ export const zoneAttendanceController = {
               role: servicePerson.role,
               serviceZones: servicePerson.serviceZones,
               _count: {
-                activityLogs: activityLogs.length
+                activityLogs: transformedActivityLogs.length
               }
             },
             flags: [{
@@ -937,8 +962,8 @@ export const zoneAttendanceController = {
               severity: 'error'
             }],
             gaps: [],
-            activityCount: activityLogs.length,
-            activityLogs: activityLogs,
+            activityCount: transformedActivityLogs.length,
+            activityLogs: transformedActivityLogs,
             auditLogs: auditLogs
           }
         });
@@ -1169,14 +1194,39 @@ export const zoneAttendanceController = {
         }
       }
 
+      // Transform activity logs to extract photos and location data from metadata
+      const transformedActivityLogs = activityLogs.map((activity: any) => ({
+        ...activity,
+        ActivityStage: activity.ActivityStage?.map((stage: any) => ({
+          ...stage,
+          // Extract accuracy and locationSource from metadata if not present as direct fields
+          accuracy: stage.accuracy ?? stage.metadata?.accuracy,
+          locationSource: stage.locationSource ?? stage.metadata?.locationSource,
+          photos: (stage.metadata?.photos || []).map((photo: any) => {
+            // Handle different photo object structures
+            // Photos can come as dataUrl (base64), cloudinaryUrl, url, or thumbnailUrl
+            const photoUrl = photo.cloudinaryUrl || photo.url || photo.thumbnailUrl || photo.dataUrl || '';
+            return {
+              id: photo.id || Math.random(),
+              filename: photo.filename || photo.name || 'photo',
+              cloudinaryUrl: photoUrl,
+              url: photoUrl, // Include both for compatibility
+              thumbnailUrl: photo.thumbnailUrl || photoUrl,
+              dataUrl: photo.dataUrl, // Include dataUrl if available
+              createdAt: photo.createdAt || photo.timestamp || stage.createdAt || new Date().toISOString(),
+            };
+          }),
+        })) || [],
+      }));
+
       return res.json({
         success: true,
         data: {
           ...attendanceRecord,
           flags,
           gaps,
-          activityCount: activityLogs.length,
-          activityLogs,
+          activityCount: transformedActivityLogs.length,
+          activityLogs: transformedActivityLogs,
           auditLogs
         }
       });

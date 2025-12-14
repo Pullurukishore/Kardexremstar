@@ -1,7 +1,32 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { ComponentType } from 'react';
+import type { ComponentType } from 'react';
+import type { DashboardData, StatusDistribution, TrendsData } from './types';
+
+// Props interfaces for dynamic components
+interface FieldServiceAnalyticsProps {
+  dashboardData: Partial<DashboardData>;
+  loading?: boolean;
+}
+
+interface PerformanceAnalyticsProps {
+  dashboardData: Partial<DashboardData>;
+  loading?: boolean;
+}
+
+interface AdvancedAnalyticsProps {
+  dashboardData: Partial<DashboardData>;
+  statusDistribution: StatusDistribution;
+  ticketTrends: TrendsData;
+  loading: boolean;
+}
+
+interface ZonePerformanceAnalyticsProps {
+  dashboardData: Partial<DashboardData>;
+  isRefreshing: boolean;
+  onRefresh: () => Promise<void>;
+}
 
 // Loading component for heavy analytics
 const AnalyticsLoading = () => (
@@ -16,33 +41,33 @@ const AnalyticsLoading = () => (
   </div>
 );
 
-// Dynamic imports for heavy components with loading states
-export const DynamicFieldServiceAnalytics = dynamic(
-  () => import('./FieldServiceAnalytics'),
+// Dynamic imports for heavy components with loading states and proper typing
+export const DynamicFieldServiceAnalytics = dynamic<FieldServiceAnalyticsProps>(
+  () => import('./FieldServiceAnalytics').then(mod => mod.default as ComponentType<FieldServiceAnalyticsProps>),
   {
     loading: () => <AnalyticsLoading />,
     ssr: false, // Client-side only for better performance
   }
 );
 
-export const DynamicPerformanceAnalytics = dynamic(
-  () => import('./PerformanceAnalytics'),
+export const DynamicPerformanceAnalytics = dynamic<PerformanceAnalyticsProps>(
+  () => import('./PerformanceAnalytics').then(mod => mod.default as ComponentType<PerformanceAnalyticsProps>),
   {
     loading: () => <AnalyticsLoading />,
     ssr: false,
   }
 );
 
-export const DynamicAdvancedAnalytics = dynamic(
-  () => import('./AdvancedAnalytics'),
+export const DynamicAdvancedAnalytics = dynamic<AdvancedAnalyticsProps>(
+  () => import('./AdvancedAnalytics').then(mod => mod.default as ComponentType<AdvancedAnalyticsProps>),
   {
     loading: () => <AnalyticsLoading />,
     ssr: false,
   }
 );
 
-export const DynamicZonePerformanceAnalytics = dynamic(
-  () => import('./ZonePerformanceAnalytics'),
+export const DynamicZonePerformanceAnalytics = dynamic<ZonePerformanceAnalyticsProps>(
+  () => import('./ZonePerformanceAnalytics').then(mod => mod.default as ComponentType<ZonePerformanceAnalyticsProps>),
   {
     loading: () => <AnalyticsLoading />,
     ssr: false,

@@ -7,6 +7,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { getCurrentUser } from '@/lib/api/auth';
 import { UserRole } from '@/types/user.types';
+import { DashboardErrorFallback } from '@/components/layout/DashboardErrorFallback';
 
 export default async function DashboardRootLayout({
   children,
@@ -42,6 +43,14 @@ export default async function DashboardRootLayout({
       </TooltipProvider>
     );
   } catch (error) {
-    redirect('/auth/login');
+    // When the backend is unreachable or returns an unexpected error,
+    // show a stable error state instead of redirecting back to login.
+    // This prevents redirect loops between dashboard routes and the login page
+    // and gives the user clear actions (retry / go to login).
+    return (
+      <TooltipProvider>
+        <DashboardErrorFallback />
+      </TooltipProvider>
+    );
   }
 }

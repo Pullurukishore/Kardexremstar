@@ -51,7 +51,7 @@ export default function TicketDetailPage() {
     try {
       setLoading(true);
       const response = await api.get(`/tickets/${id}`);
-      setTicket(response.data);
+      setTicket(response.data?.data ?? response.data);
     } catch (error) {
       toast({
         title: 'Error',
@@ -68,14 +68,14 @@ export default function TicketDetailPage() {
       try {
         setLoading(true);
         const response = await api.get(`/tickets/${id}`);
-        setTicket(response.data);
+        setTicket(response.data?.data ?? response.data);
       } catch (error) {
         toast({
           title: 'Error',
           description: 'Failed to load ticket details',
           variant: 'destructive',
         });
-        router.push('/admin/tickets');
+        router.push('/zone/tickets');
       } finally {
         setLoading(false);
       }
@@ -486,44 +486,7 @@ export default function TicketDetailPage() {
                     </div>
                   </div>
                 </Button>
-                <Button 
-                  onClick={async () => {
-                    try {
-                      // Directly open service person selection
-                      const servicePersons = await api.get('/service-persons');
-                      if (servicePersons.data.length === 0) {
-                        toast({
-                          title: 'No Service Persons',
-                          description: 'There are no service persons available for assignment',
-                          variant: 'destructive',
-                        });
-                        return;
-                      }
-                      setAssignmentStep('SERVICE_PERSON');
-                      setIsAssignDialogOpen(true);
-                    } catch (error) {
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to load service persons. Please try again.',
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
-                  disabled={!ticket}
-                  variant="outline"
-                  className="w-full justify-start h-12 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-blue-200 hover:border-blue-300 text-blue-700 hover:text-blue-800 transition-all duration-200 shadow-sm hover:shadow-md group"
-                >
-                  <div className="flex items-center">
-                    <div className="p-1.5 rounded-full bg-blue-100 group-hover:bg-blue-200 mr-3 transition-colors">
-                      <Wrench className="h-4 w-4" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium">Assign to Service Person</div>
-                      <div className="text-xs text-blue-600 opacity-80">Send to field technician</div>
-                    </div>
-                  </div>
-                </Button>
-              </div>
+                              </div>
             </CardContent>
           </Card>
 

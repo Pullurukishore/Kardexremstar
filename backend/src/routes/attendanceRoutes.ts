@@ -29,14 +29,14 @@ router.post('/re-checkin', requireRole(['SERVICE_PERSON']), attendanceController
 // Auto checkout (for cron job or admin)
 router.post('/auto-checkout', requireRole(['ADMIN']), attendanceController.autoCheckout);
 
-// Get all attendance records (admin/zone user)
-router.get('/all', requireRole(['ADMIN', 'ZONE_USER']), attendanceController.getAllAttendance);
+// Get all attendance records (admin/zone user/expert helpdesk)
+router.get('/all', requireRole(['ADMIN', 'ZONE_USER', 'EXPERT_HELPDESK']), attendanceController.getAllAttendance);
 
-// Get live tracking data (admin/zone user)
-router.get('/live-tracking', requireRole(['ADMIN', 'ZONE_USER']), attendanceController.getLiveTracking);
+// Get live tracking data (admin/zone user/expert helpdesk)
+router.get('/live-tracking', requireRole(['ADMIN', 'ZONE_USER', 'EXPERT_HELPDESK']), attendanceController.getLiveTracking);
 
-// Debug endpoints for cron job status (admin only)
-router.get('/cron-status', requireRole(['ADMIN']), (req, res) => {
+// Debug endpoints for cron job status (admin/expert helpdesk)
+router.get('/cron-status', requireRole(['ADMIN', 'EXPERT_HELPDESK']), (req, res) => {
   try {
     const jobs = cronService.listJobs();
     const autoCheckoutStatus = cronService.getJobStatus('auto-checkout');
@@ -67,8 +67,8 @@ router.get('/cron-status', requireRole(['ADMIN']), (req, res) => {
   }
 });
 
-// Restart auto-checkout job (admin only)
-router.post('/restart-cron', requireRole(['ADMIN']), (req, res) => {
+// Restart auto-checkout job (admin/expert helpdesk)
+router.post('/restart-cron', requireRole(['ADMIN', 'EXPERT_HELPDESK']), (req, res) => {
   try {
     cronService.stopJob('auto-checkout');
     cronService.startAutoCheckoutJob();

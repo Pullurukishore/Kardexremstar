@@ -468,6 +468,16 @@ export const logout = async (req: AuthenticatedRequest, res: Response) => {
     res.clearCookie('accessToken', clearCookieOptions);
     res.clearCookie('token', clearCookieOptions);
     res.clearCookie('refreshToken', clearCookieOptions);
+    res.clearCookie('userRole', clearCookieOptions);
+
+    // Also clear non-httpOnly cookies that might be set on client side
+    const clientCookieOptions = {
+      path: '/',
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const
+    };
+    res.clearCookie('userRole', clientCookieOptions);
 
     res.json({ message: 'Logged out successfully' });
   } catch (error) {

@@ -1,78 +1,107 @@
-"use client";
+'use client';
 
-import React from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { BarChart3, Calendar, Clock, RefreshCw, Download, Info } from "lucide-react";
-import CreateTicketButton from "@/components/tickets/CreateTicketButton";
+import React from 'react';
+import { RefreshCw, BarChart3, Calendar, Clock, Users, Wrench, Building2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import CreateTicketButton from '@/components/tickets/CreateTicketButton';
 
 interface ExecutiveHeaderProps {
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
+  // Optional stats to display
+  stats?: {
+    totalCustomers?: number;
+    totalServicePersons?: number;
+    totalServiceZones?: number;
+  };
 }
 
-export default function ExecutiveHeader({ isRefreshing, onRefresh }: ExecutiveHeaderProps) {
+export default function ExecutiveHeader({ 
+  isRefreshing, 
+  onRefresh,
+  stats 
+}: ExecutiveHeaderProps) {
   return (
-    <div className="mb-6 sm:mb-8 w-full max-w-full overflow-x-hidden">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6 w-full max-w-full">
-        <div className="space-y-2 min-w-0 flex-1">
-          <div className="flex items-center gap-2 sm:gap-3 w-full max-w-full">
-            <div className="p-1.5 sm:p-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg sm:rounded-xl flex-shrink-0">
-              <BarChart3 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+    <div className="mb-8">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl">
+              <BarChart3 className="w-8 h-8 text-white" />
             </div>
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent leading-tight truncate">
-                Executive Dashboard
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                Admin Dashboard
               </h1>
-              <p className="text-sm sm:text-base text-slate-600 font-medium truncate">Business Intelligence & Field Service Analytics</p>
+              <p className="text-slate-600 font-medium">Real-time Operations & Field Service Intelligence</p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-slate-500 w-full max-w-full overflow-hidden">
-            <div className="flex items-center gap-1 min-w-0">
-              <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "short",
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
+          
+          <div className="flex items-center gap-4 text-sm text-slate-500">
+            <div className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
             </div>
-            <div className="flex items-center gap-1 min-w-0">
-              <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">Last updated: {new Date().toLocaleTimeString()}</span>
-              {isRefreshing && <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 ml-1 animate-spin flex-shrink-0" />}
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              Last updated: {new Date().toLocaleTimeString()}
+              {isRefreshing && <RefreshCw className="w-4 h-4 ml-1 animate-spin" />}
             </div>
           </div>
+
+          {/* Admin Stats */}
+          {stats && (stats.totalCustomers || stats.totalServicePersons || stats.totalServiceZones) && (
+            <div className="flex flex-wrap items-center gap-3 mt-4">
+              {stats.totalCustomers !== undefined && (
+                <div className="flex items-center gap-2 bg-gradient-to-r from-blue-100 to-blue-200 px-4 py-2 rounded-xl shadow-sm">
+                  <Users className="h-4 w-4 text-blue-600" />
+                  <span className="font-semibold text-blue-800">
+                    {stats.totalCustomers} Customers
+                  </span>
+                </div>
+              )}
+              {stats.totalServicePersons !== undefined && (
+                <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-purple-200 px-4 py-2 rounded-xl shadow-sm">
+                  <Wrench className="h-4 w-4 text-purple-600" />
+                  <span className="font-semibold text-purple-800">
+                    {stats.totalServicePersons} Technicians
+                  </span>
+                </div>
+              )}
+              {stats.totalServiceZones !== undefined && (
+                <div className="flex items-center gap-2 bg-gradient-to-r from-green-100 to-green-200 px-4 py-2 rounded-xl shadow-sm">
+                  <Building2 className="h-4 w-4 text-green-600" />
+                  <span className="font-semibold text-green-800">
+                    {stats.totalServiceZones} Zones
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto flex-shrink-0">
-          <CreateTicketButton 
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 text-sm sm:text-base px-3 sm:px-4 py-2 whitespace-nowrap"
-          >
-            <span className="hidden sm:inline">Create New Ticket</span>
-            <span className="sm:hidden">New Ticket</span>
-          </CreateTicketButton>
-          <Button
-            onClick={onRefresh}
-            variant="default"
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 text-sm sm:text-base px-3 sm:px-4 py-2 whitespace-nowrap"
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh Data'}</span>
-            <span className="sm:hidden">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-          </Button>
-        </div>
-      </div>
-      
-      {/* Business Hours Notice */}
-      <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg w-full max-w-full overflow-hidden">
-        <div className="flex items-start gap-2 text-blue-800">
-          <Info className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
-          <span className="text-xs sm:text-sm font-medium leading-relaxed">
-            Time metrics (Response Time, Resolution Time, Downtime, Onsite Work) are calculated using business hours only (9 AM - 5:30 PM, Monday to Saturday). Travel times show actual elapsed time.
-          </span>
+
+        <div className="flex flex-wrap gap-3">
+          <div className="flex gap-2">
+            <CreateTicketButton 
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 flex items-center gap-2"
+            >
+              Create New Ticket
+            </CreateTicketButton>
+            <Button
+              onClick={onRefresh}
+              variant="default"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 flex items-center gap-2"
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

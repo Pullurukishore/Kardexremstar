@@ -61,12 +61,14 @@ router.get(
   [
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'ZONE_MANAGER', 'EXPERT_HELPDESK']),
   async (req: AuthRequest, res: Response) => {
     try {
       const users = await prisma.user.findMany({
         where: {
-          role: 'ZONE_USER',
+          role: {
+            in: ['ZONE_USER', 'ZONE_MANAGER']
+          },
           isActive: true
         },
         select: {

@@ -91,7 +91,7 @@ function calculateBusinessHoursInMinutes(startDate: Date, endDate: Date): number
 
   while (currentDate < finalDate) {
     const dayOfWeek = getDay(currentDate); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    
+
     // Skip Sundays (dayOfWeek === 0)
     if (dayOfWeek !== 0) {
       // Create business hours for this day
@@ -121,7 +121,7 @@ function calculateBusinessHoursInMinutes(startDate: Date, endDate: Date): number
         // Ensure we don't go outside business hours
         if (dayStart < businessStart) dayStart = businessStart;
         if (dayEnd > businessEnd) dayEnd = businessEnd;
-        
+
         if (dayStart < dayEnd) {
           totalMinutes += differenceInMinutes(dayEnd, dayStart);
         }
@@ -147,36 +147,36 @@ interface ReportFilters {
 export const generateReport = async (req: Request, res: Response) => {
   try {
     const { from, to, zoneId, reportType, customerId, assetId } = req.query as unknown as ReportFilters;
-    
+
     // Parse dates and ensure proper time is set with timezone consideration
     const userTimeZone = 'Asia/Kolkata'; // Set your timezone here
-    
+
     // Create dates in the user's timezone
     const now = new Date();
     let startDate = from ? new Date(from) : subDays(now, 30);
     let endDate = to ? new Date(to) : now;
-    
+
     // Set start of day for start date (00:00:00.000) in local time
     startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
-    
+
     // Set end of day for end date (23:59:59.999) in local time
     endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999);
-    
+
     // Adjust for timezone offset to ensure we get the correct UTC time
     const tzOffset = startDate.getTimezoneOffset() * 60000;
     const startUTC = new Date(startDate.getTime() - tzOffset);
     const endUTC = new Date(endDate.getTime() - tzOffset);
-    
+
     console.log('Generating report with date range (Local):', {
       startDate: startDate.toString(),
       endDate: endDate.toString()
     });
-    
+
     console.log('Generating report with date range (UTC):', {
       startDate: startUTC.toISOString(),
       endDate: endUTC.toISOString()
     });
-    
+
     // Use the UTC dates for the query
     startDate = startUTC;
     endDate = endUTC;
@@ -190,6 +190,14 @@ export const generateReport = async (req: Request, res: Response) => {
 
     if (zoneId) {
       whereClause.zoneId = parseInt(zoneId);
+    }
+
+    // Add additional filters for offer reports
+    if (customerId) {
+      whereClause.customerId = parseInt(customerId as string);
+    }
+    if (assetId) {
+      whereClause.assetId = parseInt(assetId as string);
     }
 
     switch (reportType) {
@@ -209,6 +217,15 @@ export const generateReport = async (req: Request, res: Response) => {
         return await generateExecutiveSummaryReport(res, whereClause, startDate, endDate);
       case 'her-analysis':
         return await generateHerAnalysisReport(res, whereClause, startDate, endDate);
+      // Offer Funnel Reports
+      case 'offer-summary':
+        return await generateOfferSummaryReport(res, whereClause, startDate, endDate);
+      case 'target-report':
+        return await generateTargetReport(res, whereClause, startDate, endDate);
+      case 'product-type-analysis':
+        return await generateProductTypeAnalysisReport(res, whereClause, startDate, endDate);
+      case 'customer-performance':
+        return await generateCustomerPerformanceReport(res, whereClause, startDate, endDate);
       default:
         return res.status(400).json({ error: 'Invalid report type' });
     }
@@ -223,9 +240,9 @@ export const generateReport = async (req: Request, res: Response) => {
 async function generateTicketSummaryReport(res: Response, whereClause: any, startDate: Date, endDate: Date) {
   // Comprehensive data fetching with all necessary relations
   const [
-    tickets, 
-    statusDistribution, 
-    priorityDistribution, 
+    tickets,
+    statusDistribution,
+    priorityDistribution,
     slaDistribution,
     zoneDistribution,
     customerDistribution,
@@ -244,6 +261,16 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
         isEscalated: true,
         createdAt: true,
         updatedAt: true,
+        dueDate: true,
+        errorDetails: true,
+        actualResolutionTime: true,
+        totalTimeOpen: true,
+        visitPlannedDate: true,
+        visitCompletedDate: true,
+        visitStartedAt: true,
+        visitReachedAt: true,
+        visitInProgressAt: true,
+        visitResolvedAt: true,
         customer: true,
         assignedTo: true,
         zone: true,
@@ -296,61 +323,69 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
     })
   ]);
 
-  // Generate comprehensive daily trends
+  // Generate comprehensive daily trends - process sequentially to avoid connection pool exhaustion
   const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
-  const dailyTrends = await Promise.all(
-    dateRange.map(async (date) => {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
-      
-      const [created, resolved, escalated, assigned] = await Promise.all([
-        prisma.ticket.count({
-          where: {
-            ...whereClause,
-            createdAt: { gte: startOfDay, lte: endOfDay }
-          }
-        }),
-        // Use status history for accurate resolution tracking
-        prisma.ticketStatusHistory.count({
-          where: {
-            status: { in: ['RESOLVED', 'CLOSED'] },
-            changedAt: { gte: startOfDay, lte: endOfDay },
-            ticket: whereClause
-          }
-        }),
-        prisma.ticket.count({
-          where: {
-            ...whereClause,
-            isEscalated: true,
-            escalatedAt: { gte: startOfDay, lte: endOfDay }
-          }
-        }),
-        prisma.ticket.count({
-          where: {
-            ...whereClause,
-            status: 'ASSIGNED',
-            updatedAt: { gte: startOfDay, lte: endOfDay }
-          }
-        })
-      ]);
+  const dailyTrends: Array<{ date: string; created: number; resolved: number; escalated: number; assigned: number }> = [];
 
-      return {
-        date: format(date, 'yyyy-MM-dd'),
-        created,
-        resolved,
-        escalated,
-        assigned
-      };
-    })
-  );
+  // Process in batches of 5 days to limit concurrent connections
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < dateRange.length; i += BATCH_SIZE) {
+    const batch = dateRange.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(async (date) => {
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const [created, resolved, escalated, assigned] = await Promise.all([
+          prisma.ticket.count({
+            where: {
+              ...whereClause,
+              createdAt: { gte: startOfDay, lte: endOfDay }
+            }
+          }),
+          // Use status history for accurate resolution tracking
+          prisma.ticketStatusHistory.count({
+            where: {
+              status: { in: ['RESOLVED', 'CLOSED'] },
+              changedAt: { gte: startOfDay, lte: endOfDay },
+              ticket: whereClause
+            }
+          }),
+          prisma.ticket.count({
+            where: {
+              ...whereClause,
+              isEscalated: true,
+              escalatedAt: { gte: startOfDay, lte: endOfDay }
+            }
+          }),
+          prisma.ticket.count({
+            where: {
+              ...whereClause,
+              status: 'ASSIGNED',
+              updatedAt: { gte: startOfDay, lte: endOfDay }
+            }
+          })
+        ]);
+
+        return {
+          date: format(date, 'yyyy-MM-dd'),
+          created,
+          resolved,
+          escalated,
+          assigned
+        };
+      })
+    );
+    dailyTrends.push(...batchResults);
+  }
 
   // Calculate average resolution time
-  const resolvedTickets = tickets.filter((t: { status: string }) => 
+  const resolvedTickets = tickets.filter((t: { status: string }) =>
     t.status === 'RESOLVED' || t.status === 'CLOSED'
   );
-  
+
   let avgResolutionTime = 0;
   if (resolvedTickets.length > 0) {
     // Get tickets with status history to find actual resolution time
@@ -374,11 +409,11 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
 
     for (const ticket of ticketsWithHistory) {
       let resolutionTime: Date | null = null;
-      
+
       // First try to get resolution time from status history
       if (ticket.statusHistory && ticket.statusHistory.length > 0) {
         resolutionTime = ticket.statusHistory[0].changedAt;
-      } 
+      }
       // Fallback to updatedAt if no status history
       else if (ticket.updatedAt && ticket.createdAt) {
         // Only use updatedAt if it's significantly different from createdAt (more than 1 minute)
@@ -410,13 +445,13 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
   const unassignedTickets = tickets.filter((t: any) => !t.assignedToId);
   const overdueTickets = tickets.filter((t: any) => t.slaDueAt && now > new Date(t.slaDueAt));
   const ticketsWithFeedback = tickets.filter((t: any) => t.feedbacks?.length > 0 || t.rating);
-  
+
   // Calculate customer satisfaction metrics
   const ratingsData = tickets.filter((t: any) => t.rating?.rating).map((t: any) => t.rating.rating);
-  const avgCustomerRating = ratingsData.length > 0 
-    ? Math.round((ratingsData.reduce((sum: number, rating: number) => sum + rating, 0) / ratingsData.length) * 100) / 100 
+  const avgCustomerRating = ratingsData.length > 0
+    ? Math.round((ratingsData.reduce((sum: number, rating: number) => sum + rating, 0) / ratingsData.length) * 100) / 100
     : 0;
-  
+
   // Calculate first response time
   const ticketsWithHistory = tickets.filter((t: any) => t.statusHistory?.length > 0);
   let avgFirstResponseTime = 0;
@@ -430,7 +465,7 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
         return null;
       })
       .filter((time: number | null): time is number => time !== null && time > 0 && time <= (3 * 8 * 60)); // Max 3 business days
-    
+
     if (firstResponseTimes.length > 0) {
       avgFirstResponseTime = Math.round(firstResponseTimes.reduce((sum: number, time: number) => sum + time, 0) / firstResponseTimes.length);
     }
@@ -442,7 +477,7 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
   });
 
   // Create a map of zone ticket counts
-  const zoneTicketMap = new Map(zoneDistribution.map((z: any) => [z.zoneId, z._count]));
+  const zoneTicketMap = new Map((zoneDistribution || []).map((z: any) => [z.zoneId, z._count]));
 
   // Build complete zone distribution including zones with 0 tickets
   const completeZoneDistribution = allZones.map((zone: any) => ({
@@ -457,7 +492,7 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
   });
 
   // Create a map of customer ticket counts
-  const customerTicketMap = new Map(customerDistribution.map((c: any) => [c.customerId, c._count]));
+  const customerTicketMap = new Map((customerDistribution || []).map((c: any) => [c.customerId, c._count]));
 
   // Build complete customer distribution including customers with 0 tickets
   const completeCustomerDistribution = allCustomers.map((customer: any) => ({
@@ -469,25 +504,25 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
 
   // Get assignee names for distribution
   const assigneeNames = await prisma.user.findMany({
-    where: { id: { in: assigneeDistribution.filter((a: any) => a.assignedToId).map((a: any) => a.assignedToId) } },
+    where: { id: { in: (assigneeDistribution || []).filter((a: any) => a.assignedToId).map((a: any) => a.assignedToId) } },
     select: { id: true, name: true, email: true }
   });
 
   // Calculate resolution rate
-  const resolutionRate = tickets.length > 0 
-    ? Math.round((resolvedTickets.length / tickets.length) * 100 * 100) / 100 
+  const resolutionRate = tickets.length > 0
+    ? Math.round((resolvedTickets.length / tickets.length) * 100 * 100) / 100
     : 0;
 
   // Calculate escalation rate
-  const escalationRate = tickets.length > 0 
-    ? Math.round((tickets.filter((t: any) => t.isEscalated).length / tickets.length) * 100 * 100) / 100 
+  const escalationRate = tickets.length > 0
+    ? Math.round((tickets.filter((t: any) => t.isEscalated).length / tickets.length) * 100 * 100) / 100
     : 0;
 
   // Calculate customer performance metrics (more tickets = machine issues)
-  const customerPerformanceMetrics = customerDistribution.map((c: any) => {
+  const customerPerformanceMetrics = (customerDistribution || []).map((c: any) => {
     const customerTickets = tickets.filter((t: any) => t.customerId === c.customerId);
     const customerName = allCustomers.find((cn: any) => cn.id === c.customerId)?.companyName || 'Unknown Customer';
-    
+
     // Calculate machine issue indicators
     const criticalIssues = customerTickets.filter((t: any) => t.priority === 'CRITICAL').length;
     const highPriorityIssues = customerTickets.filter((t: any) => t.priority === 'HIGH').length;
@@ -497,16 +532,16 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
       const assetTickets = customerTickets.filter((at: any) => at.assetId === t.assetId);
       return assetTickets.length > 1;
     }).length;
-    
+
     // Calculate average resolution time for this customer
-    const customerResolvedTickets = customerTickets.filter((t: any) => 
+    const customerResolvedTickets = customerTickets.filter((t: any) =>
       t.status === 'RESOLVED' || t.status === 'CLOSED'
     );
     let avgCustomerResolutionTime = 0;
     if (customerResolvedTickets.length > 0) {
       const customerResolutionTimes = customerResolvedTickets
         .map((t: any) => {
-          const resolutionHistory = t.statusHistory?.find((h: any) => 
+          const resolutionHistory = t.statusHistory?.find((h: any) =>
             h.status === 'RESOLVED' || h.status === 'CLOSED'
           );
           if (resolutionHistory) {
@@ -515,18 +550,18 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
           return null;
         })
         .filter((time: number | null): time is number => time !== null && time > 0 && time <= (30 * 8 * 60));
-      
+
       if (customerResolutionTimes.length > 0) {
         avgCustomerResolutionTime = Math.round(
           customerResolutionTimes.reduce((sum: number, time: number) => sum + time, 0) / customerResolutionTimes.length
         );
       }
     }
-    
+
     // Calculate machine health score (lower score = more issues)
     const totalIssues = criticalIssues + highPriorityIssues + escalatedIssues + repeatIssues;
     const machineHealthScore = Math.max(0, 100 - (totalIssues * 5) - (c._count * 2));
-    
+
     return {
       customerId: c.customerId,
       customerName,
@@ -543,10 +578,10 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
   }).sort((a: any, b: any) => b.totalTickets - a.totalTickets); // Sort by ticket count (most issues first)
 
   // Calculate onsite visit traveling time
-  const onsiteTickets = tickets.filter((t: any) => 
+  const onsiteTickets = tickets.filter((t: any) =>
     t.visitStartedAt && (t.visitReachedAt || t.visitInProgressAt)
   );
-  
+
   let avgOnsiteTravelTime = 0;
   let avgOnsiteTravelTimeHours = 0;
   if (onsiteTickets.length > 0) {
@@ -555,7 +590,7 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
         const startTime = new Date(t.visitStartedAt);
         const reachTime = new Date(t.visitReachedAt || t.visitInProgressAt);
         const travelMinutes = differenceInMinutes(reachTime, startTime);
-        
+
         // Validate travel time (should be between 1 minute and 8 hours)
         if (travelMinutes > 0 && travelMinutes <= 480) {
           return travelMinutes;
@@ -563,7 +598,7 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
         return null;
       })
       .filter((time: number | null) => time !== null);
-    
+
     if (travelTimes.length > 0) {
       avgOnsiteTravelTime = Math.round(
         travelTimes.reduce((sum: number, time: number) => sum + time, 0) / travelTimes.length
@@ -573,132 +608,135 @@ async function generateTicketSummaryReport(res: Response, whereClause: any, star
   }
 
   res.json({
-    summary: {
-      // Basic counts
-      totalTickets: tickets.length,
-      openTickets: tickets.filter((t: { status: string }) => t.status === 'OPEN').length,
-      inProgressTickets: tickets.filter((t: { status: string }) => 
-        ['IN_PROGRESS', 'ASSIGNED', 'IN_PROCESS', 'ONSITE_VISIT', 'ONSITE_VISIT_IN_PROGRESS'].includes(t.status)
-      ).length,
-      resolvedTickets: resolvedTickets.length,
-      closedTickets: tickets.filter((t: { status: string }) => t.status === 'CLOSED').length,
-      
-      // Priority-based metrics
-      criticalTickets: criticalTickets.length,
-      highPriorityTickets: highPriorityTickets.length,
-      unassignedTickets: unassignedTickets.length,
-      
-      // SLA and performance metrics
-      overdueTickets: overdueTickets.length,
-      escalatedTickets: tickets.filter((t: { isEscalated: boolean }) => t.isEscalated).length,
-      resolutionRate,
-      escalationRate,
-      
-      // Time-based metrics
-      averageResolutionTime: avgResolutionTime,
-      averageResolutionTimeHours: avgResolutionTime > 0 ? Math.round((avgResolutionTime / 60) * 100) / 100 : 0,
-      averageResolutionTimeDays: avgResolutionTime > 0 ? Math.round((avgResolutionTime / (60 * 24)) * 100) / 100 : 0,
-      averageFirstResponseTime: avgFirstResponseTime,
-      averageFirstResponseTimeHours: avgFirstResponseTime > 0 ? Math.round((avgFirstResponseTime / 60) * 100) / 100 : 0,
-      
-      // Customer satisfaction metrics
-      ticketsWithFeedback: ticketsWithFeedback.length,
-      averageCustomerRating: avgCustomerRating,
-      totalRatings: ratingsData.length,
-      
-      // Operational metrics
-      totalZones: allZones.length,
-      totalCustomers: allCustomers.length,
-      totalAssignees: assigneeNames.length,
-      
-      // Onsite visit metrics
-      avgOnsiteTravelTime: avgOnsiteTravelTime,
-      avgOnsiteTravelTimeHours: avgOnsiteTravelTimeHours,
-      totalOnsiteVisits: onsiteTickets.length,
-    },
-    
-    // Enhanced distributions with names
-    statusDistribution: statusDistribution.reduce((acc: any, curr: any) => ({
-      ...acc,
-      [curr.status]: curr._count
-    }), {}),
-    
-    priorityDistribution: priorityDistribution.reduce((acc: any, curr: any) => ({
-      ...acc,
-      [curr.priority]: curr._count
-    }), {}),
-    
-    slaDistribution: slaDistribution.reduce((acc: any, curr: any) => ({
-      ...acc,
-      [curr.slaStatus || 'NOT_SET']: curr._count
-    }), {}),
-    
-    zoneDistribution: completeZoneDistribution,
-    
-    customerDistribution: completeCustomerDistribution,
-    
-    assigneeDistribution: assigneeDistribution
-      .filter((a: any) => a.assignedToId)
-      .map((a: any) => ({
-        assigneeId: a.assignedToId,
-        assigneeName: assigneeNames.find((an: any) => an.id === a.assignedToId)?.name || 
-                     assigneeNames.find((an: any) => an.id === a.assignedToId)?.email || 'Unknown Assignee',
-        count: a._count
-      })),
-    
-    // Enhanced daily trends
-    dailyTrends,
-    
-    // Recent tickets with full details
-    recentTickets: tickets
-      .sort((a: { createdAt: Date }, b: { createdAt: Date }) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, 20)
-      .map((ticket: any) => ({
-        id: ticket.id,
-        title: ticket.title,
-        status: ticket.status,
-        priority: ticket.priority,
-        createdAt: ticket.createdAt,
-        customerName: ticket.customer?.companyName || 'Unknown',
-        zoneName: ticket.zone?.name || 'Unknown',
-        assigneeName: ticket.assignedTo?.name || 'Unassigned',
-        isEscalated: ticket.isEscalated,
-        slaStatus: ticket.slaStatus,
-        hasRating: !!ticket.rating,
-        rating: ticket.rating?.rating || null
-      })),
-      
-    // Customer performance metrics (machine health analysis)
-    customerPerformanceMetrics,
-    
-    // Performance insights
-    insights: {
-      topPerformingZone: completeZoneDistribution.length > 0 
-        ? completeZoneDistribution[0].zoneName || 'N/A'
-        : 'N/A',
-      mostActiveCustomer: completeCustomerDistribution.length > 0 
-        ? completeCustomerDistribution[0].customerName || 'N/A'
-        : 'N/A',
-      topAssignee: assigneeDistribution.length > 0 && assigneeDistribution[0].assignedToId
-        ? assigneeNames.find((an: any) => an.id === assigneeDistribution[0].assignedToId)?.name || 'N/A'
-        : 'N/A',
-      worstPerformingCustomer: customerPerformanceMetrics.length > 0 
-        ? customerPerformanceMetrics[0].customerName
-        : 'N/A',
-      avgTravelTimeFormatted: avgOnsiteTravelTimeHours > 0 
-        ? `${Math.floor(avgOnsiteTravelTimeHours)}h ${avgOnsiteTravelTime % 60}m`
-        : 'N/A'
+    success: true,
+    data: {
+      summary: {
+        // Basic counts
+        totalTickets: tickets.length,
+        openTickets: tickets.filter((t: { status: string }) => t.status === 'OPEN').length,
+        inProgressTickets: tickets.filter((t: { status: string }) =>
+          ['IN_PROGRESS', 'ASSIGNED', 'IN_PROCESS', 'ONSITE_VISIT', 'ONSITE_VISIT_IN_PROGRESS'].includes(t.status)
+        ).length,
+        resolvedTickets: resolvedTickets.length,
+        closedTickets: tickets.filter((t: { status: string }) => t.status === 'CLOSED').length,
+
+        // Priority-based metrics
+        criticalTickets: criticalTickets.length,
+        highPriorityTickets: highPriorityTickets.length,
+        unassignedTickets: unassignedTickets.length,
+
+        // SLA and performance metrics
+        overdueTickets: overdueTickets.length,
+        escalatedTickets: tickets.filter((t: { isEscalated: boolean }) => t.isEscalated).length,
+        resolutionRate,
+        escalationRate,
+
+        // Time-based metrics
+        averageResolutionTime: avgResolutionTime,
+        averageResolutionTimeHours: avgResolutionTime > 0 ? Math.round((avgResolutionTime / 60) * 100) / 100 : 0,
+        averageResolutionTimeDays: avgResolutionTime > 0 ? Math.round((avgResolutionTime / (60 * 24)) * 100) / 100 : 0,
+        averageFirstResponseTime: avgFirstResponseTime,
+        averageFirstResponseTimeHours: avgFirstResponseTime > 0 ? Math.round((avgFirstResponseTime / 60) * 100) / 100 : 0,
+
+        // Customer satisfaction metrics
+        ticketsWithFeedback: ticketsWithFeedback.length,
+        averageCustomerRating: avgCustomerRating,
+        totalRatings: ratingsData.length,
+
+        // Operational metrics
+        totalZones: allZones.length,
+        totalCustomers: allCustomers.length,
+        totalAssignees: assigneeNames.length,
+
+        // Onsite visit metrics
+        avgOnsiteTravelTime: avgOnsiteTravelTime,
+        avgOnsiteTravelTimeHours: avgOnsiteTravelTimeHours,
+        totalOnsiteVisits: onsiteTickets.length,
+      },
+
+      // Enhanced distributions with names
+      statusDistribution: (statusDistribution || []).reduce((acc: any, curr: any) => ({
+        ...acc,
+        [curr.status]: curr._count
+      }), {}),
+
+      priorityDistribution: (priorityDistribution || []).reduce((acc: any, curr: any) => ({
+        ...acc,
+        [curr.priority]: curr._count
+      }), {}),
+
+      slaDistribution: (slaDistribution || []).reduce((acc: any, curr: any) => ({
+        ...acc,
+        [curr.slaStatus || 'NOT_SET']: curr._count
+      }), {}),
+
+      zoneDistribution: completeZoneDistribution,
+
+      customerDistribution: completeCustomerDistribution,
+
+      assigneeDistribution: (assigneeDistribution || [])
+        .filter((a: any) => a.assignedToId)
+        .map((a: any) => ({
+          assigneeId: a.assignedToId,
+          assigneeName: assigneeNames.find((an: any) => an.id === a.assignedToId)?.name ||
+            assigneeNames.find((an: any) => an.id === a.assignedToId)?.email || 'Unknown Assignee',
+          count: a._count
+        })),
+
+      // Enhanced daily trends
+      dailyTrends,
+
+      // Recent tickets with full details
+      recentTickets: tickets
+        .sort((a: { createdAt: Date }, b: { createdAt: Date }) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, 20)
+        .map((ticket: any) => ({
+          id: ticket.id,
+          title: ticket.title,
+          status: ticket.status,
+          priority: ticket.priority,
+          createdAt: ticket.createdAt,
+          customerName: ticket.customer?.companyName || 'Unknown',
+          zoneName: ticket.zone?.name || 'Unknown',
+          assigneeName: ticket.assignedTo?.name || 'Unassigned',
+          isEscalated: ticket.isEscalated,
+          slaStatus: ticket.slaStatus,
+          hasRating: !!ticket.rating,
+          rating: ticket.rating?.rating || null
+        })),
+
+      // Customer performance metrics (machine health analysis)
+      customerPerformanceMetrics,
+
+      // Performance insights
+      insights: {
+        topPerformingZone: completeZoneDistribution.length > 0
+          ? completeZoneDistribution[0].zoneName || 'N/A'
+          : 'N/A',
+        mostActiveCustomer: completeCustomerDistribution.length > 0
+          ? completeCustomerDistribution[0].customerName || 'N/A'
+          : 'N/A',
+        topAssignee: (assigneeDistribution || []).length > 0 && assigneeDistribution[0].assignedToId
+          ? assigneeNames.find((an: any) => an.id === assigneeDistribution[0].assignedToId)?.name || 'N/A'
+          : 'N/A',
+        worstPerformingCustomer: customerPerformanceMetrics.length > 0
+          ? customerPerformanceMetrics[0].customerName
+          : 'N/A',
+        avgTravelTimeFormatted: avgOnsiteTravelTimeHours > 0
+          ? `${Math.floor(avgOnsiteTravelTimeHours)}h ${avgOnsiteTravelTime % 60}m`
+          : 'N/A'
+      }
     }
   });
 }
 
 async function generateSlaPerformanceReport(res: Response, whereClause: any, startDate: Date, endDate: Date) {
   const tickets = await prisma.ticket.findMany({
-    where: { 
-      ...whereClause, 
+    where: {
+      ...whereClause,
       slaDueAt: { not: null }
     },
-    include: { 
+    include: {
       customer: true,
       assignedTo: true,
       zone: true,
@@ -714,44 +752,50 @@ async function generateSlaPerformanceReport(res: Response, whereClause: any, sta
   const prioritySla = Object.values(Priority).reduce((acc: any, priority: any) => {
     const priorityTickets = tickets.filter((t: any) => t.priority === priority);
     const priorityBreaches = priorityTickets.filter((t: any) => t.slaDueAt && now > t.slaDueAt);
-    
+
     acc[priority] = {
       total: priorityTickets.length,
       breaches: priorityBreaches.length,
-      compliance: priorityTickets.length > 0 
-        ? ((priorityTickets.length - priorityBreaches.length) / priorityTickets.length) * 100 
+      compliance: priorityTickets.length > 0
+        ? ((priorityTickets.length - priorityBreaches.length) / priorityTickets.length) * 100
         : 100
     };
     return acc;
   }, {} as Record<string, any>);
 
   res.json({
-    summary: {
-      totalTicketsWithSLA: tickets.length,
-      slaBreaches: slaBreaches.length,
-      slaOnTime: slaOnTime.length,
-      complianceRate: tickets.length > 0 
-        ? ((tickets.length - slaBreaches.length) / tickets.length) * 100 
-        : 100
-    },
-    prioritySla,
-    breachedTickets: slaBreaches.map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      status: t.status,
-      priority: t.priority,
-      slaDueAt: t.slaDueAt,
-      customer: t.customer?.companyName || 'Unknown',
-      assignedTo: t.assignedTo ? t.assignedTo.name : 'Unassigned',
-      zone: t.zone?.name || 'No Zone',
-      asset: t.asset ? `${t.asset.machineId} - ${t.asset.model}` : 'No Asset'
-    }))
+    success: true,
+    data: {
+      summary: {
+        totalTicketsWithSLA: tickets.length,
+        slaBreaches: slaBreaches.length,
+        slaOnTime: slaOnTime.length,
+        complianceRate: tickets.length > 0
+          ? ((tickets.length - slaBreaches.length) / tickets.length) * 100
+          : 100
+      },
+      prioritySla,
+      breachedTickets: slaBreaches.map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        slaDueAt: t.slaDueAt,
+        customer: t.customer?.companyName || 'Unknown',
+        assignedTo: t.assignedTo ? t.assignedTo.name : 'Unassigned',
+        zone: t.zone?.name || 'No Zone',
+        asset: t.asset ? `${t.asset.machineId} - ${t.asset.model}` : 'No Asset'
+      }))
+    }
   });
 }
 
 async function generateCustomerSatisfactionReport(res: Response, whereClause: any, startDate: Date, endDate: Date) {
   const data = await getCustomerSatisfactionData(whereClause, startDate, endDate);
-  res.json(data);
+  res.json({
+    success: true,
+    data
+  });
 }
 
 async function getCustomerSatisfactionData(whereClause: any, startDate: Date, endDate: Date) {
@@ -892,7 +936,7 @@ async function getCustomerSatisfactionData(whereClause: any, startDate: Date, en
 async function generateZonePerformanceReport(res: Response, whereClause: any, startDate: Date, endDate: Date) {
   // Create a clean where clause for the zone query
   const zoneWhere: any = {};
-  
+
   // If a specific zone is selected, only fetch that zone
   if (whereClause.zoneId !== undefined) {
     if (typeof whereClause.zoneId === 'number' || typeof whereClause.zoneId === 'string') {
@@ -904,7 +948,7 @@ async function generateZonePerformanceReport(res: Response, whereClause: any, st
       }
     }
   }
-  
+
   const zones = await prisma.serviceZone.findMany({
     where: zoneWhere,
     include: {
@@ -931,13 +975,13 @@ async function generateZonePerformanceReport(res: Response, whereClause: any, st
 
   const zoneStats = zones.map((zone: any) => {
     const tickets = zone.tickets;
-    const resolvedTickets = tickets.filter((t: { status: string }) => 
+    const resolvedTickets = tickets.filter((t: { status: string }) =>
       t.status === 'RESOLVED' || t.status === 'CLOSED'
     );
-    const openTickets = tickets.filter((t: { status: string }) => 
+    const openTickets = tickets.filter((t: { status: string }) =>
       ['OPEN', 'IN_PROGRESS', 'ASSIGNED'].includes(t.status)
     );
-    
+
     // Calculate average resolution time for this zone (business hours)
     let avgResolutionTime = 0;
     if (resolvedTickets.length > 0) {
@@ -963,7 +1007,7 @@ async function generateZonePerformanceReport(res: Response, whereClause: any, st
       servicePersons: zone.servicePersons.length,
       customerCount,
       assetCount,
-      resolutionRate: tickets.length > 0 
+      resolutionRate: tickets.length > 0
         ? parseFloat(((resolvedTickets.length / tickets.length) * 100).toFixed(2))
         : 0,
       averageResolutionTime: avgResolutionTime,
@@ -972,14 +1016,17 @@ async function generateZonePerformanceReport(res: Response, whereClause: any, st
   });
 
   res.json({
-    zones: zoneStats.sort((a: { resolutionRate: number }, b: { resolutionRate: number }) => b.resolutionRate - a.resolutionRate),
-    totalZones: zones.length,
-    overallStats: {
-      totalTickets: zoneStats.reduce((sum: number, zone: { totalTickets: number }) => sum + (zone.totalTickets || 0), 0),
-      totalResolved: zoneStats.reduce((sum: number, zone: { resolvedTickets: number }) => sum + (zone.resolvedTickets || 0), 0),
-      averageResolutionRate: zoneStats.length > 0 
-        ? zoneStats.reduce((sum: number, zone: { resolutionRate: number }) => sum + zone.resolutionRate, 0) / zoneStats.length
-        : 0
+    success: true,
+    data: {
+      zones: zoneStats.sort((a: { resolutionRate: number }, b: { resolutionRate: number }) => b.resolutionRate - a.resolutionRate),
+      totalZones: zones.length,
+      overallStats: {
+        totalTickets: zoneStats.reduce((sum: number, zone: { totalTickets: number }) => sum + (zone.totalTickets || 0), 0),
+        totalResolved: zoneStats.reduce((sum: number, zone: { resolvedTickets: number }) => sum + (zone.resolvedTickets || 0), 0),
+        averageResolutionRate: zoneStats.length > 0
+          ? zoneStats.reduce((sum: number, zone: { resolutionRate: number }) => sum + zone.resolutionRate, 0) / zoneStats.length
+          : 0
+      }
     }
   });
 }
@@ -988,7 +1035,7 @@ async function generateAgentProductivityReport(res: Response, whereClause: any, 
   // Build filter for agents: service persons that have assigned tickets in allowed zones/date
   const assignedTicketsWhere: any = { ...whereClause };
   const agents = await prisma.user.findMany({
-    where: { 
+    where: {
       role: 'SERVICE_PERSON',
       assignedTickets: {
         some: assignedTicketsWhere
@@ -1013,17 +1060,17 @@ async function generateAgentProductivityReport(res: Response, whereClause: any, 
 
   const agentStats = agents.map((agent: any) => {
     const tickets = agent.assignedTickets || [];
-    const resolvedTickets = tickets.filter((t: { status: string }) => 
+    const resolvedTickets = tickets.filter((t: { status: string }) =>
       t.status === 'RESOLVED' || t.status === 'CLOSED'
     );
-    
+
     // Calculate average resolution time in minutes
     const resolvedWithTime = resolvedTickets.filter((t: any) => t.createdAt && t.updatedAt);
     const totalResolutionTime = resolvedWithTime.reduce((sum: number, t: any) => {
       return sum + calculateBusinessHoursInMinutes(t.createdAt, t.updatedAt);
     }, 0);
-    
-    const avgResolutionTime = resolvedWithTime.length > 0 
+
+    const avgResolutionTime = resolvedWithTime.length > 0
       ? Math.round(totalResolutionTime / resolvedWithTime.length)
       : 0;
 
@@ -1031,8 +1078,8 @@ async function generateAgentProductivityReport(res: Response, whereClause: any, 
     const ticketsWithResponse = tickets.filter((t: any) => t.updatedAt !== t.createdAt);
     const avgFirstResponseTime = ticketsWithResponse.length > 0
       ? Math.round(ticketsWithResponse.reduce((sum: number, t: any) => {
-          return sum + calculateBusinessHoursInMinutes(t.createdAt, t.updatedAt);
-        }, 0) / ticketsWithResponse.length)
+        return sum + calculateBusinessHoursInMinutes(t.createdAt, t.updatedAt);
+      }, 0) / ticketsWithResponse.length)
       : 0;
 
     return {
@@ -1042,10 +1089,10 @@ async function generateAgentProductivityReport(res: Response, whereClause: any, 
       zones: agent.serviceZones.map((sz: any) => sz.serviceZone.name),
       totalTickets: tickets.length,
       resolvedTickets: resolvedTickets.length,
-      openTickets: tickets.filter((t: any) => 
+      openTickets: tickets.filter((t: any) =>
         ['OPEN', 'IN_PROGRESS', 'ASSIGNED'].includes(t.status)
       ).length,
-      resolutionRate: tickets.length > 0 
+      resolutionRate: tickets.length > 0
         ? parseFloat(((resolvedTickets.length / tickets.length) * 100).toFixed(2))
         : 0,
       averageResolutionTime: avgResolutionTime,
@@ -1055,16 +1102,19 @@ async function generateAgentProductivityReport(res: Response, whereClause: any, 
   });
 
   res.json({
-    agents: agentStats.sort((a: { resolutionRate: number }, b: { resolutionRate: number }) => b.resolutionRate - a.resolutionRate),
-    totalAgents: agents.length,
-    performanceMetrics: {
-      topPerformer: agentStats.length > 0 
-        ? agentStats.reduce((max: { resolutionRate: number }, agent: { resolutionRate: number }) => 
+    success: true,
+    data: {
+      agents: agentStats.sort((a: { resolutionRate: number }, b: { resolutionRate: number }) => b.resolutionRate - a.resolutionRate),
+      totalAgents: agents.length,
+      performanceMetrics: {
+        topPerformer: agentStats.length > 0
+          ? agentStats.reduce((max: { resolutionRate: number }, agent: { resolutionRate: number }) =>
             agent.resolutionRate > max.resolutionRate ? agent : max, agentStats[0])
-        : null,
-      averageResolutionRate: agentStats.length > 0
-        ? agentStats.reduce((sum: number, agent: any) => sum + agent.resolutionRate, 0) / agentStats.length
-        : 0
+          : null,
+        averageResolutionRate: agentStats.length > 0
+          ? agentStats.reduce((sum: number, agent: any) => sum + agent.resolutionRate, 0) / agentStats.length
+          : 0
+      }
     }
   });
 }
@@ -1125,7 +1175,7 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
 
   // Build filters for assets
   const assetWhere: any = {};
-  
+
   // Add zone filter for assets
   if (whereClause?.zoneId !== undefined) {
     if (typeof whereClause.zoneId === 'number' || typeof whereClause.zoneId === 'string') {
@@ -1134,12 +1184,12 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
       assetWhere.customer = { serviceZoneId: { in: (whereClause.zoneId as any).in } };
     }
   }
-  
+
   // Add customer filter if specified
   if (filters?.customerId) {
     assetWhere.customerId = parseInt(filters.customerId);
   }
-  
+
   // Add asset filter if specified
   if (filters?.assetId) {
     assetWhere.id = parseInt(filters.assetId);
@@ -1158,7 +1208,7 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
     ...whereClause,
     OR: [
       { status: { in: ['OPEN', 'IN_PROGRESS', 'ASSIGNED'] } },
-      { 
+      {
         status: { in: ['RESOLVED', 'CLOSED'] },
         updatedAt: { gte: startDate, lte: endDate }
       }
@@ -1192,7 +1242,7 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
   // Calculate downtime for each ticket
   const ticketDowntimeData = ticketsWithDowntime.map((ticket: any) => {
     let downtimeMinutes = 0;
-    
+
     if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
       // For resolved tickets, calculate the time between creation and resolution (business hours)
       downtimeMinutes = calculateBusinessHoursInMinutes(ticket.createdAt, ticket.updatedAt);
@@ -1200,7 +1250,7 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
       // For open tickets, calculate time from creation to now (business hours)
       downtimeMinutes = calculateBusinessHoursInMinutes(ticket.createdAt, new Date());
     }
-    
+
     return {
       assetId: ticket.assetId,
       machineId: ticket.asset?.machineId || 'Unknown',
@@ -1237,16 +1287,16 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
         resolvedIncidents: 0
       };
     }
-    
+
     acc[assetKey].totalDowntimeMinutes += ticket.downtimeMinutes;
     acc[assetKey].incidents += 1;
-    
+
     if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
       acc[assetKey].resolvedIncidents += 1;
     } else {
       acc[assetKey].openIncidents += 1;
     }
-    
+
     return acc;
   }, {} as Record<string, any>);
 
@@ -1254,7 +1304,7 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
   const allMachineDowntime = allAssets.map((asset: any) => {
     const assetKey = asset.id;
     const downtimeData = assetDowntimeMap[assetKey];
-    
+
     if (downtimeData) {
       // Asset has issues - return with downtime data
       return {
@@ -1269,8 +1319,8 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
         openIncidents: downtimeData.openIncidents,
         resolvedIncidents: downtimeData.resolvedIncidents,
         totalDowntimeHours: Math.round((downtimeData.totalDowntimeMinutes / 60) * 100) / 100,
-        avgDowntimeHours: downtimeData.incidents > 0 
-          ? Math.round((downtimeData.totalDowntimeMinutes / downtimeData.incidents / 60) * 100) / 100 
+        avgDowntimeHours: downtimeData.incidents > 0
+          ? Math.round((downtimeData.totalDowntimeMinutes / downtimeData.incidents / 60) * 100) / 100
           : 0
       };
     } else {
@@ -1293,16 +1343,16 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
   });
 
   // Sort by downtime (descending) - machines with issues first
-  const sortedMachineDowntime = allMachineDowntime.sort((a: any, b: any) => 
+  const sortedMachineDowntime = allMachineDowntime.sort((a: any, b: any) =>
     b.totalDowntimeMinutes - a.totalDowntimeMinutes
   );
 
   // Calculate summary statistics
   const machinesWithIssues = sortedMachineDowntime.filter((m: any) => m.incidents > 0);
-  const totalDowntimeHours = machinesWithIssues.reduce((sum: number, machine: any) => 
+  const totalDowntimeHours = machinesWithIssues.reduce((sum: number, machine: any) =>
     sum + machine.totalDowntimeHours, 0
   );
-  
+
   // Prepare response
   const response: IndustrialZoneData = {
     zoneName: whereClause?.zoneId ? `Zone ${whereClause.zoneId}` : 'All Zones',
@@ -1322,7 +1372,7 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
       phone: sp.phone,
       zones: sp.serviceZones.map((sz: any) => sz.serviceZone.name),
       assignedTickets: sp.assignedTickets.length,
-      activeTickets: sp.assignedTickets.filter((t: any) => 
+      activeTickets: sp.assignedTickets.filter((t: any) =>
         ['OPEN', 'IN_PROGRESS', 'ASSIGNED'].includes(t.status)
       ).length
     })),
@@ -1335,7 +1385,7 @@ async function generateIndustrialDataReport(res: Response, whereClause: any, sta
       totalMachinesWithDowntime: machinesWithIssues.length,
       totalMachinesWithoutIssues: allAssets.length - machinesWithIssues.length,
       totalDowntimeHours: Math.round(totalDowntimeHours * 100) / 100,
-      averageDowntimePerMachine: machinesWithIssues.length > 0 
+      averageDowntimePerMachine: machinesWithIssues.length > 0
         ? Math.round((totalDowntimeHours / machinesWithIssues.length) * 100) / 100
         : 0,
       totalIncidents: machinesWithIssues.reduce((sum: number, m: any) => sum + m.incidents, 0),
@@ -1363,10 +1413,10 @@ export const exportReport = async (req: Request, res: Response) => {
     if (!reportType) {
       return res.status(400).json({ error: 'Report type is required' });
     }
-    
+
     const startDate = from ? new Date(from) : subDays(new Date(), 30);
     const endDate = to ? new Date(to) : new Date();
-    
+
     // Set end date to end of day
     endDate.setHours(23, 59, 59, 999);
 
@@ -1383,7 +1433,7 @@ export const exportReport = async (req: Request, res: Response) => {
     let data: any[] = [];
     let columns: ColumnDefinition[] = [];
     let summaryData: any = null;
-    
+
     // Custom title mapping for better report names
     const titleMap: { [key: string]: string } = {
       'industrial-data': 'Machine Report',
@@ -1393,17 +1443,18 @@ export const exportReport = async (req: Request, res: Response) => {
       'agent-productivity': 'Performance Report of All Service Persons and Zone Users',
       'sla-performance': 'SLA Performance Report',
       'executive-summary': 'Executive Summary Report',
-      'her-analysis': 'Business Hours SLA Report'
+      'her-analysis': 'Business Hours SLA Report',
+      'offer-summary': 'Offer Funnel Summary Report'
     };
-    
-    const reportTitle = titleMap[reportType] || reportType.split('-').map(word => 
+
+    const reportTitle = titleMap[reportType] || reportType.split('-').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
-    
+
     const filename = `${reportTitle.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}`;
-    const filters = { 
-      from: startDate.toISOString(), 
-      to: endDate.toISOString(), 
+    const filters = {
+      from: startDate.toISOString(),
+      to: endDate.toISOString(),
       ...Object.fromEntries(
         Object.entries(otherFilters).filter(([_, v]) => v !== undefined && v !== '')
       )
@@ -1417,38 +1468,38 @@ export const exportReport = async (req: Request, res: Response) => {
         summaryData = ticketData.summary;
         columns = getPdfColumns('ticket-summary');
         break;
-        
+
       case 'sla-performance':
         const slaData = await getSlaPerformanceData(whereClause, startDate, endDate);
         data = slaData.breachedTickets || [];
         summaryData = slaData.summary;
         columns = getPdfColumns('sla-performance');
         break;
-        
+
       case 'executive-summary':
         const executiveData = await getExecutiveSummaryData(whereClause, startDate, endDate);
         data = executiveData.trends || [];
         summaryData = executiveData.summary;
         columns = getPdfColumns('executive-summary');
         break;
-        
+
       case 'customer-satisfaction':
         const satisfactionData = await getCustomerSatisfactionData(whereClause, startDate, endDate);
         data = satisfactionData.recentFeedbacks || [];
-        
+
         // Calculate average rating
         const totalRatings = Object.entries(satisfactionData.ratingDistribution || {})
           .reduce((sum, [rating, count]) => sum + (parseInt(rating) * (count as number)), 0);
         const totalResponses = Object.values(satisfactionData.ratingDistribution || {})
           .reduce((sum, count) => sum + (count as number), 0);
         const averageRating = totalResponses > 0 ? (totalRatings / totalResponses).toFixed(1) : 0;
-        
+
         summaryData = {
           'Average Rating': averageRating,
           'Total Feedbacks': totalResponses,
           'Rating Distribution': JSON.stringify(satisfactionData.ratingDistribution || {})
         };
-        
+
         columns = [
           { key: 'id', header: 'ID', width: 10 },
           { key: 'rating', header: 'Rating', width: 15 },
@@ -1458,28 +1509,28 @@ export const exportReport = async (req: Request, res: Response) => {
           { key: 'customerName', header: 'Customer', width: 30 }
         ];
         break;
-        
+
       case 'industrial-data':
         const industrialData = await getIndustrialDataData(whereClause, startDate, endDate, otherFilters);
         data = industrialData.machineDowntime || [];
         summaryData = industrialData.summary;
         columns = getPdfColumns('industrial-data');
         break;
-        
+
       case 'agent-productivity':
         const agentData = await getAgentProductivityData(whereClause, startDate, endDate);
         data = agentData.agents || [];
         summaryData = agentData.summary;
         columns = getPdfColumns('agent-productivity');
         break;
-        
+
       case 'zone-performance':
         const zoneData = await getZonePerformanceData(whereClause, startDate, endDate);
         data = zoneData.zones || [];
         summaryData = zoneData.summary;
         columns = getPdfColumns('zone-performance');
         break;
-        
+
       case 'her-analysis':
         // HER Analysis uses the same data structure as the generateHerAnalysisReport
         const herTickets = await prisma.ticket.findMany({
@@ -1491,7 +1542,7 @@ export const exportReport = async (req: Request, res: Response) => {
             asset: true
           }
         });
-        
+
         // HER calculation helper functions
         const BUSINESS_START_HOUR = 9;
         const BUSINESS_END_HOUR = 17;
@@ -1500,7 +1551,7 @@ export const exportReport = async (req: Request, res: Response) => {
         const SLA_HOURS_BY_PRIORITY: Record<string, number> = {
           'CRITICAL': 4, 'HIGH': 8, 'MEDIUM': 24, 'LOW': 48
         };
-        
+
         const calculateBusinessHours = (startDate: Date, endDate: Date): number => {
           let businessHours = 0;
           let currentDate = new Date(startDate);
@@ -1522,14 +1573,14 @@ export const exportReport = async (req: Request, res: Response) => {
           }
           return businessHours;
         };
-        
+
         data = herTickets.map((ticket: any) => {
           const priority = ticket.priority || 'LOW';
           const herHours = SLA_HOURS_BY_PRIORITY[priority] || SLA_HOURS_BY_PRIORITY['LOW'];
           let businessHoursUsed = 0;
           let isHerBreached = false;
           let resolvedAt = null;
-          
+
           if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
             businessHoursUsed = calculateBusinessHours(ticket.createdAt, ticket.updatedAt);
             isHerBreached = businessHoursUsed > herHours;
@@ -1537,7 +1588,7 @@ export const exportReport = async (req: Request, res: Response) => {
           } else {
             businessHoursUsed = calculateBusinessHours(ticket.createdAt, new Date());
           }
-          
+
           return {
             id: ticket.id,
             title: ticket.title,
@@ -1555,18 +1606,18 @@ export const exportReport = async (req: Request, res: Response) => {
             resolvedAt: resolvedAt
           };
         });
-        
+
         const herCompliantTickets = data.filter((t: any) => t.isHerBreached === 'No').length;
         const herBreachedTickets = data.filter((t: any) => t.isHerBreached === 'Yes').length;
         const complianceRate = data.length > 0 ? (herCompliantTickets / data.length) * 100 : 100;
-        
+
         summaryData = {
           'Total Tickets': data.length,
           'HER Compliant': herCompliantTickets,
           'HER Breached': herBreachedTickets,
           'Compliance Rate': `${Math.round(complianceRate * 100) / 100}%`
         };
-        
+
         columns = [
           { key: 'id', header: 'Ticket ID', width: 12 },
           { key: 'title', header: 'Title', width: 30 },
@@ -1584,7 +1635,39 @@ export const exportReport = async (req: Request, res: Response) => {
           { key: 'resolvedAt', header: 'Resolved', width: 20, format: (date: string) => date ? new Date(date).toLocaleString() : 'N/A' }
         ];
         break;
-        
+
+      case 'offer-summary':
+        // Fetch offers with all related data
+        const offers = await prisma.offer.findMany({
+          where: {
+            createdAt: {
+              gte: startDate,
+              lte: endDate,
+            },
+            ...(zoneId ? { zoneId: parseInt(zoneId as string) } : {}),
+          },
+          include: {
+            contact: true,
+            zone: true,
+            assignedTo: true,
+            createdBy: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        });
+
+        data = offers;
+        summaryData = {
+          totalOffers: offers.length,
+          totalOfferValue: offers.reduce((sum: number, o: any) => sum + (o.offerValue || 0), 0),
+          totalPoValue: offers.reduce((sum: number, o: any) => sum + (o.poValue || 0), 0),
+          wonOffers: offers.filter((o: any) => o.stage === 'WON').length,
+          lostOffers: offers.filter((o: any) => o.stage === 'LOST').length,
+        };
+        columns = getPdfColumns('offer-summary');
+        break;
+
       default:
         return res.status(400).json({ error: 'Invalid report type' });
     }
@@ -1601,7 +1684,7 @@ export const exportReport = async (req: Request, res: Response) => {
       await generatePdf(res, data, pdfColumns, reportTitle, filters, summaryData);
     }
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to export report',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -1621,19 +1704,19 @@ const getNestedValue = (obj: any, path: string) => {
 async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: Date): Promise<TicketSummaryData> {
   // Debug: Log the where clause to see what's being filtered
   console.log('Fetching tickets with where clause:', JSON.stringify(whereClause, null, 2));
-  
+
   // First, get all tickets without any filters to verify data exists
   const allTickets = await prisma.ticket.findMany({
     take: 1 // Just get one ticket to check if any exist
   });
-  
+
   console.log(`Found ${allTickets.length} total tickets in the database`);
-  
+
   // Now get the actual tickets with the provided filters
   const tickets = await prisma.ticket.findMany({
     where: whereClause,
-    include: { 
-      customer: true, 
+    include: {
+      customer: true,
       assignedTo: true,
       zone: true,
       asset: true,
@@ -1648,7 +1731,7 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
       createdAt: 'desc'
     }
   });
-  
+
   console.log(`Found ${tickets.length} tickets matching the filters`);
 
   const statusDistribution = await prisma.ticket.groupBy({
@@ -1677,7 +1760,7 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
-      
+
       const [created, resolved] = await Promise.all([
         prisma.ticket.count({
           where: {
@@ -1703,10 +1786,10 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
   );
 
   // Calculate average resolution time
-  const resolvedTickets = tickets.filter((t: { status: string }) => 
+  const resolvedTickets = tickets.filter((t: { status: string }) =>
     t.status === 'RESOLVED' || t.status === 'CLOSED'
   );
-  
+
   let avgResolutionTime = 0;
   if (resolvedTickets.length > 0) {
     const totalTime = resolvedTickets.reduce((sum: number, ticket: { updatedAt: Date; createdAt: Date }) => {
@@ -1733,11 +1816,11 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
     let travelTime = 0;
     if (ticket.statusHistory && ticket.statusHistory.length > 0) {
       const statusHistory = ticket.statusHistory;
-      
+
       // Going travel time (ONSITE_VISIT_STARTED → ONSITE_VISIT_REACHED)
       const goingStart = statusHistory.find((h: any) => h.status === 'ONSITE_VISIT_STARTED');
       const goingEnd = statusHistory.find((h: any) => h.status === 'ONSITE_VISIT_REACHED');
-      
+
       // Return travel time (ONSITE_VISIT_RESOLVED → ONSITE_VISIT_COMPLETED)
       const returnStart = statusHistory.find((h: any) => h.status === 'ONSITE_VISIT_RESOLVED');
       const returnEnd = statusHistory.find((h: any) => h.status === 'ONSITE_VISIT_COMPLETED');
@@ -1773,10 +1856,10 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
     let onsiteWorkingTime = 0;
     if (ticket.statusHistory && ticket.statusHistory.length > 0) {
       const statusHistory = ticket.statusHistory;
-      
+
       const onsiteStart = statusHistory.find((h: any) => h.status === 'ONSITE_VISIT_IN_PROGRESS');
       const onsiteEnd = statusHistory.find((h: any) => h.status === 'ONSITE_VISIT_RESOLVED');
-      
+
       if (onsiteStart && onsiteEnd && onsiteStart.changedAt < onsiteEnd.changedAt) {
         const workingMinutes = differenceInMinutes(new Date(onsiteEnd.changedAt), new Date(onsiteStart.changedAt));
         if (workingMinutes > 0 && workingMinutes <= 480) { // Max 8 hours for onsite work
@@ -1789,7 +1872,7 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
     let totalResolutionTime = 0;
     if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
       if (ticket.statusHistory && ticket.statusHistory.length > 0) {
-        const resolutionHistory = ticket.statusHistory.find((h: any) => 
+        const resolutionHistory = ticket.statusHistory.find((h: any) =>
           h.status === 'RESOLVED' || h.status === 'CLOSED'
         );
         if (resolutionHistory) {
@@ -1867,7 +1950,7 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
     summary: {
       totalTickets: tickets.length,
       openTickets: tickets.filter((t: any) => t.status === 'OPEN').length,
-      inProgressTickets: tickets.filter((t: any) => 
+      inProgressTickets: tickets.filter((t: any) =>
         ['IN_PROGRESS', 'ASSIGNED', 'IN_PROCESS'].includes(t.status)
       ).length,
       resolvedTickets: resolvedTickets.length,
@@ -1875,17 +1958,17 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
       averageResolutionTime: avgResolutionTime,
       escalatedTickets: tickets.filter((t: { isEscalated: boolean }) => t.isEscalated).length,
     },
-    statusDistribution: statusDistribution.length > 0 
+    statusDistribution: statusDistribution.length > 0
       ? statusDistribution.reduce((acc: Record<string, number>, curr: { status: string; _count: number }) => ({
-          ...acc,
-          [curr.status]: curr._count
-        }), {})
+        ...acc,
+        [curr.status]: curr._count
+      }), {})
       : emptyDistribution,
     priorityDistribution: priorityDistribution.length > 0
       ? priorityDistribution.reduce((acc: Record<string, number>, curr: { priority: string; _count: number }) => ({
-          ...acc,
-          [curr.priority]: curr._count
-        }), {})
+        ...acc,
+        [curr.priority]: curr._count
+      }), {})
       : emptyPriorityDistribution,
     dailyTrends
   };
@@ -1893,11 +1976,11 @@ async function getTicketSummaryData(whereClause: any, startDate: Date, endDate: 
 
 async function getSlaPerformanceData(whereClause: any, startDate: Date, endDate: Date): Promise<SlaPerformanceData> {
   const tickets = await prisma.ticket.findMany({
-    where: { 
-      ...whereClause, 
+    where: {
+      ...whereClause,
       slaDueAt: { not: null }
     },
-    include: { 
+    include: {
       customer: true,
       assignedTo: true,
       zone: true,
@@ -1912,12 +1995,12 @@ async function getSlaPerformanceData(whereClause: any, startDate: Date, endDate:
   const prioritySla = Object.values(Priority).reduce((acc: any, priority: any) => {
     const priorityTickets = tickets.filter((t: any) => t.priority === priority);
     const priorityBreaches = priorityTickets.filter((t: any) => t.slaDueAt && now > t.slaDueAt);
-    
+
     acc[priority] = {
       total: priorityTickets.length,
       breaches: priorityBreaches.length,
-      compliance: priorityTickets.length > 0 
-        ? ((priorityTickets.length - priorityBreaches.length) / priorityTickets.length) * 100 
+      compliance: priorityTickets.length > 0
+        ? ((priorityTickets.length - priorityBreaches.length) / priorityTickets.length) * 100
         : 100
     };
     return acc;
@@ -1929,8 +2012,8 @@ async function getSlaPerformanceData(whereClause: any, startDate: Date, endDate:
       totalTicketsWithSLA: tickets.length,
       slaBreaches: breachedTickets.length,
       slaOnTime: tickets.length - breachedTickets.length,
-      complianceRate: tickets.length > 0 
-        ? ((tickets.length - breachedTickets.length) / tickets.length) * 100 
+      complianceRate: tickets.length > 0
+        ? ((tickets.length - breachedTickets.length) / tickets.length) * 100
         : 100
     },
     prioritySla
@@ -1965,10 +2048,10 @@ async function getZonePerformanceData(whereClause: any, startDate: Date, endDate
 
   const zoneStats = zones.map((zone: any) => {
     const tickets = zone.tickets;
-    const resolvedTickets = tickets.filter((t: { status: string }) => 
+    const resolvedTickets = tickets.filter((t: { status: string }) =>
       t.status === 'RESOLVED' || t.status === 'CLOSED'
     );
-    
+
     // Calculate average resolution time for this zone
     let avgResolutionTime = 0;
     if (resolvedTickets.length > 0) {
@@ -1990,13 +2073,13 @@ async function getZonePerformanceData(whereClause: any, startDate: Date, endDate
       zoneName: zone.name,
       totalTickets: tickets.length,
       resolvedTickets: resolvedTickets.length,
-      openTickets: tickets.filter((t: any) => 
+      openTickets: tickets.filter((t: any) =>
         ['OPEN', 'IN_PROGRESS', 'ASSIGNED'].includes(t.status)
       ).length,
       servicePersons: zone.servicePersons.length,
       customerCount,
       assetCount,
-      resolutionRate: tickets.length > 0 
+      resolutionRate: tickets.length > 0
         ? parseFloat(((resolvedTickets.length / tickets.length) * 100).toFixed(2))
         : 0,
       averageResolutionTime: avgResolutionTime,
@@ -2010,7 +2093,7 @@ async function getZonePerformanceData(whereClause: any, startDate: Date, endDate
       totalZones: zones.length,
       totalTickets: zoneStats.reduce((sum: number, zone: { totalTickets: number }) => sum + (zone.totalTickets || 0), 0),
       totalResolved: zoneStats.reduce((sum: number, zone: { resolvedTickets: number }) => sum + (zone.resolvedTickets || 0), 0),
-      averageResolutionRate: zoneStats.length > 0 
+      averageResolutionRate: zoneStats.length > 0
         ? zoneStats.reduce((sum: number, zone: { resolutionRate: number }) => sum + (zone.resolutionRate || 0), 0) / zoneStats.length
         : 0
     }
@@ -2019,7 +2102,7 @@ async function getZonePerformanceData(whereClause: any, startDate: Date, endDate
 
 async function getAgentProductivityData(whereClause: any, startDate: Date, endDate: Date): Promise<AgentProductivityData> {
   const agents = await prisma.user.findMany({
-    where: { 
+    where: {
       role: 'SERVICE_PERSON',
       assignedTickets: {
         some: whereClause
@@ -2044,17 +2127,17 @@ async function getAgentProductivityData(whereClause: any, startDate: Date, endDa
 
   const agentStats = agents.map((agent: any) => {
     const tickets = agent.assignedTickets || [];
-    const resolvedTickets = tickets.filter((t: { status: string }) => 
+    const resolvedTickets = tickets.filter((t: { status: string }) =>
       t.status === 'RESOLVED' || t.status === 'CLOSED'
     );
-    
+
     // Calculate average resolution time in minutes
     const resolvedWithTime = resolvedTickets.filter((t: any) => t.createdAt && t.updatedAt);
     const totalResolutionTime = resolvedWithTime.reduce((sum: number, t: any) => {
       return sum + calculateBusinessHoursInMinutes(t.createdAt, t.updatedAt);
     }, 0);
-    
-    const avgResolutionTime = resolvedWithTime.length > 0 
+
+    const avgResolutionTime = resolvedWithTime.length > 0
       ? Math.round(totalResolutionTime / resolvedWithTime.length)
       : 0;
 
@@ -2062,8 +2145,8 @@ async function getAgentProductivityData(whereClause: any, startDate: Date, endDa
     const ticketsWithResponse = tickets.filter((t: any) => t.updatedAt !== t.createdAt);
     const avgFirstResponseTime = ticketsWithResponse.length > 0
       ? Math.round(ticketsWithResponse.reduce((sum: number, t: any) => {
-          return sum + calculateBusinessHoursInMinutes(t.createdAt, t.updatedAt);
-        }, 0) / ticketsWithResponse.length)
+        return sum + calculateBusinessHoursInMinutes(t.createdAt, t.updatedAt);
+      }, 0) / ticketsWithResponse.length)
       : 0;
 
     return {
@@ -2073,10 +2156,10 @@ async function getAgentProductivityData(whereClause: any, startDate: Date, endDa
       zones: agent.serviceZones.map((sz: any) => sz.serviceZone.name),
       totalTickets: tickets.length,
       resolvedTickets: resolvedTickets.length,
-      openTickets: tickets.filter((t: any) => 
+      openTickets: tickets.filter((t: any) =>
         ['OPEN', 'IN_PROGRESS', 'ASSIGNED'].includes(t.status)
       ).length,
-      resolutionRate: tickets.length > 0 
+      resolutionRate: tickets.length > 0
         ? parseFloat(((resolvedTickets.length / tickets.length) * 100).toFixed(2))
         : 0,
       averageResolutionTime: avgResolutionTime,
@@ -2090,9 +2173,9 @@ async function getAgentProductivityData(whereClause: any, startDate: Date, endDa
     summary: {
       totalAgents: agents.length,
       performanceMetrics: {
-        topPerformer: agentStats.length > 0 
-          ? agentStats.reduce((max: any, agent: any) => 
-              agent.resolutionRate > max.resolutionRate ? agent : max, agentStats[0])
+        topPerformer: agentStats.length > 0
+          ? agentStats.reduce((max: any, agent: any) =>
+            agent.resolutionRate > max.resolutionRate ? agent : max, agentStats[0])
           : null,
         averageResolutionRate: agentStats.length > 0
           ? agentStats.reduce((sum: number, agent: any) => sum + agent.resolutionRate, 0) / agentStats.length
@@ -2144,7 +2227,7 @@ async function getIndustrialDataData(whereClause: any, startDate: Date, endDate:
     ...whereClause,
     OR: [
       { status: { in: ['OPEN', 'IN_PROGRESS', 'ASSIGNED'] } },
-      { 
+      {
         status: { in: ['RESOLVED', 'CLOSED'] },
         updatedAt: { gte: startDate, lte: endDate }
       }
@@ -2178,7 +2261,7 @@ async function getIndustrialDataData(whereClause: any, startDate: Date, endDate:
   // Calculate downtime for each machine
   const machineDowntime = ticketsWithDowntime.map((ticket: any) => {
     let downtimeMinutes = 0;
-    
+
     if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
       // For resolved tickets, calculate the time between creation and resolution (business hours)
       downtimeMinutes = calculateBusinessHoursInMinutes(ticket.createdAt, ticket.updatedAt);
@@ -2186,14 +2269,14 @@ async function getIndustrialDataData(whereClause: any, startDate: Date, endDate:
       // For open tickets, calculate time from creation to now (business hours)
       downtimeMinutes = calculateBusinessHoursInMinutes(ticket.createdAt, new Date());
     }
-    
+
     // Format downtime in hours and minutes
     const downtimeHours = Math.floor(downtimeMinutes / 60);
     const remainingMinutes = downtimeMinutes % 60;
-    const downtimeFormatted = downtimeMinutes > 0 
+    const downtimeFormatted = downtimeMinutes > 0
       ? `${downtimeHours}h ${remainingMinutes}m`
       : '0h 0m';
-    
+
     // Determine assigned technician (zone user or service person)
     let assignedTechnician = 'Unassigned';
     if (ticket.assignedTo) {
@@ -2208,7 +2291,7 @@ async function getIndustrialDataData(whereClause: any, startDate: Date, endDate:
         assignedTechnician = name;
       }
     }
-    
+
     return {
       machineId: ticket.asset?.machineId || 'Unknown',
       model: ticket.asset?.model || 'Unknown',
@@ -2243,16 +2326,16 @@ async function getIndustrialDataData(whereClause: any, startDate: Date, endDate:
         resolvedIncidents: 0
       };
     }
-    
+
     acc[machineKey].totalDowntimeMinutes += curr.downtimeMinutes;
     acc[machineKey].incidents += 1;
-    
+
     if (curr.status === 'RESOLVED' || curr.status === 'CLOSED') {
       acc[machineKey].resolvedIncidents += 1;
     } else {
       acc[machineKey].openIncidents += 1;
     }
-    
+
     return acc;
   }, {} as Record<string, any>);
 
@@ -2287,25 +2370,25 @@ async function getIndustrialDataData(whereClause: any, startDate: Date, endDate:
       phone: sp.phone,
       zones: sp.serviceZones.map((sz: any) => sz.serviceZone.name),
       assignedTickets: sp.assignedTickets?.length || 0,
-      activeTickets: sp.assignedTickets?.filter((t: any) => 
+      activeTickets: sp.assignedTickets?.filter((t: any) =>
         ['OPEN', 'IN_PROGRESS', 'ASSIGNED'].includes(t.status)
       ).length || 0
     })),
     machineDowntime: filteredMachineDowntime as any[],
-    detailedDowntime: machineDowntime.filter((downtime: any) => 
+    detailedDowntime: machineDowntime.filter((downtime: any) =>
       !filters?.assetId || downtime.machineId === filters.assetId
     ) as any[],
     summary: {
       totalZoneUsers: zoneUsers.length,
       totalServicePersons: servicePersons.length,
       totalMachinesWithDowntime: filteredMachineDowntime.length,
-      totalDowntimeHours: filteredMachineDowntime.reduce((sum: number, machine: any) => 
+      totalDowntimeHours: filteredMachineDowntime.reduce((sum: number, machine: any) =>
         sum + Math.round((machine.totalDowntimeMinutes || 0) / 60 * 100) / 100, 0
       ),
-      averageDowntimePerMachine: filteredMachineDowntime.length > 0 
-        ? Math.round(filteredMachineDowntime.reduce((sum: number, machine: any) => 
-            sum + (machine.totalDowntimeMinutes || 0), 0
-          ) / filteredMachineDowntime.length / 60 * 100) / 100
+      averageDowntimePerMachine: filteredMachineDowntime.length > 0
+        ? Math.round(filteredMachineDowntime.reduce((sum: number, machine: any) =>
+          sum + (machine.totalDowntimeMinutes || 0), 0
+        ) / filteredMachineDowntime.length / 60 * 100) / 100
         : 0
     }
   };
@@ -2375,17 +2458,17 @@ async function generateExecutiveSummaryReport(res: Response, whereClause: any, s
     const resolvedTickets = tickets.filter((t: { status: string }) => ['RESOLVED', 'CLOSED'].includes(t.status));
     const openTickets = tickets.filter((t: { status: string }) => ['OPEN', 'IN_PROGRESS', 'ASSIGNED'].includes(t.status));
     const criticalTickets = tickets.filter((t: { priority: string }) => t.priority === 'CRITICAL');
-    
+
     // Calculate resolution metrics
-    const avgResolutionTime = resolvedTickets.length > 0 
+    const avgResolutionTime = resolvedTickets.length > 0
       ? resolvedTickets.reduce((sum: number, ticket: { updatedAt: Date; createdAt: Date }) => {
-          return sum + differenceInMinutes(ticket.updatedAt, ticket.createdAt);
-        }, 0) / resolvedTickets.length
+        return sum + differenceInMinutes(ticket.updatedAt, ticket.createdAt);
+      }, 0) / resolvedTickets.length
       : 0;
 
     // Customer satisfaction metrics
-    const avgRating = feedbacks.length > 0 
-      ? feedbacks.reduce((sum: number, fb: any) => sum + fb.rating, 0) / feedbacks.length 
+    const avgRating = feedbacks.length > 0
+      ? feedbacks.reduce((sum: number, fb: any) => sum + fb.rating, 0) / feedbacks.length
       : 0;
 
     // Financial impact estimation (simplified)
@@ -2435,14 +2518,14 @@ async function generateExecutiveSummaryReport(res: Response, whereClause: any, s
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(date);
         dayEnd.setHours(23, 59, 59, 999);
-        
+
         const [created, resolved, feedback] = await Promise.all([
           prisma.ticket.count({
             where: { ...whereClause, createdAt: { gte: dayStart, lte: dayEnd } }
           }),
           prisma.ticket.count({
-            where: { 
-              ...whereClause, 
+            where: {
+              ...whereClause,
               status: { in: ['RESOLVED', 'CLOSED'] },
               updatedAt: { gte: dayStart, lte: dayEnd }
             }
@@ -2463,29 +2546,32 @@ async function generateExecutiveSummaryReport(res: Response, whereClause: any, s
     );
 
     res.json({
-      summary: {
-        totalTickets: tickets.length,
-        resolvedTickets: resolvedTickets.length,
-        openTickets: openTickets.length,
-        criticalTickets: criticalTickets.length,
-        resolutionRate: tickets.length > 0 ? (resolvedTickets.length / tickets.length) * 100 : 0,
-        avgResolutionTimeHours: Math.round(avgResolutionTime / 60),
-        customerSatisfaction: parseFloat(avgRating.toFixed(1)),
-        totalCustomers: customers.length,
-        activeAssets: assets.length,
-        estimatedRevenueSaved,
-        downtimeCost,
-        netBusinessImpact: estimatedRevenueSaved - downtimeCost
-      },
-      zonePerformance: zonePerformance.sort((a: { efficiency: number }, b: { efficiency: number }) => b.efficiency - a.efficiency),
-      agentProductivity: agentProductivity.sort((a: { productivity: number }, b: { productivity: number }) => b.productivity - a.productivity),
-      assetHealth: assetHealth.sort((a: { healthScore: number }, b: { healthScore: number }) => a.healthScore - b.healthScore),
-      trends,
-      kpis: {
-        firstCallResolution: Math.round(Math.random() * 20 + 70), // Simulated KPI
-        slaCompliance: Math.round(Math.random() * 15 + 80), // Simulated KPI
-        customerRetention: Math.round(Math.random() * 10 + 85), // Simulated KPI
-        operationalEfficiency: Math.round(Math.random() * 20 + 75) // Simulated KPI
+      success: true,
+      data: {
+        summary: {
+          totalTickets: tickets.length,
+          resolvedTickets: resolvedTickets.length,
+          openTickets: openTickets.length,
+          criticalTickets: criticalTickets.length,
+          resolutionRate: tickets.length > 0 ? (resolvedTickets.length / tickets.length) * 100 : 0,
+          avgResolutionTimeHours: Math.round(avgResolutionTime / 60),
+          customerSatisfaction: parseFloat(avgRating.toFixed(1)),
+          totalCustomers: customers.length,
+          activeAssets: assets.length,
+          estimatedRevenueSaved,
+          downtimeCost,
+          netBusinessImpact: estimatedRevenueSaved - downtimeCost
+        },
+        zonePerformance: zonePerformance.sort((a: { efficiency: number }, b: { efficiency: number }) => b.efficiency - a.efficiency),
+        agentProductivity: agentProductivity.sort((a: { productivity: number }, b: { productivity: number }) => b.productivity - a.productivity),
+        assetHealth: assetHealth.sort((a: { healthScore: number }, b: { healthScore: number }) => a.healthScore - b.healthScore),
+        trends,
+        kpis: {
+          firstCallResolution: Math.round(Math.random() * 20 + 70), // Simulated KPI
+          slaCompliance: Math.round(Math.random() * 15 + 80), // Simulated KPI
+          customerRetention: Math.round(Math.random() * 10 + 85), // Simulated KPI
+          operationalEfficiency: Math.round(Math.random() * 20 + 75) // Simulated KPI
+        }
       }
     });
   } catch (error) {
@@ -2529,8 +2615,8 @@ async function getExecutiveSummaryData(whereClause: any, startDate: Date, endDat
   const resolvedTickets = tickets.filter((t: { status: string }) => ['RESOLVED', 'CLOSED'].includes(t.status));
   const openTickets = tickets.filter((t: { status: string }) => ['OPEN', 'IN_PROGRESS', 'ASSIGNED'].includes(t.status));
   const avgRating = feedbacks.length > 0 ? feedbacks.reduce((sum: number, fb: { rating: number }) => sum + fb.rating, 0) / feedbacks.length : 0;
-  
-  const avgResolutionTime = resolvedTickets.length > 0 
+
+  const avgResolutionTime = resolvedTickets.length > 0
     ? resolvedTickets.reduce((sum: number, ticket: { updatedAt: Date, createdAt: Date }) => sum + differenceInMinutes(ticket.updatedAt, ticket.createdAt), 0) / resolvedTickets.length
     : 0;
 
@@ -2542,14 +2628,14 @@ async function getExecutiveSummaryData(whereClause: any, startDate: Date, endDat
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(date);
       dayEnd.setHours(23, 59, 59, 999);
-      
+
       const [created, resolved] = await Promise.all([
         prisma.ticket.count({
           where: { ...whereClause, createdAt: { gte: dayStart, lte: dayEnd } }
         }),
         prisma.ticket.count({
-          where: { 
-            ...whereClause, 
+          where: {
+            ...whereClause,
             status: { in: ['RESOLVED', 'CLOSED'] },
             updatedAt: { gte: dayStart, lte: dayEnd }
           }
@@ -2618,33 +2704,33 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
     function calculateBusinessHours(startDate: Date, endDate: Date): number {
       let businessHours = 0;
       let currentDate = new Date(startDate);
-      
+
       while (currentDate < endDate) {
         const dayOfWeek = currentDate.getDay();
-        
+
         // Skip Sundays (0)
         if (WORKING_DAYS.includes(dayOfWeek)) {
           const dayStart = new Date(currentDate);
           dayStart.setHours(BUSINESS_START_HOUR, 0, 0, 0);
-          
+
           const dayEnd = new Date(currentDate);
           dayEnd.setHours(BUSINESS_END_HOUR, BUSINESS_END_MINUTE, 0, 0);
-          
+
           // Calculate overlap with business hours for this day
           const periodStart = new Date(Math.max(currentDate.getTime(), dayStart.getTime()));
           const periodEnd = new Date(Math.min(endDate.getTime(), dayEnd.getTime()));
-          
+
           if (periodStart < periodEnd) {
             const hoursThisDay = (periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60);
             businessHours += hoursThisDay;
           }
         }
-        
+
         // Move to next day
         currentDate.setDate(currentDate.getDate() + 1);
         currentDate.setHours(0, 0, 0, 0);
       }
-      
+
       return businessHours;
     }
 
@@ -2653,36 +2739,36 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
       const slaHours = SLA_HOURS_BY_PRIORITY[priority] || SLA_HOURS_BY_PRIORITY['LOW'];
       let remainingHours = slaHours;
       let currentDate = new Date(createdAt);
-      
+
       // If ticket created outside business hours, start from next business day
       const dayOfWeek = currentDate.getDay();
       const hour = currentDate.getHours();
       const minute = currentDate.getMinutes();
-      
-      if (!WORKING_DAYS.includes(dayOfWeek) || 
-          hour < BUSINESS_START_HOUR || 
-          (hour > BUSINESS_END_HOUR) || 
-          (hour === BUSINESS_END_HOUR && minute > BUSINESS_END_MINUTE)) {
+
+      if (!WORKING_DAYS.includes(dayOfWeek) ||
+        hour < BUSINESS_START_HOUR ||
+        (hour > BUSINESS_END_HOUR) ||
+        (hour === BUSINESS_END_HOUR && minute > BUSINESS_END_MINUTE)) {
         // Move to next business day at 9 AM
         do {
           currentDate.setDate(currentDate.getDate() + 1);
           currentDate.setHours(BUSINESS_START_HOUR, 0, 0, 0);
         } while (!WORKING_DAYS.includes(currentDate.getDay()));
       }
-      
+
       // Add business hours to find deadline
       while (remainingHours > 0) {
         const dayOfWeek = currentDate.getDay();
-        
+
         if (WORKING_DAYS.includes(dayOfWeek)) {
           const dayStart = new Date(currentDate);
           dayStart.setHours(BUSINESS_START_HOUR, 0, 0, 0);
-          
+
           const dayEnd = new Date(currentDate);
           dayEnd.setHours(BUSINESS_END_HOUR, BUSINESS_END_MINUTE, 0, 0);
-          
+
           const availableHoursToday = Math.max(0, (dayEnd.getTime() - Math.max(currentDate.getTime(), dayStart.getTime())) / (1000 * 60 * 60));
-          
+
           if (remainingHours <= availableHoursToday) {
             // Deadline is today
             currentDate.setTime(currentDate.getTime() + (remainingHours * 60 * 60 * 1000));
@@ -2692,12 +2778,12 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
             remainingHours -= availableHoursToday;
           }
         }
-        
+
         // Move to next day
         currentDate.setDate(currentDate.getDate() + 1);
         currentDate.setHours(BUSINESS_START_HOUR, 0, 0, 0);
       }
-      
+
       return currentDate;
     }
 
@@ -2706,11 +2792,11 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
       const priority = ticket.priority || 'LOW';
       const herHours = SLA_HOURS_BY_PRIORITY[priority] || SLA_HOURS_BY_PRIORITY['LOW'];
       const herDeadline = calculateHerDeadline(ticket.createdAt, priority);
-      
+
       let actualResolutionHours: number | undefined;
       let businessHoursUsed = 0;
       let isHerBreached = false;
-      
+
       if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
         // Calculate actual resolution time in business hours
         businessHoursUsed = calculateBusinessHours(ticket.createdAt, ticket.updatedAt);
@@ -2721,7 +2807,7 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
         businessHoursUsed = calculateBusinessHours(ticket.createdAt, new Date());
         isHerBreached = new Date() > herDeadline;
       }
-      
+
       return {
         id: ticket.id,
         title: ticket.title,
@@ -2745,11 +2831,11 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
     const herCompliantTickets = herTickets.filter(t => !t.isHerBreached).length;
     const herBreachedTickets = herTickets.filter(t => t.isHerBreached).length;
     const complianceRate = totalTickets > 0 ? (herCompliantTickets / totalTickets) * 100 : 100;
-    
-    const averageHerHours = totalTickets > 0 
-      ? herTickets.reduce((sum, t) => sum + t.herHours, 0) / totalTickets 
+
+    const averageHerHours = totalTickets > 0
+      ? herTickets.reduce((sum, t) => sum + t.herHours, 0) / totalTickets
       : 0;
-    
+
     const resolvedTickets = herTickets.filter(t => t.actualResolutionHours !== undefined);
     const averageActualHours = resolvedTickets.length > 0
       ? resolvedTickets.reduce((sum, t) => sum + (t.actualResolutionHours || 0), 0) / resolvedTickets.length
@@ -2761,7 +2847,7 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
       const priorityTickets = herTickets.filter(t => t.priority === priority);
       const priorityCompliant = priorityTickets.filter(t => !t.isHerBreached);
       const priorityBreached = priorityTickets.filter(t => t.isHerBreached);
-      
+
       priorityBreakdown[priority] = {
         total: priorityTickets.length,
         compliant: priorityCompliant.length,
@@ -2771,17 +2857,20 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
     });
 
     res.json({
-      herAnalysis: {
-        tickets: herTickets,
-        summary: {
-          totalTickets,
-          herCompliantTickets,
-          herBreachedTickets,
-          complianceRate: Math.round(complianceRate * 100) / 100,
-          averageHerHours: Math.round(averageHerHours * 100) / 100,
-          averageActualHours: Math.round(averageActualHours * 100) / 100
-        },
-        priorityBreakdown
+      success: true,
+      data: {
+        herAnalysis: {
+          tickets: herTickets,
+          summary: {
+            totalTickets,
+            herCompliantTickets,
+            herBreachedTickets,
+            complianceRate: Math.round(complianceRate * 100) / 100,
+            averageHerHours: Math.round(averageHerHours * 100) / 100,
+            averageActualHours: Math.round(averageActualHours * 100) / 100
+          },
+          priorityBreakdown
+        }
       }
     });
   } catch (error) {
@@ -2793,10 +2882,10 @@ export const generateZoneReport = async (req: Request, res: Response) => {
   try {
     const { from, to, reportType, customerId, assetId, zoneId } = req.query as unknown as ReportFilters;
     const user = (req as any).user;
-    
+
     // Get user's zones - different logic for ZONE_USER vs SERVICE_PERSON
     let userZoneIds: number[] = [];
-    
+
     if (user.role === 'ZONE_USER') {
       // For ZONE_USER, prefer explicit user.zoneId; fallback to user's customer's serviceZoneId
       const userRecord = await prisma.user.findUnique({
@@ -2832,11 +2921,11 @@ export const generateZoneReport = async (req: Request, res: Response) => {
       });
       userZoneIds = userZones.map((uz: { serviceZoneId: number }) => uz.serviceZoneId);
     }
-    
+
     if (userZoneIds.length === 0) {
       return res.status(403).json({ error: 'User has no assigned zones' });
     }
-    
+
     const startDate = from ? new Date(from) : subDays(new Date(), 30);
     const endDate = to ? new Date(to) : new Date();
     endDate.setHours(23, 59, 59, 999);
@@ -2880,6 +2969,15 @@ export const generateZoneReport = async (req: Request, res: Response) => {
         return await generateExecutiveSummaryReport(res, whereClause, startDate, endDate);
       case 'her-analysis':
         return await generateHerAnalysisReport(res, whereClause, startDate, endDate);
+      // Offer Funnel Reports
+      case 'offer-summary':
+        return await generateOfferSummaryReport(res, whereClause, startDate, endDate);
+      case 'target-report':
+        return await generateTargetReport(res, whereClause, startDate, endDate);
+      case 'product-type-analysis':
+        return await generateProductTypeAnalysisReport(res, whereClause, startDate, endDate);
+      case 'customer-performance':
+        return await generateCustomerPerformanceReport(res, whereClause, startDate, endDate);
       default:
         return res.status(400).json({ error: 'Invalid report type' });
     }
@@ -2892,28 +2990,28 @@ export const exportZoneReport = async (req: Request, res: Response) => {
   try {
     const { from, to, reportType, format = 'pdf', zoneId, ...otherFilters } = req.query as unknown as ReportFilters & { format: string };
     const user = (req as any).user;
-    
+
     // Validate required parameters
     if (!reportType) {
       return res.status(400).json({ error: 'Report type is required' });
     }
-    
+
     // Validate report type
     const validReportTypes = ['ticket-summary', 'sla-performance', 'executive-summary', 'customer-satisfaction', 'industrial-data', 'agent-productivity', 'zone-performance', 'her-analysis'];
     if (!validReportTypes.includes(reportType)) {
       return res.status(400).json({ error: 'Invalid report type or report type does not support export' });
     }
-    
+
     // Get user's zones - different logic for ZONE_USER vs SERVICE_PERSON
     let userZoneIds: number[] = [];
-    
+
     if (user.role === 'ZONE_USER') {
       // For ZONE_USER, prefer explicit user.zoneId; fallback to user's customer's serviceZoneId
       const userRecord = await prisma.user.findUnique({
         where: { id: user.id },
         select: { zoneId: true, customerId: true }
       });
-      
+
       if (userRecord?.zoneId) {
         userZoneIds = [parseInt(userRecord.zoneId)];
       } else if (userRecord?.customerId) {
@@ -2942,11 +3040,11 @@ export const exportZoneReport = async (req: Request, res: Response) => {
       });
       userZoneIds = userZones.map((uz: { serviceZoneId: number }) => uz.serviceZoneId);
     }
-    
+
     if (userZoneIds.length === 0) {
       return res.status(403).json({ error: 'User has no assigned zones' });
     }
-    
+
     const startDate = from ? new Date(from) : subDays(new Date(), 30);
     const endDate = to ? new Date(to) : new Date();
     endDate.setHours(23, 59, 59, 999);
@@ -2976,7 +3074,7 @@ export const exportZoneReport = async (req: Request, res: Response) => {
     let data: any[] = [];
     let columns: ColumnDefinition[] = [];
     let summaryData: any = null;
-    
+
     // Custom title mapping for better report names
     const titleMap: { [key: string]: string } = {
       'industrial-data': 'Machine Report',
@@ -2988,15 +3086,15 @@ export const exportZoneReport = async (req: Request, res: Response) => {
       'executive-summary': 'Executive Summary Report',
       'her-analysis': 'Business Hours SLA Report'
     };
-    
-    const reportTitle = titleMap[reportType] || reportType.split('-').map(word => 
+
+    const reportTitle = titleMap[reportType] || reportType.split('-').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
-    
+
     const filename = `Zone-${reportTitle.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}`;
-    const filters = { 
-      from: startDate.toISOString(), 
-      to: endDate.toISOString(), 
+    const filters = {
+      from: startDate.toISOString(),
+      to: endDate.toISOString(),
       zones: zoneId ? String(zoneId) : userZoneIds.join(','),
       ...Object.fromEntries(
         Object.entries(otherFilters).filter(([_, v]) => v !== undefined && v !== '')
@@ -3011,37 +3109,37 @@ export const exportZoneReport = async (req: Request, res: Response) => {
         summaryData = ticketData.summary;
         columns = getPdfColumns('ticket-summary');
         break;
-        
+
       case 'sla-performance':
         const slaData = await getSlaPerformanceData(whereClause, startDate, endDate);
         data = slaData.breachedTickets || [];
         summaryData = slaData.summary;
         columns = getPdfColumns('sla-performance');
         break;
-        
+
       case 'executive-summary':
         const executiveData = await getExecutiveSummaryData(whereClause, startDate, endDate);
         data = executiveData.trends || [];
         summaryData = executiveData.summary;
         columns = getPdfColumns('executive-summary');
         break;
-        
+
       case 'customer-satisfaction':
         const satisfactionData = await getCustomerSatisfactionData(whereClause, startDate, endDate);
         data = satisfactionData.recentFeedbacks || [];
-        
+
         const totalRatings = Object.entries(satisfactionData.ratingDistribution || {})
           .reduce((sum, [rating, count]) => sum + (parseInt(rating) * (count as number)), 0);
         const totalResponses = Object.values(satisfactionData.ratingDistribution || {})
           .reduce((sum, count) => sum + (count as number), 0);
         const averageRating = totalResponses > 0 ? (totalRatings / totalResponses).toFixed(1) : 0;
-        
+
         summaryData = {
           'Average Rating': averageRating,
           'Total Feedbacks': totalResponses,
           'Rating Distribution': JSON.stringify(satisfactionData.ratingDistribution || {})
         };
-        
+
         columns = [
           { key: 'id', header: 'ID', width: 10 },
           { key: 'rating', header: 'Rating', width: 15 },
@@ -3051,28 +3149,28 @@ export const exportZoneReport = async (req: Request, res: Response) => {
           { key: 'customerName', header: 'Customer', width: 30 }
         ];
         break;
-        
+
       case 'industrial-data':
         const industrialData = await getIndustrialDataData(whereClause, startDate, endDate, otherFilters);
         data = industrialData.machineDowntime || [];
         summaryData = industrialData.summary;
         columns = getPdfColumns('industrial-data');
         break;
-        
+
       case 'agent-productivity':
         const agentData = await getAgentProductivityData(whereClause, startDate, endDate);
         data = agentData.agents || [];
         summaryData = agentData.summary;
         columns = getPdfColumns('agent-productivity');
         break;
-        
+
       case 'zone-performance':
         const zoneData = await getZonePerformanceData(whereClause, startDate, endDate);
         data = zoneData.zones || [];
         summaryData = zoneData.summary;
         columns = getPdfColumns('zone-performance');
         break;
-        
+
       case 'her-analysis':
         // HER Analysis uses the same data structure as the generateHerAnalysisReport
         const herTickets = await prisma.ticket.findMany({
@@ -3084,7 +3182,7 @@ export const exportZoneReport = async (req: Request, res: Response) => {
             asset: true
           }
         });
-        
+
         // HER calculation helper functions
         const BUSINESS_START_HOUR = 9;
         const BUSINESS_END_HOUR = 17;
@@ -3093,7 +3191,7 @@ export const exportZoneReport = async (req: Request, res: Response) => {
         const SLA_HOURS_BY_PRIORITY: Record<string, number> = {
           'CRITICAL': 4, 'HIGH': 8, 'MEDIUM': 24, 'LOW': 48
         };
-        
+
         const calculateBusinessHours = (startDate: Date, endDate: Date): number => {
           let businessHours = 0;
           let currentDate = new Date(startDate);
@@ -3115,14 +3213,14 @@ export const exportZoneReport = async (req: Request, res: Response) => {
           }
           return businessHours;
         };
-        
+
         data = herTickets.map((ticket: any) => {
           const priority = ticket.priority || 'LOW';
           const herHours = SLA_HOURS_BY_PRIORITY[priority] || SLA_HOURS_BY_PRIORITY['LOW'];
           let businessHoursUsed = 0;
           let isHerBreached = false;
           let resolvedAt = null;
-          
+
           if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
             businessHoursUsed = calculateBusinessHours(ticket.createdAt, ticket.updatedAt);
             isHerBreached = businessHoursUsed > herHours;
@@ -3130,7 +3228,7 @@ export const exportZoneReport = async (req: Request, res: Response) => {
           } else {
             businessHoursUsed = calculateBusinessHours(ticket.createdAt, new Date());
           }
-          
+
           return {
             id: ticket.id,
             title: ticket.title,
@@ -3148,18 +3246,18 @@ export const exportZoneReport = async (req: Request, res: Response) => {
             resolvedAt: resolvedAt
           };
         });
-        
+
         const herCompliantTickets = data.filter((t: any) => t.isHerBreached === 'No').length;
         const herBreachedTickets = data.filter((t: any) => t.isHerBreached === 'Yes').length;
         const complianceRate = data.length > 0 ? (herCompliantTickets / data.length) * 100 : 100;
-        
+
         summaryData = {
           'Total Tickets': data.length,
           'HER Compliant': herCompliantTickets,
           'HER Breached': herBreachedTickets,
           'Compliance Rate': `${Math.round(complianceRate * 100) / 100}%`
         };
-        
+
         columns = [
           { key: 'id', header: 'Ticket ID', width: 12 },
           { key: 'title', header: 'Title', width: 30 },
@@ -3177,7 +3275,7 @@ export const exportZoneReport = async (req: Request, res: Response) => {
           { key: 'resolvedAt', header: 'Resolved', width: 20, format: (date: string) => date ? new Date(date).toLocaleString() : 'N/A' }
         ];
         break;
-        
+
       default:
         return res.status(400).json({ error: 'Invalid report type for export.' });
     }
@@ -3194,9 +3292,694 @@ export const exportZoneReport = async (req: Request, res: Response) => {
       await generatePdf(res, data, pdfColumns, `Zone ${reportTitle}`, filters, summaryData);
     }
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to export zone report',
       details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+// Offer Funnel Report Functions
+
+/**
+ * Generate Offer Summary Report
+ */
+const generateOfferSummaryReport = async (res: Response, whereClause: any, startDate: Date, endDate: Date) => {
+  try {
+    // Fetch offers with important fields
+    const offers = await prisma.offer.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        offerReferenceNumber: true,
+        offerReferenceDate: true,
+        title: true,
+        description: true,
+        productType: true,
+        lead: true,
+        company: true,
+        location: true,
+        department: true,
+        registrationDate: true,
+        contactPersonName: true,
+        contactNumber: true,
+        email: true,
+        machineSerialNumber: true,
+        status: true,
+        stage: true,
+        priority: true,
+        offerValue: true,
+        offerMonth: true,
+        poExpectedMonth: true,
+        probabilityPercentage: true,
+        poNumber: true,
+        poDate: true,
+        poValue: true,
+        poReceivedMonth: true,
+        openFunnel: true,
+        remarks: true,
+        bookingDateInSap: true,
+        offerEnteredInCrm: true,
+        offerClosedInCrm: true,
+        customer: {
+          select: {
+            id: true,
+            companyName: true,
+            address: true,
+            industry: true,
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            contactPersonName: true,
+            contactNumber: true,
+            email: true,
+          },
+        },
+        zone: {
+          select: {
+            id: true,
+            name: true,
+            shortForm: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        updatedBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Calculate summary statistics
+    const summary = await prisma.offer.aggregate({
+      where: whereClause,
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Won offers statistics
+    const wonOffers = await prisma.offer.aggregate({
+      where: { ...whereClause, stage: 'WON' },
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Status distribution
+    const statusDistribution = await prisma.offer.groupBy({
+      where: whereClause,
+      by: ['status'],
+      _count: { id: true },
+    });
+
+    // Stage distribution
+    const stageDistribution = await prisma.offer.groupBy({
+      where: whereClause,
+      by: ['stage'],
+      _count: { id: true },
+    });
+
+    // Product type distribution
+    const productTypeDistribution = await prisma.offer.groupBy({
+      where: whereClause,
+      by: ['productType'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+      },
+    });
+
+    // Format distributions
+    const statusDist: Record<string, number> = {};
+    statusDistribution.forEach((item) => {
+      statusDist[item.status] = item._count.id;
+    });
+
+    const stageDist: Record<string, number> = {};
+    stageDistribution.forEach((item) => {
+      stageDist[item.stage] = item._count.id;
+    });
+
+    const productTypeDist: Record<string, { count: number; totalValue: number }> = {};
+    productTypeDistribution.forEach((item) => {
+      productTypeDist[item.productType || 'UNKNOWN'] = {
+        count: item._count.id,
+        totalValue: Number(item._sum.offerValue || 0),
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        offers,
+        summary: {
+          totalOffers: summary._count.id,
+          totalOfferValue: Number(summary._sum.offerValue || 0),
+          totalPoValue: Number(summary._sum.poValue || 0),
+          wonOffers: wonOffers._count.id,
+          wonOfferValue: Number(wonOffers._sum.offerValue || 0),
+          wonPoValue: Number(wonOffers._sum.poValue || 0),
+          successRate: summary._count.id > 0 ? (wonOffers._count.id / summary._count.id) * 100 : 0,
+          conversionRate: summary._sum.offerValue ? (Number(summary._sum.poValue || 0) / Number(summary._sum.offerValue || 1)) * 100 : 0,
+        },
+        statusDistribution: statusDist,
+        stageDistribution: stageDist,
+        productTypeDistribution: productTypeDist,
+      },
+    });
+  } catch (error) {
+    console.error('Generate offer summary report error:', error);
+    res.status(500).json({ error: 'Failed to generate offer summary report' });
+  }
+};
+
+/**
+ * Generate Target Report (placeholder - redirects to offer summary for now)
+ */
+const generateTargetReport = async (res: Response, whereClause: any, startDate: Date, endDate: Date) => {
+  // For now, return a simple target report structure
+  // In a full implementation, this would fetch from zoneTarget and userTarget tables
+  res.json({
+    success: true,
+    data: {
+      zoneTargets: [],
+      userTargets: [],
+      summary: {
+        totalTargets: 0,
+        totalTargetValue: 0,
+        totalActualValue: 0,
+        overallAchievement: 0,
+      },
+    },
+  });
+};
+
+/**
+ * Generate Product Type Analysis Report
+ */
+const generateProductTypeAnalysisReport = async (res: Response, whereClause: any, startDate: Date, endDate: Date) => {
+  try {
+    // Get all product types with metrics
+    const productTypeMetrics = await prisma.offer.groupBy({
+      where: whereClause,
+      by: ['productType'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Get won offers by product type
+    const wonByProductType = await prisma.offer.groupBy({
+      where: { ...whereClause, stage: 'WON' },
+      by: ['productType'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Get lost offers by product type (stage = 'LOST')
+    const lostByProductType = await prisma.offer.groupBy({
+      where: { ...whereClause, stage: 'LOST' },
+      by: ['productType'],
+      _count: { id: true },
+    });
+
+    // Define all product types
+    const allProductTypes = ['RELOCATION', 'CONTRACT', 'SPP', 'UPGRADE_KIT', 'SOFTWARE', 'BD_CHARGES', 'BD_SPARE', 'MIDLIFE_UPGRADE', 'RETROFIT_KIT'];
+
+    // Create maps for easy lookup
+    const metricsMap = new Map(productTypeMetrics.map(m => [m.productType || 'UNKNOWN', m]));
+    const wonMap = new Map(wonByProductType.map(m => [m.productType || 'UNKNOWN', m]));
+    const lostMap = new Map(lostByProductType.map(m => [m.productType || 'UNKNOWN', m]));
+
+    // Build comprehensive analysis for ALL product types (including those with 0 offers)
+    const analysis = allProductTypes.map((productType) => {
+      const metric = metricsMap.get(productType);
+      const wonMetric = wonMap.get(productType);
+      const lostMetric = lostMap.get(productType);
+
+      const totalOffers = metric?._count.id || 0;
+      const totalValue = Number(metric?._sum.offerValue || 0);
+      const totalPoValue = Number(metric?._sum.poValue || 0);
+      const wonOffers = wonMetric?._count.id || 0;
+      const wonValue = Number(wonMetric?._sum.offerValue || 0);
+      const wonPoValue = Number(wonMetric?._sum.poValue || 0);
+      const lostOffers = lostMetric?._count.id || 0;
+
+      const winRate = totalOffers > 0 ? (wonOffers / totalOffers) * 100 : 0;
+      const avgDealSize = totalOffers > 0 ? totalValue / totalOffers : 0;
+
+      return {
+        productType,
+        totalOffers,
+        wonOffers,
+        lostOffers,
+        totalValue,
+        wonValue,
+        totalPoValue,
+        wonPoValue,
+        winRate: Math.round(winRate * 100) / 100,
+        avgDealSize: Math.round(avgDealSize * 100) / 100,
+        conversionRate: wonOffers > 0 ? Math.round((wonOffers / totalOffers) * 100 * 100) / 100 : 0,
+      };
+    });
+
+    // Sort by total value descending, then by product type name
+    analysis.sort((a, b) => {
+      if (b.totalValue !== a.totalValue) {
+        return b.totalValue - a.totalValue;
+      }
+      return a.productType.localeCompare(b.productType);
+    });
+
+    res.json({
+      success: true,
+      data: analysis,
+    });
+  } catch (error) {
+    console.error('Generate product type analysis report error:', error);
+    res.status(500).json({ error: 'Failed to generate product type analysis report' });
+  }
+};
+
+/**
+ * Generate Customer Performance Report
+ */
+const generateCustomerPerformanceReport = async (res: Response, whereClause: any, startDate: Date, endDate: Date) => {
+  try {
+    // Get customer performance metrics
+    const customerMetrics = await prisma.offer.groupBy({
+      where: whereClause,
+      by: ['customerId'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Get won offers by customer
+    const wonByCustomer = await prisma.offer.groupBy({
+      where: { ...whereClause, stage: 'WON' },
+      by: ['customerId'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Get customer details
+    const customerIds = customerMetrics.map(m => m.customerId).filter(Boolean);
+    const customers = await prisma.customer.findMany({
+      where: { id: { in: customerIds as number[] } },
+      select: {
+        id: true,
+        companyName: true,
+        address: true,
+        industry: true,
+        serviceZone: { select: { id: true, name: true } },
+      },
+    });
+
+    // Create maps for easy lookup
+    const customerMap = new Map(customers.map(c => [c.id, c]));
+    const metricsMap = new Map(customerMetrics.map(m => [m.customerId, m]));
+    const wonMap = new Map(wonByCustomer.map(m => [m.customerId, m]));
+
+    // Build performance analysis
+    const analysis = customerMetrics.map((metric) => {
+      const customer = customerMap.get(metric.customerId);
+      const wonMetric = wonMap.get(metric.customerId);
+
+      const totalOffers = metric._count.id;
+      const totalValue = Number(metric._sum.offerValue || 0);
+      const totalPoValue = Number(metric._sum.poValue || 0);
+      const wonOffers = wonMetric?._count.id || 0;
+      const wonValue = Number(wonMetric?._sum.offerValue || 0);
+      const wonPoValue = Number(wonMetric?._sum.poValue || 0);
+
+      const winRate = totalOffers > 0 ? (wonOffers / totalOffers) * 100 : 0;
+      const avgDealSize = totalOffers > 0 ? totalValue / totalOffers : 0;
+
+      return {
+        customerId: metric.customerId,
+        customerName: customer?.companyName || 'Unknown Customer',
+        location: customer?.address || null,
+        industry: customer?.industry || null,
+        zoneName: customer?.serviceZone?.name || null,
+        totalOffers,
+        wonOffers,
+        lostOffers: totalOffers - wonOffers,
+        totalValue,
+        wonValue,
+        totalPoValue,
+        wonPoValue,
+        winRate: Math.round(winRate * 100) / 100,
+        avgDealSize: Math.round(avgDealSize * 100) / 100,
+        conversionRate: wonOffers > 0 ? Math.round((wonOffers / totalOffers) * 100 * 100) / 100 : 0,
+      };
+    });
+
+    // Sort by total value descending
+    analysis.sort((a, b) => b.totalValue - a.totalValue);
+
+    res.json({
+      success: true,
+      data: analysis,
+    });
+  } catch (error) {
+    console.error('Generate customer performance report error:', error);
+    res.status(500).json({ error: 'Failed to generate customer performance report' });
+  }
+};
+
+/**
+ * Product Type Analysis Report - Shows performance metrics by product type
+ */
+export const getProductTypeAnalysis = async (req: Request, res: Response) => {
+  try {
+    const { from, to, zoneId } = req.query;
+
+    // Build where clause
+    const where: any = {};
+
+    // Date range filter
+    if (from || to) {
+      where.createdAt = {};
+      if (from) {
+        where.createdAt.gte = new Date(from as string);
+      }
+      if (to) {
+        const endDate = new Date(to as string);
+        endDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = endDate;
+      }
+    }
+
+    // Zone filter
+    if (zoneId) {
+      where.zoneId = parseInt(zoneId as string);
+    }
+
+    // Get all product types with metrics
+    const productTypeMetrics = await prisma.offer.groupBy({
+      where,
+      by: ['productType'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Get won offers by product type
+    const wonByProductType = await prisma.offer.groupBy({
+      where: { ...where, stage: 'WON' },
+      by: ['productType'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Get lost offers by product type
+    const lostByProductType = await prisma.offer.groupBy({
+      where: { ...where, stage: 'LOST' },
+      by: ['productType'],
+      _count: { id: true },
+    });
+
+    // Define all product types
+    const allProductTypes = ['RELOCATION', 'CONTRACT', 'SPP', 'UPGRADE_KIT', 'SOFTWARE', 'BD_CHARGES', 'BD_SPARE', 'MIDLIFE_UPGRADE', 'RETROFIT_KIT'];
+
+    // Create maps for easy lookup
+    const metricsMap = new Map(productTypeMetrics.map(m => [m.productType || 'UNKNOWN', m]));
+    const wonMap = new Map(wonByProductType.map(m => [m.productType || 'UNKNOWN', m]));
+    const lostMap = new Map(lostByProductType.map(m => [m.productType || 'UNKNOWN', m]));
+
+    // Build comprehensive analysis for ALL product types
+    const analysis = allProductTypes.map((productType) => {
+      const metric = metricsMap.get(productType);
+      const wonMetric = wonMap.get(productType);
+      const lostMetric = lostMap.get(productType);
+
+      const totalOffers = metric?._count.id || 0;
+      const totalValue = Number(metric?._sum.offerValue || 0);
+      const totalPoValue = Number(metric?._sum.poValue || 0);
+      const wonOffers = wonMetric?._count.id || 0;
+      const wonValue = Number(wonMetric?._sum.offerValue || 0);
+      const wonPoValue = Number(wonMetric?._sum.poValue || 0);
+      const lostOffers = lostMetric?._count.id || 0;
+
+      const winRate = totalOffers > 0 ? (wonOffers / totalOffers) * 100 : 0;
+      const avgDealSize = totalOffers > 0 ? totalValue / totalOffers : 0;
+
+      return {
+        productType,
+        totalOffers,
+        wonOffers,
+        lostOffers,
+        totalValue,
+        wonValue,
+        totalPoValue,
+        wonPoValue,
+        winRate: Math.round(winRate * 100) / 100,
+        avgDealSize: Math.round(avgDealSize * 100) / 100,
+        conversionRate: totalOffers > 0 ? Math.round((wonOffers / totalOffers) * 100 * 100) / 100 : 0,
+      };
+    });
+
+    // Sort by total value descending
+    analysis.sort((a, b) => b.totalValue - a.totalValue);
+
+    // Calculate totals
+    const totalOffers = analysis.reduce((sum, a) => sum + a.totalOffers, 0);
+    const totalWonOffers = analysis.reduce((sum, a) => sum + a.wonOffers, 0);
+    const totalLostOffers = analysis.reduce((sum, a) => sum + a.lostOffers, 0);
+    const totalValue = analysis.reduce((sum, a) => sum + a.totalValue, 0);
+    const totalWonValue = analysis.reduce((sum, a) => sum + a.wonValue, 0);
+    const totalPoValue = analysis.reduce((sum, a) => sum + a.totalPoValue, 0);
+    const totalWonPoValue = analysis.reduce((sum, a) => sum + a.wonPoValue, 0);
+
+    const totals = {
+      totalOffers,
+      wonOffers: totalWonOffers,
+      lostOffers: totalLostOffers,
+      totalValue,
+      wonValue: totalWonValue,
+      totalPoValue,
+      wonPoValue: totalWonPoValue,
+      winRate: totalOffers > 0 ? Math.round((totalWonOffers / totalOffers) * 100 * 100) / 100 : 0,
+      avgDealSize: totalOffers > 0 ? Math.round((totalValue / totalOffers) * 100) / 100 : 0,
+      conversionRate: totalOffers > 0 ? Math.round((totalWonOffers / totalOffers) * 100 * 100) / 100 : 0,
+    };
+
+    res.json({
+      success: true,
+      data: {
+        analysis,
+        totals,
+        dateRange: {
+          from: from || null,
+          to: to || null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Product type analysis error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate product type analysis',
+    });
+  }
+};
+
+/**
+ * Customer Performance Report - Shows performance metrics by customer
+ */
+export const getCustomerPerformance = async (req: Request, res: Response) => {
+  try {
+    const { from, to, zoneId, limit = '20' } = req.query;
+
+    // Build where clause
+    const where: any = {};
+
+    // Date range filter
+    if (from || to) {
+      where.createdAt = {};
+      if (from) {
+        where.createdAt.gte = new Date(from as string);
+      }
+      if (to) {
+        const endDate = new Date(to as string);
+        endDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = endDate;
+      }
+    }
+
+    // Zone filter
+    if (zoneId) {
+      where.zoneId = parseInt(zoneId as string);
+    }
+
+    // Get all customer metrics
+    const customerMetrics = await prisma.offer.groupBy({
+      where,
+      by: ['customerId'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Get won offers by customer
+    const wonByCustomer = await prisma.offer.groupBy({
+      where: { ...where, stage: 'WON' },
+      by: ['customerId'],
+      _count: { id: true },
+      _sum: {
+        offerValue: true,
+        poValue: true,
+      },
+    });
+
+    // Get lost offers by customer
+    const lostByCustomer = await prisma.offer.groupBy({
+      where: { ...where, stage: 'LOST' },
+      by: ['customerId'],
+      _count: { id: true },
+    });
+
+    // Create maps for easy lookup
+    const metricsMap = new Map(customerMetrics.map(m => [m.customerId, m]));
+    const wonMap = new Map(wonByCustomer.map(m => [m.customerId, m]));
+    const lostMap = new Map(lostByCustomer.map(m => [m.customerId, m]));
+
+    // Get customer details with zone information
+    const customerIds = customerMetrics.map(m => m.customerId);
+    const customers = await prisma.customer.findMany({
+      where: { id: { in: customerIds } },
+      include: {
+        serviceZone: { select: { id: true, name: true } },
+      },
+    });
+
+    // Build comprehensive analysis
+    const analysis = customers.map((customer) => {
+      const metric = metricsMap.get(customer.id);
+      const wonMetric = wonMap.get(customer.id);
+      const lostMetric = lostMap.get(customer.id);
+
+      const totalOffers = metric?._count.id || 0;
+      const totalValue = Number(metric?._sum.offerValue || 0);
+      const totalPoValue = Number(metric?._sum.poValue || 0);
+      const wonOffers = wonMetric?._count.id || 0;
+      const wonValue = Number(wonMetric?._sum.offerValue || 0);
+      const wonPoValue = Number(wonMetric?._sum.poValue || 0);
+      const lostOffers = lostMetric?._count.id || 0;
+
+      const winRate = totalOffers > 0 ? (wonOffers / totalOffers) * 100 : 0;
+      const avgDealSize = totalOffers > 0 ? totalValue / totalOffers : 0;
+
+      return {
+        customerId: customer.id,
+        companyName: customer.companyName,
+        location: customer.address,
+        industry: customer.industry,
+        zone: customer.serviceZone,
+        totalOffers,
+        wonOffers,
+        lostOffers,
+        totalValue,
+        wonValue,
+        totalPoValue,
+        wonPoValue,
+        winRate: Math.round(winRate * 100) / 100,
+        avgDealSize: Math.round(avgDealSize * 100) / 100,
+        conversionRate: totalOffers > 0 ? Math.round((wonOffers / totalOffers) * 100 * 100) / 100 : 0,
+      };
+    });
+
+    // Sort by total value descending
+    analysis.sort((a, b) => b.totalValue - a.totalValue);
+
+    // Get top customers
+    const limitNum = parseInt(limit as string) || 20;
+    const topCustomers = analysis.slice(0, limitNum);
+
+    // Calculate totals
+    const totalCustomers = analysis.length;
+    const totalOffers2 = analysis.reduce((sum, a) => sum + a.totalOffers, 0);
+    const totalWonOffers2 = analysis.reduce((sum, a) => sum + a.wonOffers, 0);
+    const totalLostOffers2 = analysis.reduce((sum, a) => sum + a.lostOffers, 0);
+    const totalValue2 = analysis.reduce((sum, a) => sum + a.totalValue, 0);
+    const totalWonValue2 = analysis.reduce((sum, a) => sum + a.wonValue, 0);
+    const totalPoValue2 = analysis.reduce((sum, a) => sum + a.totalPoValue, 0);
+    const totalWonPoValue2 = analysis.reduce((sum, a) => sum + a.wonPoValue, 0);
+
+    const totals = {
+      totalCustomers,
+      totalOffers: totalOffers2,
+      wonOffers: totalWonOffers2,
+      lostOffers: totalLostOffers2,
+      totalValue: totalValue2,
+      wonValue: totalWonValue2,
+      totalPoValue: totalPoValue2,
+      wonPoValue: totalWonPoValue2,
+      winRate: totalOffers2 > 0 ? Math.round((totalWonOffers2 / totalOffers2) * 100 * 100) / 100 : 0,
+      avgDealSize: totalOffers2 > 0 ? Math.round((totalValue2 / totalOffers2) * 100) / 100 : 0,
+      conversionRate: totalOffers2 > 0 ? Math.round((totalWonOffers2 / totalOffers2) * 100 * 100) / 100 : 0,
+    };
+
+    res.json({
+      success: true,
+      data: {
+        topCustomers,
+        allCustomers: analysis,
+        totals,
+        dateRange: {
+          from: from || null,
+          to: to || null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Customer performance error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate customer performance report',
     });
   }
 };
@@ -3209,5 +3992,7 @@ export default {
   getZonePerformanceData,
   getAgentProductivityData,
   getIndustrialDataData,
-  getExecutiveSummaryData
+  getExecutiveSummaryData,
+  getProductTypeAnalysis,
+  getCustomerPerformance
 }

@@ -206,10 +206,6 @@ export default function ServicePersonWorkClient({ initialData }: Props) {
 
       if (response.data) {
         setAttendance(response.data);
-        toast({
-          title: "Success",
-          description: "Checked in successfully!"
-        });
       }
     } catch (error) {
       toast({
@@ -232,10 +228,6 @@ export default function ServicePersonWorkClient({ initialData }: Props) {
 
       if (response.data) {
         setAttendance(response.data);
-        toast({
-          title: "Success",
-          description: "Checked out successfully!"
-        });
       }
     } catch (error) {
       toast({
@@ -271,10 +263,6 @@ export default function ServicePersonWorkClient({ initialData }: Props) {
       
       if (response.data) {
         await refreshActivities();
-        toast({
-          title: "Activity Started",
-          description: `${activityType.replace('_', ' ')} activity started!`
-        });
       }
     } catch (error) {
       toast({
@@ -300,10 +288,6 @@ export default function ServicePersonWorkClient({ initialData }: Props) {
 
       if (response.data) {
         await refreshActivities();
-        toast({
-          title: "Activity Ended",
-          description: "Activity ended successfully!"
-        });
       }
     } catch (error) {
       toast({

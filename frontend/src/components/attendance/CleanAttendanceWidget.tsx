@@ -165,11 +165,6 @@ export default function CleanAttendanceWidget({
     }));
     
     setLastKnownLocation(attendanceLocation);
-    
-    toast({
-      title: "Location Captured",
-      description: `${location.source === 'manual' ? 'Manual' : 'GPS'} location set for attendance.`,
-    });
   };
 
   // Legacy location capture (keeping for backward compatibility)
@@ -413,10 +408,10 @@ export default function CleanAttendanceWidget({
     const location = enhancedLocationState.capturedLocation;
     
     // Validate GPS accuracy (reject if > 100m for GPS sources)
-    if (location.source === 'gps' && location.accuracy > 100) {
+    if (location.source === 'gps' && location.accuracy > 2000) {
       toast({
         title: "GPS Accuracy Too Poor",
-        description: `GPS accuracy is ±${Math.round(location.accuracy)}m (requires ≤100m). Please move to an area with better GPS signal.`,
+        description: `GPS accuracy is ±${Math.round(location.accuracy)}m (requires ≤2000m). Please move to an area with better GPS signal.`,
         variant: "destructive",
       });
       
@@ -441,11 +436,6 @@ export default function CleanAttendanceWidget({
 
       const response = await apiClient.post('/attendance/checkin', checkInData);
       
-      toast({
-        title: 'Checked In Successfully',
-        description: `Location: ${location.address || 'Coordinates captured'} (±${Math.round(location.accuracy)}m)`,
-      });
-
       // Reset enhanced location state
       setEnhancedLocationState({
         isCapturing: false,
@@ -503,11 +493,6 @@ export default function CleanAttendanceWidget({
         }
       };
       setAttendanceData(newData);
-
-      toast({
-        title: 'Checked In Successfully',
-        description: location.address,
-      });
 
       // Refresh local data
       await fetchAttendanceStatus();
@@ -571,10 +556,10 @@ export default function CleanAttendanceWidget({
     const location = enhancedLocationState.capturedLocation;
     
     // Validate GPS accuracy (reject if > 100m for GPS sources)
-    if (location.source === 'gps' && location.accuracy > 100) {
+    if (location.source === 'gps' && location.accuracy > 2000) {
       toast({
         title: "GPS Accuracy Too Poor",
-        description: `GPS accuracy is ±${Math.round(location.accuracy)}m (requires ≤100m). Please move to an area with better GPS signal.`,
+        description: `GPS accuracy is ±${Math.round(location.accuracy)}m (requires ≤2000m). Please move to an area with better GPS signal.`,
         variant: "destructive",
       });
       
@@ -598,11 +583,6 @@ export default function CleanAttendanceWidget({
     try {
       const response = await apiClient.post('/attendance/checkout', checkOutData);
       
-      toast({
-        title: 'Checked Out Successfully',
-        description: `Location: ${location.address || 'Coordinates captured'} (±${Math.round(location.accuracy)}m)`,
-      });
-
       // Reset enhanced location state
       setEnhancedLocationState({
         isCapturing: false,
@@ -676,11 +656,6 @@ export default function CleanAttendanceWidget({
       };
       setAttendanceData(newData);
 
-      toast({
-        title: 'Checked Out Successfully',
-        description: `Total hours: ${formatHours(result.attendance?.totalHours)}h`,
-      });
-
       // Refresh local data
       await fetchAttendanceStatus();
       await fetchAttendanceStats();
@@ -740,10 +715,10 @@ export default function CleanAttendanceWidget({
     const location = enhancedLocationState.capturedLocation;
     
     // Validate GPS accuracy (reject if > 100m for GPS sources)
-    if (location.source === 'gps' && location.accuracy > 100) {
+    if (location.source === 'gps' && location.accuracy > 2000) {
       toast({
         title: "GPS Accuracy Too Poor",
-        description: `GPS accuracy is ±${Math.round(location.accuracy)}m (requires ≤100m). Please move to an area with better GPS signal.`,
+        description: `GPS accuracy is ±${Math.round(location.accuracy)}m (requires ≤2000m). Please move to an area with better GPS signal.`,
         variant: "destructive",
       });
       
@@ -786,11 +761,6 @@ export default function CleanAttendanceWidget({
         }
       };
       setAttendanceData(newData);
-
-      toast({
-        title: 'Re-Checked In Successfully',
-        description: `Location: ${location.address || 'Coordinates captured'} (±${Math.round(location.accuracy)}m)`,
-      });
 
       // Reset enhanced location state
       setEnhancedLocationState({
@@ -853,11 +823,6 @@ export default function CleanAttendanceWidget({
       };
       setAttendanceData(newData);
 
-      toast({
-        title: 'Re-Checked In Successfully',
-        description: location.address,
-      });
-
       // Refresh local data
       await fetchAttendanceStatus();
       await fetchAttendanceStats();
@@ -909,11 +874,6 @@ export default function CleanAttendanceWidget({
         } : attendanceData?.attendance
       };
       setAttendanceData(newData);
-
-      toast({
-        title: 'Checked Out Successfully',
-        description: `Early checkout completed. Total hours: ${formatHours(result.attendance?.totalHours)}h`,
-      });
 
       // Reset enhanced location state
       setEnhancedLocationState({

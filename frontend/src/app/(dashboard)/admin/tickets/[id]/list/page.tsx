@@ -19,7 +19,7 @@ import {
   Upload,
   Camera
 } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { Ticket } from '@/types/ticket';
 import api from '@/lib/api/axios';
 import { StatusBadge } from '@/components/tickets/StatusBadge';
@@ -38,13 +38,12 @@ import PhotoGallery from '@/components/photo/PhotoGallery';
 export default function TicketDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const { user } = useAuth();
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments' | 'reports' | 'photos'>('details');
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
-  const [assignmentStep, setAssignmentStep] = useState<'ZONE_USER' | 'SERVICE_PERSON'>('ZONE_USER');
+  const [assignmentStep, setAssignmentStep] = useState<'ZONE_USER' | 'SERVICE_PERSON' | 'EXPERT_HELPDESK'>('ZONE_USER');
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
 
   const fetchTicketDetails = async () => {
@@ -53,11 +52,7 @@ export default function TicketDetailPage() {
       const response = await api.get(`/tickets/${id}`);
       setTicket(response.data);
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load ticket details',
-        variant: 'destructive',
-      });
+      toast.error('Failed to load ticket details');
     } finally {
       setLoading(false);
     }
@@ -70,11 +65,7 @@ export default function TicketDetailPage() {
         const response = await api.get(`/tickets/${id}`);
         setTicket(response.data);
       } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to load ticket details',
-          variant: 'destructive',
-        });
+        toast.error('Failed to load ticket details');
         router.push('/admin/tickets');
       } finally {
         setLoading(false);
@@ -104,17 +95,9 @@ export default function TicketDetailPage() {
       
       await fetchTicketDetails();
       
-      toast({
-        title: 'Success',
-        description: 'Ticket status updated successfully',
-        variant: 'default',
-      });
+      toast.success('Ticket status updated successfully');
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update ticket status',
-        variant: 'destructive',
-      });
+      toast.error('Failed to update ticket status');
       throw error;
     }
   };
@@ -139,18 +122,11 @@ export default function TicketDetailPage() {
       // Refresh ticket data
       await fetchTicketDetails();
       
-      toast({
-        title: 'Success',
-        description: 'Ticket assigned successfully',
-      });
+      toast.success('Ticket assigned successfully');
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to assign ticket';
       
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast.error(errorMessage);
     }
   };
 
@@ -316,6 +292,153 @@ export default function TicketDetailPage() {
         {/* Right Column - Sidebar Content */}
         <div className="space-y-4 md:space-y-6">
           <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
+            <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50/50 rounded-t-lg border-b">
+              <CardTitle className="text-emerald-900">Assignment</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="font-medium">Assignment</h3>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Expert Helpdesk</span>
+                  <div className="flex items-center">
+                    {ticket.assignedTo && ticket.assignedTo.role === 'EXPERT_HELPDESK' ? (
+                      <>
+                        <Avatar className="h-5 w-5 mr-2">
+                          <AvatarFallback className="bg-purple-100 text-purple-700">
+                            {ticket.assignedTo.name?.charAt(0) || 'E'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span>{ticket.assignedTo.name || 'No name'}</span>
+                          {ticket.assignedTo.phone && (
+                            <span className="text-xs text-muted-foreground">{ticket.assignedTo.phone}</span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Unassigned</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Zone Manager / Zone User</span>
+                  <div className="flex items-center">
+                    {ticket.subOwner && (ticket.subOwner.role === 'ZONE_USER' || ticket.subOwner.role === 'ZONE_MANAGER') ? (
+                      <>
+                        <Avatar className="h-5 w-5 mr-2">
+                          <AvatarFallback className={`${ticket.subOwner.role === 'ZONE_MANAGER' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {ticket.subOwner.name?.charAt(0) || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span>{ticket.subOwner.name || 'No name'}</span>
+                          <span className={`text-xs font-medium ${ticket.subOwner.role === 'ZONE_MANAGER' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {ticket.subOwner.role === 'ZONE_MANAGER' ? 'Zone Manager' : 'Zone User'}
+                          </span>
+                          {ticket.subOwner.phone && (
+                            <span className="text-xs text-muted-foreground">{ticket.subOwner.phone}</span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Unassigned</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Service Person</span>
+                  <div className="flex items-center">
+                    {ticket.assignedTo && ticket.assignedTo.role === 'SERVICE_PERSON' ? (
+                      <>
+                        <Avatar className="h-5 w-5 mr-2">
+                          <AvatarFallback className="bg-blue-100 text-blue-700">
+                            {ticket.assignedTo.name?.charAt(0) || 'S'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span>{ticket.assignedTo.name || 'No name'}</span>
+                          {ticket.zone?.name && (
+                            <span className="text-xs text-blue-600 font-medium">Zone: {ticket.zone.name}</span>
+                          )}
+                          {ticket.assignedTo.phone && (
+                            <span className="text-xs text-muted-foreground">{ticket.assignedTo.phone}</span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Unassigned</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Zone</span>
+                  <div className="flex items-center">
+                    <MapPin className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                    {ticket.zone?.name || 'No zone assigned'}
+                  </div>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Created By</span>
+                  <div className="flex flex-col">
+                    <span>{ticket.owner?.name || 'System'}</span>
+                    {ticket.owner?.phone && (
+                      <span className="text-xs text-muted-foreground">{ticket.owner.phone}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-4">
+                <div className="text-sm font-medium text-muted-foreground mb-2">Quick Actions</div>
+                <Button 
+                  onClick={() => {
+                    // Open dialog for expert helpdesk assignment
+                    setAssignmentStep('EXPERT_HELPDESK');
+                    setIsAssignDialogOpen(true);
+                  }}
+                  disabled={!ticket}
+                  variant="outline"
+                  className="w-full justify-start h-12 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200 hover:border-purple-300 text-purple-700 hover:text-purple-800 transition-all duration-200 shadow-sm hover:shadow-md group"
+                >
+                  <div className="flex items-center">
+                    <div className="p-1.5 rounded-full bg-purple-100 group-hover:bg-purple-200 mr-3 transition-colors">
+                      <UserPlus className="h-4 w-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">Assign to Expert Helpdesk</div>
+                      <div className="text-xs text-purple-600 opacity-80">Specialized technical review</div>
+                    </div>
+                  </div>
+                </Button>
+                <Button 
+                  onClick={() => {
+                    // Open dialog for zone user assignment
+                    setAssignmentStep('ZONE_USER');
+                    setIsAssignDialogOpen(true);
+                  }}
+                  disabled={!ticket}
+                  variant="outline"
+                  className="w-full justify-start h-12 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border-emerald-200 hover:border-emerald-300 text-emerald-700 hover:text-emerald-800 transition-all duration-200 shadow-sm hover:shadow-md group"
+                >
+                  <div className="flex items-center">
+                    <div className="p-1.5 rounded-full bg-emerald-100 group-hover:bg-emerald-200 mr-3 transition-colors">
+                      <UserPlus className="h-4 w-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">Assign to Zone User</div>
+                      <div className="text-xs text-emerald-600 opacity-80">Zone Manager or Zone User</div>
+                    </div>
+                  </div>
+                </Button>
+                              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
             <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-t-lg border-b p-4 md:p-6">
               <div className="flex flex-col space-y-3">
                 <CardTitle className="text-amber-900 text-base md:text-lg">Details</CardTitle>
@@ -382,147 +505,6 @@ export default function TicketDetailPage() {
                 ) : (
                   <TicketComments ticketId={ticket.id} />
                 )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
-            <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50/50 rounded-t-lg border-b">
-              <CardTitle className="text-emerald-900">Assignment</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-medium">Assignment</h3>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Zone User</span>
-                  <div className="flex items-center">
-                    {ticket.subOwner && ticket.subOwner.role === 'ZONE_USER' ? (
-                      <>
-                        <Avatar className="h-5 w-5 mr-2">
-                          <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                            {ticket.subOwner.name?.charAt(0) || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                          <span>{ticket.subOwner.name || 'No name'}</span>
-                          {ticket.zone?.name && (
-                            <span className="text-xs text-emerald-600 font-medium">Zone: {ticket.zone.name}</span>
-                          )}
-                          {ticket.subOwner.phone && (
-                            <span className="text-xs text-muted-foreground">{ticket.subOwner.phone}</span>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Service Person</span>
-                  <div className="flex items-center">
-                    {ticket.assignedTo && ticket.assignedTo.role === 'SERVICE_PERSON' ? (
-                      <>
-                        <Avatar className="h-5 w-5 mr-2">
-                          <AvatarFallback className="bg-blue-100 text-blue-700">
-                            {ticket.assignedTo.name?.charAt(0) || 'S'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                          <span>{ticket.assignedTo.name || 'No name'}</span>
-                          {ticket.zone?.name && (
-                            <span className="text-xs text-blue-600 font-medium">Zone: {ticket.zone.name}</span>
-                          )}
-                          {ticket.assignedTo.phone && (
-                            <span className="text-xs text-muted-foreground">{ticket.assignedTo.phone}</span>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Zone</span>
-                  <div className="flex items-center">
-                    <MapPin className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                    {ticket.zone?.name || 'No zone assigned'}
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Created By</span>
-                  <div className="flex flex-col">
-                    <span>{ticket.owner?.name || 'System'}</span>
-                    {ticket.owner?.phone && (
-                      <span className="text-xs text-muted-foreground">{ticket.owner.phone}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-4">
-                <div className="text-sm font-medium text-muted-foreground mb-2">Quick Actions</div>
-                <Button 
-                  onClick={() => {
-                    // Open dialog for zone user assignment
-                    setAssignmentStep('ZONE_USER');
-                    setIsAssignDialogOpen(true);
-                  }}
-                  disabled={!ticket}
-                  variant="outline"
-                  className="w-full justify-start h-12 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border-emerald-200 hover:border-emerald-300 text-emerald-700 hover:text-emerald-800 transition-all duration-200 shadow-sm hover:shadow-md group"
-                >
-                  <div className="flex items-center">
-                    <div className="p-1.5 rounded-full bg-emerald-100 group-hover:bg-emerald-200 mr-3 transition-colors">
-                      <UserPlus className="h-4 w-4" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium">Assign to Zone User</div>
-                      <div className="text-xs text-emerald-600 opacity-80">Delegate to zone coordinator</div>
-                    </div>
-                  </div>
-                </Button>
-                <Button 
-                  onClick={async () => {
-                    try {
-                      // Directly open service person selection
-                      const servicePersons = await api.get('/service-persons');
-                      if (servicePersons.data.length === 0) {
-                        toast({
-                          title: 'No Service Persons',
-                          description: 'There are no service persons available for assignment',
-                          variant: 'destructive',
-                        });
-                        return;
-                      }
-                      setAssignmentStep('SERVICE_PERSON');
-                      setIsAssignDialogOpen(true);
-                    } catch (error) {
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to load service persons. Please try again.',
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
-                  disabled={!ticket}
-                  variant="outline"
-                  className="w-full justify-start h-12 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-blue-200 hover:border-blue-300 text-blue-700 hover:text-blue-800 transition-all duration-200 shadow-sm hover:shadow-md group"
-                >
-                  <div className="flex items-center">
-                    <div className="p-1.5 rounded-full bg-blue-100 group-hover:bg-blue-200 mr-3 transition-colors">
-                      <Wrench className="h-4 w-4" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium">Assign to Service Person</div>
-                      <div className="text-xs text-blue-600 opacity-80">Send to field technician</div>
-                    </div>
-                  </div>
-                </Button>
               </div>
             </CardContent>
           </Card>

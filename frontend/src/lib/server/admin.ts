@@ -183,7 +183,6 @@ export async function getZoneUsers(params: {
     const searchParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      role: 'ZONE_USER', // Only fetch users with ZONE_USER role
       ...(search && { search }),
     });
 

@@ -48,7 +48,14 @@ export function DashboardClientWrapper({ children, userRole }: DashboardClientWr
   // Removed loading states to prevent delays
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
+      {/* Animated background elements - more subtle */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#507295]/3 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-blue-200/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
+        <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-indigo-200/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '12s', animationDelay: '4s' }} />
+      </div>
+
       {/* Mobile overlay - only show if sidebar is enabled */}
       {showSidebar && (
         <AnimatePresence>
@@ -93,7 +100,7 @@ export function DashboardClientWrapper({ children, userRole }: DashboardClientWr
       {/* Main content */}
       <div 
         className={cn(
-          "flex flex-col min-h-screen transition-all duration-500 ease-out",
+          "flex flex-col min-h-screen transition-all duration-500 ease-out relative z-10",
           // Conditional margins based on sidebar visibility and user role
           !showSidebar 
             ? "ml-0" // No sidebar for service persons
@@ -111,7 +118,7 @@ export function DashboardClientWrapper({ children, userRole }: DashboardClientWr
           showSidebar={showSidebar}
         />
         
-        <main className="flex-1 overflow-y-auto focus:outline-none bg-gray-50">
+        <main className="flex-1 overflow-y-auto focus:outline-none">
           <div className={cn(
             "min-h-full",
             // Mobile-optimized padding

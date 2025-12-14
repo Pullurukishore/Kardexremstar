@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/user.types';
 import { 
   ArrowLeft, 
   Save, 
@@ -46,6 +48,9 @@ const createZoneUserSchema = z.object({
   phone: z.string().optional(),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
+  role: z.enum(['ZONE_USER', 'ZONE_MANAGER'], {
+    errorMap: () => ({ message: 'Please select a valid role' })
+  }),
   serviceZoneIds: z.array(z.number()).min(1, 'Please select a service zone'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -56,8 +61,41 @@ type CreateZoneUserForm = z.infer<typeof createZoneUserSchema>;
 
 export default function NewZoneUserPage() {
   const router = useRouter();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+
+  // Protect this page - only ADMIN can access
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        router.push('/auth/login?callbackUrl=' + encodeURIComponent('/admin/zone-users/new'));
+        return;
+      }
+      if (user?.role !== UserRole.ADMIN) {
+        router.push('/admin/dashboard');
+        return;
+      }
+    }
+  }, [authLoading, isAuthenticated, user?.role, router]);
+
+  // Show loading state while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated or not admin
+  if (!isAuthenticated || user?.role !== UserRole.ADMIN) {
+    return null;
+  }
   const [serviceZones, setServiceZones] = useState<ServiceZone[]>([]);
   const [selectedZones, setSelectedZones] = useState<number[]>([]);
   const [created, setCreated] = useState(false);
@@ -69,6 +107,7 @@ export default function NewZoneUserPage() {
     handleSubmit,
     formState: { errors },
     setValue,
+    watch,
   } = useForm<CreateZoneUserForm>({
     resolver: zodResolver(createZoneUserSchema),
     defaultValues: {
@@ -77,9 +116,12 @@ export default function NewZoneUserPage() {
       phone: '',
       password: '',
       confirmPassword: '',
+      role: 'ZONE_USER',
       serviceZoneIds: [],
     },
   });
+
+  const selectedRole = watch('role');
 
   // Fetch available service zones
   useEffect(() => {
@@ -132,7 +174,7 @@ export default function NewZoneUserPage() {
         password: data.password,
         serviceZoneIds: selectedZones,
         isActive: true,
-        role: 'ZONE_USER',
+        role: data.role,
       };
 
       const response = await apiClient.post('/zone-users/create-with-zones', payload);
@@ -233,7 +275,7 @@ export default function NewZoneUserPage() {
                 className="text-white hover:bg-white/20 hover:text-white border border-white/30"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Zone Users
+                Back to Zone Users & Managers
               </Button>
             </Link>
             <Badge className="bg-white/20 text-white hover:bg-white/30 border-white/30">
@@ -246,10 +288,10 @@ export default function NewZoneUserPage() {
               <UserPlus className="h-10 w-10" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold mb-2">Create New Zone User</h1>
+              <h1 className="text-4xl font-bold mb-2">Create New Zone User or Manager</h1>
               <p className="text-blue-100 flex items-center gap-2 text-lg">
                 <Building2 className="h-5 w-5" />
-                Add a new user and assign service zones
+                Add a new zone user or manager and assign service zones
               </p>
             </div>
           </div>
@@ -275,7 +317,7 @@ export default function NewZoneUserPage() {
           </Badge>
         </div>
         <MobilePageHeader
-          title="Create Zone User"
+          title="Create Zone User or Manager"
           description="Add a new user and assign service zones"
         />
       </div>
@@ -373,6 +415,81 @@ export default function NewZoneUserPage() {
                 <p className="text-sm text-red-500 flex items-center gap-1">
                   <BadgeIcon className="h-3 w-3" />
                   {errors.phone.message}
+                </p>
+              )}
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-3">
+              <Label htmlFor="role" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <Shield className="h-4 w-4 text-indigo-600" />
+                User Role *
+              </Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="relative">
+                  <input
+                    type="radio"
+                    id="role-zone-user"
+                    value="ZONE_USER"
+                    {...register('role')}
+                    className="sr-only"
+                  />
+                  <label
+                    htmlFor="role-zone-user"
+                    className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedRole === 'ZONE_USER'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-blue-300'
+                    }`}
+                  >
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                      selectedRole === 'ZONE_USER'
+                        ? 'border-blue-500 bg-blue-500'
+                        : 'border-gray-300'
+                    }`}>
+                      {selectedRole === 'ZONE_USER' && <div className="h-2 w-2 bg-white rounded-full" />}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Zone User</p>
+                      <p className="text-xs text-gray-600">Can manage assigned zones</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="radio"
+                    id="role-zone-manager"
+                    value="ZONE_MANAGER"
+                    {...register('role')}
+                    className="sr-only"
+                  />
+                  <label
+                    htmlFor="role-zone-manager"
+                    className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedRole === 'ZONE_MANAGER'
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 bg-white hover:border-purple-300'
+                    }`}
+                  >
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                      selectedRole === 'ZONE_MANAGER'
+                        ? 'border-purple-500 bg-purple-500'
+                        : 'border-gray-300'
+                    }`}>
+                      {selectedRole === 'ZONE_MANAGER' && <div className="h-2 w-2 bg-white rounded-full" />}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Zone Manager</p>
+                      <p className="text-xs text-gray-600">Can manage and oversee zones</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              {errors.role && (
+                <p className="text-sm text-red-500 flex items-center gap-1">
+                  <BadgeIcon className="h-3 w-3" />
+                  {errors.role.message}
                 </p>
               )}
             </div>

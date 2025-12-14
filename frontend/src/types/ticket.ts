@@ -43,7 +43,7 @@ export interface User {
   email: string;
   name?: string;
   phone?: string;
-  role: 'ADMIN' | 'ZONE_USER' | 'SERVICE_PERSON';
+  role: 'ADMIN' | 'ZONE_USER' | 'SERVICE_PERSON' | 'ZONE_MANAGER' | 'EXPERT_HELPDESK' | 'EXTERNAL_USER';
   isActive?: boolean;
 }
 

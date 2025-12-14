@@ -49,6 +49,10 @@ export default function LoginPage() {
         switch (role) {
           case 'ADMIN':
             return '/admin/dashboard';
+          case 'EXPERT_HELPDESK':
+            return '/expert/dashboard';
+          case 'ZONE_MANAGER':
+            return '/zone/dashboard';
           case 'ZONE_USER':
             return '/zone/dashboard';
           case 'SERVICE_PERSON':
@@ -140,12 +144,6 @@ export default function LoginPage() {
         
         // Show success state before redirect
         setLoginSuccess(true);
-        
-        toast({
-          title: "🎉 Login Successful!",
-          description: "Welcome! Redirecting to dashboard...",
-          duration: 3000,
-        });
         
         // Keep success state visible for 2 seconds before redirect
         setTimeout(() => {

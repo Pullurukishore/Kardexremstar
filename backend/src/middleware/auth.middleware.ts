@@ -140,6 +140,7 @@ export const authenticate = async (
           customerId: true,
           isActive: true,
           tokenVersion: true,
+          zoneId: true,
           customer: {
             select: {
               id: true,
@@ -174,6 +175,11 @@ export const authenticate = async (
       });
       
       const zoneIds = serviceZones.map(sz => sz.serviceZoneId);
+      
+      // For ZONE_MANAGER, also include direct zoneId assignment
+      if (user.zoneId && !zoneIds.includes(Number(user.zoneId))) {
+        zoneIds.push(Number(user.zoneId));
+      }
       
       // Create user object with only necessary properties
       const userPayload: AuthUser = {
@@ -288,13 +294,13 @@ export const requireRole = (roles: UserRole | UserRole[]) => {
 // Check if user has any of the required roles
 export const hasAnyRole = (userRole: UserRole, requiredRoles: UserRole[]): boolean => {
   if (userRole === 'ADMIN') return true;
-  if (userRole === 'ZONE_USER' && requiredRoles.includes('SERVICE_PERSON' as UserRole)) return true;
+  if ((userRole === 'ZONE_USER' || userRole === 'ZONE_MANAGER') && requiredRoles.includes('SERVICE_PERSON' as UserRole)) return true;
   return requiredRoles.includes(userRole);
 };
 
 // Check if user can manage tickets
 export const canManageTickets = (userRole: UserRole): boolean => {
-  return ['ADMIN', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole);
+  return ['ADMIN', 'ZONE_MANAGER', 'ZONE_USER', 'SERVICE_PERSON'].includes(userRole);
 };
 
 // Asset management permissions middleware (for route handlers)
@@ -307,12 +313,12 @@ export const canManageAssets = async (req: AuthedRequest, res: Response, next: N
 
     const { role, customerId } = req.user;
 
-    // Admins and ZONE_USERs can manage assets
-    if (role === UserRole.ADMIN || role === UserRole.ZONE_USER) {
+    // Admins, ZONE_MANAGERS, and ZONE_USERs can manage assets
+    if (role === UserRole.ADMIN || role === UserRole.ZONE_MANAGER || role === UserRole.ZONE_USER) {
       return next();
     }
 
-    // Only ADMIN and ZONE_USER can manage assets
+    // Only ADMIN, ZONE_MANAGER, and ZONE_USER can manage assets
     return res.status(403).json({
       success: false,
       error: 'Insufficient permissions to manage assets',

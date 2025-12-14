@@ -138,6 +138,7 @@ export default function ZoneDashboardClient({
       ]);
       
       const transformedData = transformZoneDataToDashboardData(zoneRes.data);
+      
       setZoneDashboardData(zoneRes.data || null);
       setDashboardData(transformedData);
       setStatusDistribution(statusRes.data || { distribution: [] });

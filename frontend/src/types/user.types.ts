@@ -1,8 +1,10 @@
 export enum UserRole {
   ADMIN = 'ADMIN',
+  ZONE_MANAGER = 'ZONE_MANAGER',
   ZONE_USER = 'ZONE_USER',
   SERVICE_PERSON = 'SERVICE_PERSON',
   EXTERNAL_USER = 'EXTERNAL_USER',
+  EXPERT_HELPDESK = 'EXPERT_HELPDESK',
 }
 
 export interface ServiceZone {

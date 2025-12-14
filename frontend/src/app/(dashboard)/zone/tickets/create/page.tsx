@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { Form } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 import api from '@/lib/api/axios';
@@ -50,7 +50,6 @@ type AssetFormValues = z.infer<typeof assetSchema>;
 
 export default function ZoneCreateTicketPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -113,66 +112,54 @@ export default function ZoneCreateTicketPage() {
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
-        // Debug log
         
-        // Check if user has service zones assigned
-        const hasServiceZones = user?.serviceZones && user.serviceZones.length > 0;
-        const userZoneId = user?.zoneId || 
-          (hasServiceZones && user?.serviceZones?.[0]?.serviceZoneId) || 
-          null;
-        
-        // Fetch the zone that the zone user is assigned to
-        if (userZoneId) {
-          // Debug log
-          
+        // For zone managers and zone users, only show their assigned zones
+        if (user?.role === 'ZONE_MANAGER' || user?.role === 'ZONE_USER') {
           try {
-            const response = await api.get(`/service-zones/${userZoneId}`);
-            // Debug log
+            // Fetch all zones
+            const response = await api.get('/service-zones');
             
             if (response.data) {
-              const zoneData = response.data.data || response.data; // Handle both response formats
-              // Debug log
+              // Handle both response formats
+              const allZones = Array.isArray(response.data) ? response.data : 
+                              (response.data.data ? response.data.data : []);
               
-              if (zoneData) {
-                setZones([zoneData]);
-                // Auto-select the zone for zone user
-                form.setValue('zoneId', zoneData.id, { shouldValidate: true });
+              // Filter zones based on user's zoneIds (populated by auth middleware)
+              const userZoneIds = user?.zoneIds || [];
+              const userZones = allZones.filter((zone: any) => userZoneIds.includes(zone.id));
+              
+              if (userZones.length > 0) {
+                setZones(userZones);
+                // Auto-select the first zone
+                form.setValue('zoneId', userZones[0].id, { shouldValidate: true });
                 return; // Exit early on success
               } else {
-                }
-            } else {
+                toast.error('You are not assigned to any service zone. Please contact your administrator.');
+                setZones([]);
+                return;
               }
+            }
           } catch (apiError) {
             // Don't throw here, we'll handle it below with a user-friendly message
           }
-        } 
+        }
         
-        // If we get here, either no zone ID or API call failed
-        const errorMsg = hasServiceZones 
-          ? 'Failed to load service zone details. Please try again.'
-          : 'You are not assigned to any service zone. Please contact your administrator.';
-          
-        toast({
-          title: 'Error',
-          description: errorMsg,
-          variant: 'destructive',
-        });
+        // If we get here, zones failed to load
+        toast.error('Failed to load service zones. Please try again.');
         setZones([]);
       } catch (error: any) {
-        const errorMessage = error.response?.data?.message || 'Failed to load service zone. Please try again.';
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          variant: 'destructive',
-        });
+        const errorMessage = error.response?.data?.message || 'Failed to load service zones. Please try again.';
+        toast.error(errorMessage);
         setZones([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchInitialData();
-  }, [user]);
+    if (user) {
+      fetchInitialData();
+    }
+  }, [user, form, toast]);
 
   // Watch all required fields for validation
   const zoneId = form.watch('zoneId');
@@ -221,11 +208,7 @@ export default function ZoneCreateTicketPage() {
         setContacts([]);
         setAssets([]);
       } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to load customers for your zone. Please try again.',
-          variant: 'destructive',
-        });
+        toast.error('Failed to load customers for your zone. Please try again.');
         setCustomers([]);
       } finally {
         setIsLoadingCustomers(false);
@@ -260,21 +243,13 @@ export default function ZoneCreateTicketPage() {
     try {
       updateCustomerData();
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update customer data. Please try again.',
-        variant: 'destructive',
-      });
+      toast.error('Failed to update customer data. Please try again.');
     }
   }, [customerId, form, customers, toast]);
 
   const handleCreateAsset = async (values: AssetFormValues) => {
     if (!customerId) {
-      toast({
-        title: 'Error',
-        description: 'Please select a customer first',
-        variant: 'destructive',
-      });
+      toast.error('Please select a customer first');
       return;
     }
 
@@ -292,11 +267,11 @@ export default function ZoneCreateTicketPage() {
       form.setValue('assetId', newAsset.id.toString());
       assetForm.reset();
       setIsAddAssetOpen(false);
-      toast({ title: 'Success', description: `Asset "${newAsset.model}" has been created and selected.` });
+      toast.success(`Asset "${newAsset.model}" has been created and selected.`);
     } catch (error: any) {
       let errorMessage = 'Failed to create asset. Please try again.';
       if (error.response?.data?.message) errorMessage = error.response.data.message;
-      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      toast.error(errorMessage);
     } finally {
       setIsCreatingAsset(false);
     }
@@ -304,11 +279,7 @@ export default function ZoneCreateTicketPage() {
 
   const handleCreateContact = async (values: ContactFormValues) => {
     if (!customerId) {
-      toast({
-        title: 'Error',
-        description: 'Please select a customer first',
-        variant: 'destructive',
-      });
+      toast.error('Please select a customer first');
       return;
     }
 
@@ -326,11 +297,11 @@ export default function ZoneCreateTicketPage() {
       form.setValue('contactId', newContact.id.toString());
       contactForm.reset();
       setIsAddContactOpen(false);
-      toast({ title: 'Success', description: `Contact "${newContact.name}" has been created and selected.` });
+      toast.success(`Contact "${newContact.name}" has been created and selected.`);
     } catch (error: any) {
       let errorMessage = 'Failed to create contact. Please try again.';
       if (error.response?.data?.message) errorMessage = error.response.data.message;
-      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      toast.error(errorMessage);
     } finally {
       setIsCreatingContact(false);
     }
@@ -359,13 +330,7 @@ export default function ZoneCreateTicketPage() {
       const selectedCustomer = customers.find(c => c.id === parseInt(values.customerId));
       const selectedZone = zones.find(z => z.id === values.zoneId);
 
-      toast({
-        title: '🎉 Ticket Created Successfully!',
-        description: `Ticket #${ticketData.id || 'New'} has been created for ${selectedCustomer?.companyName || 'customer'} in ${selectedZone?.name || 'your zone'}. Redirecting...`,
-        duration: 3000,
-      });
-
-      form.reset({ priority: 'MEDIUM' });
+      toast.success(`🎉 Ticket Created Successfully!\nWelcome! Redirecting to tickets page...\n${selectedCustomer?.companyName || 'customer'} in ${selectedZone?.name || 'your zone'}.`);
       setTimeout(() => {
         router.push('/zone/tickets');
         router.refresh();
@@ -380,12 +345,7 @@ export default function ZoneCreateTicketPage() {
         errorMessage = error.message;
       }
 
-      toast({
-        title: '❌ Error Creating Ticket',
-        description: errorMessage,
-        variant: 'destructive',
-        duration: 5000,
-      });
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

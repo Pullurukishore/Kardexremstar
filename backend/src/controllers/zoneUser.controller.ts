@@ -25,18 +25,32 @@ export const listZoneUsers = async (req: Request, res: Response) => {
 
     // Build where clause for search
     const whereClause: any = {
-      // Filter by role - default to ZONE_USER if not specified
-      role: role || 'ZONE_USER',
+      // Filter by role - include both ZONE_USER and ZONE_MANAGER
+      role: {
+        in: role ? [role] : ['ZONE_USER', 'ZONE_MANAGER']
+      },
       serviceZones: {
         some: {} // Only users who have zone assignments
       }
     };
 
+    console.log('Querying zone users with roles:', role ? [role] : ['ZONE_USER', 'ZONE_MANAGER']);
+
     if (search) {
-      whereClause.email = {
-        contains: search,
-        mode: 'insensitive'
-      };
+      whereClause.OR = [
+        {
+          email: {
+            contains: search,
+            mode: 'insensitive'
+          }
+        },
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive'
+          }
+        }
+      ];
     }
 
     const [users, total] = await Promise.all([
@@ -68,6 +82,8 @@ export const listZoneUsers = async (req: Request, res: Response) => {
       }),
       prisma.user.count({ where: whereClause })
     ]);
+
+    console.log(`Found ${total} zone users/managers. Roles in result:`, users.map(u => ({ id: u.id, email: u.email, role: u.role })));
 
     const totalPages = Math.ceil(total / limit);
 

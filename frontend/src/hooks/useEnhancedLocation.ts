@@ -36,7 +36,7 @@ export interface UseEnhancedLocationOptions {
 export const useEnhancedLocation = (options: UseEnhancedLocationOptions = {}) => {
   const {
     maxAccuracy = 100, // Reduced to 100m for better coordinate validation
-    maxRetries = 5, // 5 GPS attempts before manual entry
+    maxRetries = 3, // 3 GPS attempts before manual entry
     timeout = 15000,
     autoCapture = false,
     enableJumpDetection = true,
@@ -161,14 +161,16 @@ export const useEnhancedLocation = (options: UseEnhancedLocationOptions = {}) =>
               helpfulTip = "Check if location services are enabled";
             }
             
+            console.log(`[Location] Attempt ${attempt}/${maxRetries} failed - ${failureReason}, ${remainingAttempts} remaining`);
+            
             toast({
               title: `🔄 GPS Attempt ${attempt}/${maxRetries} Failed`,
               description: `${failureReason}. ${helpfulTip}. ${remainingAttempts} attempts remaining.`,
               variant: "destructive",
             });
             
-            // Wait a moment before retry to give user time to move
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Faster retry - 500ms wait instead of 2 seconds
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             // Continue to next attempt
             continue;
@@ -209,14 +211,16 @@ export const useEnhancedLocation = (options: UseEnhancedLocationOptions = {}) =>
             helpfulTip = "Check if location services are enabled on your device";
           }
           
+          console.log(`[Location] Attempt ${attempt}/${maxRetries} error - ${errorReason}, ${remainingAttempts} remaining`);
+          
           toast({
             title: `⚠️ GPS Attempt ${attempt}/${maxRetries} Error`,
             description: `${errorReason}. ${helpfulTip}. ${remainingAttempts} attempts remaining.`,
             variant: "destructive",
           });
           
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Faster retry - 500ms wait instead of 2 seconds
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           // Continue to next attempt
           continue;
@@ -241,10 +245,13 @@ export const useEnhancedLocation = (options: UseEnhancedLocationOptions = {}) =>
         }
       });
 
-      if (response.data.success) {
+      // Handle both response formats: wrapped {success, data} and direct data
+      const geocodingData = response.data.success ? response.data.data : response.data;
+      
+      if (geocodingData && geocodingData.address) {
         // Check coordinate validation from geocoding service
-        const coordinateValidation = response.data.data.coordinateValidation;
-        let finalAddress = response.data.data.address;
+        const coordinateValidation = geocodingData.coordinateValidation;
+        let finalAddress = geocodingData.address;
         
         // If coordinate validation failed, use coordinates as address
         if (coordinateValidation && !coordinateValidation.isValid) {
@@ -268,7 +275,8 @@ export const useEnhancedLocation = (options: UseEnhancedLocationOptions = {}) =>
         };
       }
     } catch (error) {
-      }
+      // Silently fail and fallback to coordinates
+    }
 
     // Fallback to coordinates if geocoding fails
     return {

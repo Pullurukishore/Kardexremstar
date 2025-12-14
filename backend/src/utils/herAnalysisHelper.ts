@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/db';
 import { differenceInMinutes } from 'date-fns';
-
-const prisma = new PrismaClient();
 
 // Business hours configuration
 const BUSINESS_START_HOUR = 9; // 9:00 AM
@@ -21,33 +19,33 @@ const SLA_HOURS_BY_PRIORITY: Record<string, number> = {
 function calculateBusinessHours(startDate: Date, endDate: Date): number {
   let businessHours = 0;
   let currentDate = new Date(startDate);
-  
+
   while (currentDate < endDate) {
     const dayOfWeek = currentDate.getDay();
-    
+
     // Skip Sundays (0)
     if (WORKING_DAYS.includes(dayOfWeek)) {
       const dayStart = new Date(currentDate);
       dayStart.setHours(BUSINESS_START_HOUR, 0, 0, 0);
-      
+
       const dayEnd = new Date(currentDate);
       dayEnd.setHours(BUSINESS_END_HOUR, BUSINESS_END_MINUTE, 0, 0);
-      
+
       // Calculate overlap with business hours for this day
       const periodStart = new Date(Math.max(currentDate.getTime(), dayStart.getTime()));
       const periodEnd = new Date(Math.min(endDate.getTime(), dayEnd.getTime()));
-      
+
       if (periodStart < periodEnd) {
         const hoursThisDay = (periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60);
         businessHours += hoursThisDay;
       }
     }
-    
+
     // Move to next day
     currentDate.setDate(currentDate.getDate() + 1);
     currentDate.setHours(0, 0, 0, 0);
   }
-  
+
   return businessHours;
 }
 
@@ -56,36 +54,36 @@ function calculateHerDeadline(createdAt: Date, priority: string): Date {
   const slaHours = SLA_HOURS_BY_PRIORITY[priority] || SLA_HOURS_BY_PRIORITY['LOW'];
   let remainingHours = slaHours;
   let currentDate = new Date(createdAt);
-  
+
   // If ticket created outside business hours, start from next business day
   const dayOfWeek = currentDate.getDay();
   const hour = currentDate.getHours();
   const minute = currentDate.getMinutes();
-  
-  if (!WORKING_DAYS.includes(dayOfWeek) || 
-      hour < BUSINESS_START_HOUR || 
-      (hour > BUSINESS_END_HOUR) || 
-      (hour === BUSINESS_END_HOUR && minute > BUSINESS_END_MINUTE)) {
+
+  if (!WORKING_DAYS.includes(dayOfWeek) ||
+    hour < BUSINESS_START_HOUR ||
+    (hour > BUSINESS_END_HOUR) ||
+    (hour === BUSINESS_END_HOUR && minute > BUSINESS_END_MINUTE)) {
     // Move to next business day at 9 AM
     do {
       currentDate.setDate(currentDate.getDate() + 1);
       currentDate.setHours(BUSINESS_START_HOUR, 0, 0, 0);
     } while (!WORKING_DAYS.includes(currentDate.getDay()));
   }
-  
+
   // Add business hours to find deadline
   while (remainingHours > 0) {
     const dayOfWeek = currentDate.getDay();
-    
+
     if (WORKING_DAYS.includes(dayOfWeek)) {
       const dayStart = new Date(currentDate);
       dayStart.setHours(BUSINESS_START_HOUR, 0, 0, 0);
-      
+
       const dayEnd = new Date(currentDate);
       dayEnd.setHours(BUSINESS_END_HOUR, BUSINESS_END_MINUTE, 0, 0);
-      
+
       const availableHoursToday = Math.max(0, (dayEnd.getTime() - Math.max(currentDate.getTime(), dayStart.getTime())) / (1000 * 60 * 60));
-      
+
       if (remainingHours <= availableHoursToday) {
         // Deadline is today
         currentDate.setTime(currentDate.getTime() + (remainingHours * 60 * 60 * 1000));
@@ -95,12 +93,12 @@ function calculateHerDeadline(createdAt: Date, priority: string): Date {
         remainingHours -= availableHoursToday;
       }
     }
-    
+
     // Move to next day
     currentDate.setDate(currentDate.getDate() + 1);
     currentDate.setHours(BUSINESS_START_HOUR, 0, 0, 0);
   }
-  
+
   return currentDate;
 }
 
@@ -121,11 +119,11 @@ export async function getHerAnalysisData(whereClause: any, startDate: Date, endD
     const priority = ticket.priority || 'LOW';
     const herHours = SLA_HOURS_BY_PRIORITY[priority] || SLA_HOURS_BY_PRIORITY['LOW'];
     const herDeadline = calculateHerDeadline(ticket.createdAt, priority);
-    
+
     let actualResolutionHours: number | undefined;
     let businessHoursUsed = 0;
     let isHerBreached = false;
-    
+
     if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
       // Calculate actual resolution time in business hours
       businessHoursUsed = calculateBusinessHours(ticket.createdAt, ticket.updatedAt);
@@ -136,7 +134,7 @@ export async function getHerAnalysisData(whereClause: any, startDate: Date, endD
       businessHoursUsed = calculateBusinessHours(ticket.createdAt, new Date());
       isHerBreached = new Date() > herDeadline;
     }
-    
+
     return {
       id: ticket.id,
       title: ticket.title,
@@ -160,11 +158,11 @@ export async function getHerAnalysisData(whereClause: any, startDate: Date, endD
   const herCompliantTickets = herTickets.filter(t => !t.isHerBreached).length;
   const herBreachedTickets = herTickets.filter(t => t.isHerBreached).length;
   const complianceRate = totalTickets > 0 ? (herCompliantTickets / totalTickets) * 100 : 100;
-  
-  const averageHerHours = totalTickets > 0 
-    ? herTickets.reduce((sum, t) => sum + t.herHours, 0) / totalTickets 
+
+  const averageHerHours = totalTickets > 0
+    ? herTickets.reduce((sum, t) => sum + t.herHours, 0) / totalTickets
     : 0;
-  
+
   const resolvedTickets = herTickets.filter(t => t.actualResolutionHours !== undefined);
   const averageActualHours = resolvedTickets.length > 0
     ? resolvedTickets.reduce((sum, t) => sum + (t.actualResolutionHours || 0), 0) / resolvedTickets.length
@@ -176,7 +174,7 @@ export async function getHerAnalysisData(whereClause: any, startDate: Date, endD
     const priorityTickets = herTickets.filter(t => t.priority === priority);
     const priorityCompliant = priorityTickets.filter(t => !t.isHerBreached);
     const priorityBreached = priorityTickets.filter(t => t.isHerBreached);
-    
+
     priorityBreakdown[priority] = {
       total: priorityTickets.length,
       compliant: priorityCompliant.length,

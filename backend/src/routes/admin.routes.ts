@@ -89,37 +89,45 @@ router.get('/zone-users', authMiddleware(['ADMIN']), async (req, res) => {
 });
 
 // User Management Routes (Admin only)
+// IMPORTANT: Put specific routes before parameterized routes to avoid conflicts
+// Get users with optional role filter - this must come before /:id route
 router.get('/users', authenticate, (req, res, next) => {
   const authReq = req as any;
   return getUsers(authReq, res).catch(next);
 });
 
+// Create user
 router.post('/users', authenticate, (req, res, next) => {
   const authReq = req as any;
   return createUser(authReq, res).catch(next);
 });
 
-router.get('/users/:id', authenticate, (req, res, next) => {
+// Get user by ID - this comes after the specific /users route
+router.get('/:id', authenticate, (req, res, next) => {
   const authReq = req as any;
   return getUserById(authReq, res).catch(next);
 });
 
-router.put('/users/:id', authenticate, (req, res, next) => {
+// Update user by ID
+router.put('/:id', authenticate, (req, res, next) => {
   const authReq = req as any;
   return updateUser(authReq, res).catch(next);
 });
 
-router.delete('/users/:id', authenticate, (req, res, next) => {
+// Delete user by ID
+router.delete('/:id', authenticate, (req, res, next) => {
   const authReq = req as any;
   return deleteUser(authReq, res).catch(next);
 });
 
-router.post('/users/:id/reset-password', authenticate, (req, res, next) => {
+// Reset user password by ID
+router.post('/:id/reset-password', authenticate, (req, res, next) => {
   const authReq = req as any;
   return resetUserPassword(authReq, res).catch(next);
 });
 
-router.patch('/users/:id/toggle-status', authenticate, (req, res, next) => {
+// Toggle user status by ID
+router.patch('/:id/toggle-status', authenticate, (req, res, next) => {
   const authReq = req as any;
   return toggleUserStatus(authReq, res).catch(next);
 });

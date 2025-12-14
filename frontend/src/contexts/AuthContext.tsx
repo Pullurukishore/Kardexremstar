@@ -719,6 +719,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
           // Clear without domain
           document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+          // Also clear with max-age=0
+          document.cookie = `${cookieName}=; path=/; max-age=0`;
         });
 
         // Also try the deleteCookie function
@@ -734,6 +736,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Clear all cookies as a last resort
         clearAllCookies();
+        
+        // Final explicit clear for userRole
+        document.cookie = 'userRole=; path=/; max-age=0';
+        document.cookie = 'userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       } catch (e) {
         // Cookie clear error
       }

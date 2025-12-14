@@ -93,8 +93,7 @@ export default function ZoneUserClient({
         params: {
           page: newPage,
           search: search,
-          limit: pagination.itemsPerPage,
-          role: 'ZONE_USER'
+          limit: pagination.itemsPerPage
         }
       });
 
@@ -125,6 +124,10 @@ export default function ZoneUserClient({
     switch (role) {
       case 'ADMIN':
         return 'default';
+      case 'ZONE_MANAGER':
+        return 'default';
+      case 'ZONE_USER':
+        return 'secondary';
       case 'SERVICE_PERSON':
         return 'secondary';
       case 'CUSTOMER':
@@ -141,8 +144,7 @@ export default function ZoneUserClient({
         params: {
           page: currentPage,
           limit: 20,
-          search: search || undefined,
-          role: 'ZONE_USER'
+          search: search || undefined
         }
       });
 
@@ -247,10 +249,10 @@ export default function ZoneUserClient({
             <div>
               <CardTitle className="text-gray-800 flex items-center gap-2">
                 <Users className="h-5 w-5 text-cyan-600" />
-                Zone Users ({filteredZoneUsers.length})
+                Zone Users & Managers ({filteredZoneUsers.length})
               </CardTitle>
               <CardDescription>
-                Manage users assigned to service zones and their permissions
+                Manage zone users and zone managers assigned to service zones and their permissions
               </CardDescription>
             </div>
             <Button
@@ -271,9 +273,9 @@ export default function ZoneUserClient({
               <div className="mx-auto h-24 w-24 rounded-full bg-gradient-to-br from-cyan-100 to-blue-100 flex items-center justify-center mb-4">
                 <Users className="h-12 w-12 text-cyan-500" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No zone users found</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No zone users or managers found</h3>
               <p className="text-gray-500 mb-6">
-                Get started by assigning users to service zones.
+                Get started by assigning zone users and managers to service zones.
               </p>
               <Link href="/admin/zone-users/new">
                 <Button className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 shadow-lg">
@@ -323,6 +325,7 @@ export default function ZoneUserClient({
                             variant={getRoleBadgeVariant(user.role)}
                             className={
                               user.role === 'ADMIN' ? 'bg-orange-100 text-orange-800 hover:bg-orange-200' :
+                              user.role === 'ZONE_MANAGER' ? 'bg-purple-100 text-purple-800 hover:bg-purple-200' :
                               user.role === 'ZONE_USER' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
                               'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }

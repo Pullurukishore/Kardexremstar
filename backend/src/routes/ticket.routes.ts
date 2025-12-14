@@ -68,7 +68,15 @@ const priorityValues = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 router.get(
   '/',
   [
-    query('status').optional().isIn(statusValues),
+    query('status').optional().custom((value: any) => {
+      if (!value) return true;
+      const statuses = (value as string).split(',').map(s => s.trim());
+      const invalidStatuses = statuses.filter(s => !statusValues.includes(s));
+      if (invalidStatuses.length > 0) {
+        throw new Error(`Invalid status values: ${invalidStatuses.join(', ')}`);
+      }
+      return true;
+    }),
     query('priority').optional().isIn(priorityValues),
     query('assignedToId').optional().isInt().toInt(),
     query('customerId').optional().isInt().toInt(),
@@ -76,7 +84,7 @@ router.get(
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'ZONE_MANAGER', 'EXTERNAL_USER', 'EXPERT_HELPDESK']),
   getTickets
 );
 
@@ -87,7 +95,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid ticket ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'ZONE_MANAGER', 'EXTERNAL_USER', 'EXPERT_HELPDESK']),
   getTicket
 );
 
@@ -98,7 +106,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid ticket ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   getTicketActivity
 );
 
@@ -115,7 +123,7 @@ router.post(
     body('assignedToId').optional().isInt().toInt(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER', 'EXPERT_HELPDESK']),
   createTicket
 );
 
@@ -131,7 +139,7 @@ router.patch(
     body('internalNotes').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   updateStatus
 );
 
@@ -148,7 +156,7 @@ router.patch(
     body('note').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   assignTicket
 );
 
@@ -163,7 +171,7 @@ router.patch(
       .toInt(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   assignToZoneUser
 );
 
@@ -181,7 +189,7 @@ router.patch(
       .isISO8601().withMessage('visitPlannedDate must be a valid date'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'ZONE_USER']),
+  requireRole(['ADMIN', 'ZONE_USER', 'EXPERT_HELPDESK']),
   planOnsiteVisit
 );
 
@@ -196,7 +204,7 @@ router.patch(
     body('sparePartsDetails').optional().isArray(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   completeOnsiteVisit
 );
 
@@ -210,7 +218,7 @@ router.post(
     body('notes').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   requestPO
 );
 
@@ -223,7 +231,7 @@ router.patch(
     body('notes').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN']),
+  requireRole(['ADMIN', 'EXPERT_HELPDESK']),
   approvePO
 );
 
@@ -238,7 +246,7 @@ router.patch(
     body('details').optional().isArray(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   updateSparePartsStatus
 );
 
@@ -251,7 +259,7 @@ router.patch(
     body('rating').optional().isInt({ min: 1, max: 5 }),
     validateRequest
   ],
-  requireRole(['ADMIN', 'ZONE_USER']),
+  requireRole(['ADMIN', 'ZONE_USER', 'EXPERT_HELPDESK']),
   closeTicket
 );
 
@@ -263,7 +271,7 @@ router.post(
     body('content').trim().notEmpty().withMessage('Note content is required'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   addNote
 );
 
@@ -274,7 +282,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid ticket ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER', 'EXPERT_HELPDESK']),
   getTicketComments
 );
 
@@ -286,7 +294,7 @@ router.post(
     body('content').trim().notEmpty().withMessage('Comment content is required'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXTERNAL_USER', 'EXPERT_HELPDESK']),
   addTicketComment
 );
 
@@ -298,7 +306,7 @@ router.post(
     param('id').isInt().toInt().withMessage('Invalid ticket ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   uploadTicketReports
 );
 
@@ -309,7 +317,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid ticket ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   getTicketReports
 );
 
@@ -321,7 +329,7 @@ router.get(
     param('reportId').isInt().toInt().withMessage('Invalid report ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   downloadTicketReport
 );
 
@@ -333,7 +341,7 @@ router.delete(
     param('reportId').isInt().toInt().withMessage('Invalid report ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   deleteTicketReport
 );
 
@@ -350,7 +358,7 @@ router.patch(
     body('plannedDate').optional().isISO8601().withMessage('Planned date must be valid'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   startOnsiteVisit
 );
 
@@ -364,7 +372,7 @@ router.patch(
     body('address').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   reachOnsiteLocation
 );
 
@@ -379,7 +387,7 @@ router.patch(
     body('workDescription').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   startOnsiteWork
 );
 
@@ -395,7 +403,7 @@ router.patch(
     body('isFullyResolved').optional().isBoolean(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   resolveOnsiteWork
 );
 
@@ -408,7 +416,7 @@ router.patch(
     body('expectedResolutionDate').optional().isISO8601(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   markOnsiteVisitPending
 );
 
@@ -423,7 +431,7 @@ router.patch(
     body('completionNotes').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   completeOnsiteVisitAndReturn
 );
 
@@ -435,7 +443,7 @@ router.patch(
     body('notes').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'EXPERT_HELPDESK']),
   updatePOReached
 );
 
@@ -446,7 +454,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid ticket ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   getOnsiteVisitTracking
 );
 
@@ -464,7 +472,7 @@ router.patch(
     body('address').optional().trim(),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   updateStatusWithLifecycle
 );
 
@@ -475,7 +483,7 @@ router.get(
     param('id').isInt().toInt().withMessage('Invalid ticket ID'),
     validateRequest
   ],
-  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   getTicketPhotos
 );
 

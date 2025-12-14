@@ -542,6 +542,20 @@ export const adminAttendanceController = {
             },
             include: {
               ActivityStage: {
+                select: {
+                  id: true,
+                  stage: true,
+                  startTime: true,
+                  endTime: true,
+                  duration: true,
+                  location: true,
+                  latitude: true,
+                  longitude: true,
+                  notes: true,
+                  metadata: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
                 orderBy: {
                   startTime: 'asc',
                 },
@@ -637,6 +651,31 @@ export const adminAttendanceController = {
             },
           });
 
+          // Transform activity logs to extract photos and location data from metadata
+          const transformedActivityLogs = activityLogs.map((activity: any) => ({
+            ...activity,
+            ActivityStage: activity.ActivityStage?.map((stage: any) => ({
+              ...stage,
+              // Extract accuracy and locationSource from metadata if not present as direct fields
+              accuracy: stage.accuracy ?? stage.metadata?.accuracy,
+              locationSource: stage.locationSource ?? stage.metadata?.locationSource,
+              photos: (stage.metadata?.photos || []).map((photo: any) => {
+                // Handle different photo object structures
+                // Photos can come as dataUrl (base64), cloudinaryUrl, url, or thumbnailUrl
+                const photoUrl = photo.cloudinaryUrl || photo.url || photo.thumbnailUrl || photo.dataUrl || '';
+                return {
+                  id: photo.id || Math.random(),
+                  filename: photo.filename || photo.name || 'photo',
+                  cloudinaryUrl: photoUrl,
+                  url: photoUrl, // Include both for compatibility
+                  thumbnailUrl: photo.thumbnailUrl || photoUrl,
+                  dataUrl: photo.dataUrl, // Include dataUrl if available
+                  createdAt: photo.createdAt || photo.timestamp || stage.createdAt || new Date().toISOString(),
+                };
+              }),
+            })) || [],
+          }));
+
           // Create synthetic absent attendance record
           const absentAttendance = {
             id: id,
@@ -654,7 +693,10 @@ export const adminAttendanceController = {
             notes: 'No attendance record for this date',
             createdAt: new Date(),
             updatedAt: new Date(),
-            user: userWithActivities,
+            user: {
+              ...userWithActivities,
+              activityLogs: transformedActivityLogs,
+            },
             gaps: [], // No gaps for absent records
             auditLogs,
           };
@@ -715,6 +757,20 @@ export const adminAttendanceController = {
         },
         include: {
           ActivityStage: {
+            select: {
+              id: true,
+              stage: true,
+              startTime: true,
+              endTime: true,
+              duration: true,
+              location: true,
+              latitude: true,
+              longitude: true,
+              notes: true,
+              metadata: true,
+              createdAt: true,
+              updatedAt: true,
+            },
             orderBy: {
               startTime: 'asc',
             },
@@ -819,7 +875,8 @@ export const adminAttendanceController = {
                   'ACTIVITY_LOG_UPDATED',
                   'ACTIVITY_STAGE_UPDATED',
                   'TICKET_STATUS_CHANGED',
-                  'AUTO_CHECKOUT_PERFORMED'
+                  'AUTO_CHECKOUT_PERFORMED',
+                  'MANUAL_CHECKOUT_PERFORMED'
                 ],
               },
             },
@@ -839,8 +896,37 @@ export const adminAttendanceController = {
         },
       });
 
+      // Transform activity logs to extract photos and location data from metadata
+      const transformedActivityLogs = attendanceWithActivities.user.activityLogs.map((activity: any) => ({
+        ...activity,
+        ActivityStage: activity.ActivityStage?.map((stage: any) => ({
+          ...stage,
+          // Extract accuracy and locationSource from metadata if not present as direct fields
+          accuracy: stage.accuracy ?? stage.metadata?.accuracy,
+          locationSource: stage.locationSource ?? stage.metadata?.locationSource,
+          photos: (stage.metadata?.photos || []).map((photo: any) => {
+            // Handle different photo object structures
+            // Photos can come as dataUrl (base64), cloudinaryUrl, url, or thumbnailUrl
+            const photoUrl = photo.cloudinaryUrl || photo.url || photo.thumbnailUrl || photo.dataUrl || '';
+            return {
+              id: photo.id || Math.random(),
+              filename: photo.filename || photo.name || 'photo',
+              cloudinaryUrl: photoUrl,
+              url: photoUrl, // Include both for compatibility
+              thumbnailUrl: photo.thumbnailUrl || photoUrl,
+              dataUrl: photo.dataUrl, // Include dataUrl if available
+              createdAt: photo.createdAt || photo.timestamp || stage.createdAt || new Date().toISOString(),
+            };
+          }),
+        })) || [],
+      }));
+
       res.json({
         ...attendanceWithActivities,
+        user: {
+          ...attendanceWithActivities.user,
+          activityLogs: transformedActivityLogs,
+        },
         gaps,
         auditLogs,
       });

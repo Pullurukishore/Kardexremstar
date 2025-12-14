@@ -1,19 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Import lightweight components directly
 import ExecutiveHeader from './ExecutiveHeader';
 import ExecutiveSummaryCards from './ExecutiveSummaryCards';
-import QuickStatsAlerts from './QuickStatsAlerts';
 import RecentTickets from './RecentTickets';
 
 // Import heavy components dynamically
 import {
-  DynamicFieldServiceAnalytics,
-  DynamicPerformanceAnalytics,
   DynamicAdvancedAnalytics,
   DynamicZonePerformanceAnalytics,
 } from './DynamicDashboardComponents';
@@ -21,22 +18,6 @@ import {
 // Import types
 import type { DashboardData, StatusDistribution, TrendsData } from '@/components/dashboard/types';
 import api from '@/lib/api/axios';
-
-// Client-side only components
-const RefreshButton = ({ onRefresh, isRefreshing }: { onRefresh: () => void, isRefreshing: boolean }) => (
-  <button
-    onClick={onRefresh}
-    disabled={isRefreshing}
-    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md ${
-      isRefreshing 
-        ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
-        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-    }`}
-  >
-    <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-    {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
-  </button>
-);
 
 interface DashboardClientProps {
   initialDashboardData: Partial<DashboardData>;
@@ -54,6 +35,27 @@ export default function DashboardClient({
   const [ticketTrends, setTicketTrends] = useState<TrendsData>(initialTicketTrends);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Monitor online status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success('Connection restored');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.error('Connection lost');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -70,6 +72,7 @@ export default function DashboardClient({
       setStatusDistribution(statusRes.data || { distribution: [] });
       setTicketTrends(trendsRes.data || { trends: [] });
       
+      toast.success('Dashboard data refreshed');
       return true;
     } catch (err) {
       setError('Failed to load dashboard data. Please try again.');
@@ -81,8 +84,6 @@ export default function DashboardClient({
   };
 
   useEffect(() => {
-    // Only fetch if initial data is empty or missing critical fields
-    // This prevents duplicate fetching since we already have SSR data
     const hasValidInitialData = 
       initialDashboardData && 
       initialDashboardData.stats && 
@@ -92,10 +93,12 @@ export default function DashboardClient({
       fetchDashboardData();
     }
     
-    // Set up auto-refresh every 5 minutes
+    // Auto-refresh every 5 minutes
     const refreshInterval = setInterval(() => {
-      fetchDashboardData();
-    }, 5 * 60 * 1000); // 5 minutes
+      if (isOnline) {
+        fetchDashboardData();
+      }
+    }, 5 * 60 * 1000);
     
     return () => clearInterval(refreshInterval);
   }, []);
@@ -106,38 +109,28 @@ export default function DashboardClient({
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-3 sm:p-4 md:p-8 flex flex-col items-center justify-center">
-        <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-md max-w-2xl w-full text-center">
-          <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-red-100">
-            <svg
-              className="h-5 w-5 sm:h-6 sm:w-6 text-red-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-              />
-            </svg>
-          </div>
-          <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-medium text-gray-900">Error loading dashboard</h3>
-          <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-            {error}
-          </p>
-          <div className="mt-4 sm:mt-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4 sm:p-6 md:p-8 flex flex-col items-center justify-center">
+        <div className="relative overflow-hidden bg-white/80 backdrop-blur-xl p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl shadow-2xl max-w-lg w-full text-center border border-white/50">
+          <div className="absolute -top-16 -right-16 w-32 h-32 bg-red-200/30 rounded-full blur-3xl" />
+          <div className="absolute -bottom-12 -left-12 w-28 h-28 bg-blue-200/30 rounded-full blur-3xl" />
+          
+          <div className="relative z-10">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-pink-600 shadow-xl mb-6">
+              <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-3">Error loading dashboard</h3>
+            <p className="text-sm sm:text-base text-slate-600 leading-relaxed mb-6">{error}</p>
             <button
               type="button"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-base font-semibold text-white shadow-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
             >
               {isRefreshing ? (
                 <>
-                  <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                  <RefreshCw className="h-5 w-5 animate-spin" />
                   Refreshing...
                 </>
               ) : (
@@ -151,43 +144,53 @@ export default function DashboardClient({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6 lg:p-8 overflow-x-hidden w-full max-w-full">
-      <div className="w-full max-w-full overflow-x-hidden">
-        {/* Executive Header - Always visible */}
-        <ExecutiveHeader 
-          onRefresh={handleRefresh} 
-          isRefreshing={isRefreshing} 
-        />
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50/80 to-indigo-100/80 p-4 sm:p-6 md:p-8 lg:p-10 overflow-x-hidden w-full max-w-full">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-gradient-to-br from-blue-200/30 to-cyan-200/20 rounded-full blur-3xl" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-gradient-to-br from-purple-200/25 to-pink-200/15 rounded-full blur-3xl" style={{ animationDuration: '10s', animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-indigo-200/20 to-blue-200/10 rounded-full blur-3xl" style={{ animationDuration: '12s', animationDelay: '4s' }} />
+      </div>
 
-        {/* Initial loading state */}
-        {isRefreshing && (
-          <div className="fixed top-3 right-3 sm:top-4 sm:right-4 z-50">
-            <div className="flex items-center gap-2 bg-white px-3 sm:px-4 py-2 rounded-full shadow-lg">
-              <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 animate-spin text-indigo-600" />
-              <span className="text-xs sm:text-sm font-medium text-gray-700">Updating data...</span>
+      <div className="relative z-10 w-full max-w-full overflow-x-hidden">
+        {/* Connection Status Indicator */}
+        {!isOnline && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+            <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 text-white px-5 py-2.5 rounded-full shadow-lg shadow-red-500/30 border border-red-400/30">
+              <WifiOff className="w-4 h-4" />
+              <span className="text-sm font-semibold">Offline Mode</span>
             </div>
           </div>
         )}
 
-        {/* Executive Summary Cards - Critical above-the-fold content */}
+        {/* Refresh Indicator */}
+        {isRefreshing && (
+          <div className="fixed top-4 right-4 z-50">
+            <div className="flex items-center gap-2.5 bg-white/95 backdrop-blur-xl px-4 py-2.5 rounded-full shadow-xl border border-slate-200/50">
+              <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
+              <span className="text-sm font-semibold text-slate-700">Syncing...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Executive Header */}
+        <ExecutiveHeader 
+          onRefresh={handleRefresh} 
+          isRefreshing={isRefreshing}
+          stats={{
+            totalCustomers: dashboardData?.adminStats?.totalCustomers,
+            totalServicePersons: dashboardData?.adminStats?.totalServicePersons,
+            totalServiceZones: dashboardData?.adminStats?.totalServiceZones,
+          }}
+        />
+
+        {/* Executive Summary Cards - All metrics consolidated here */}
         <ExecutiveSummaryCards 
           dashboardData={dashboardData} 
         />
 
-        {/* Lazy-loaded analytics components */}
-        <div className="mb-6 sm:mb-8">
-          <DynamicFieldServiceAnalytics 
-            dashboardData={dashboardData} 
-          />
-        </div>
-
-        <div className="mb-6 sm:mb-8">
-          <DynamicPerformanceAnalytics 
-            dashboardData={dashboardData} 
-          />
-        </div>
-
-        <div className="mb-6 sm:mb-8">
+        {/* Advanced Analytics - Status Distribution & Trends */}
+        <div className="mb-8 sm:mb-10">
           <DynamicAdvancedAnalytics 
             dashboardData={dashboardData}
             statusDistribution={statusDistribution}
@@ -196,20 +199,25 @@ export default function DashboardClient({
           />
         </div>
 
-        <div className="mb-6 sm:mb-8">
+        {/* Recent Tickets */}
+        <div className="mb-8 sm:mb-10">
           <RecentTickets 
             dashboardData={dashboardData} 
             loading={isRefreshing}
           />
         </div>
 
-        <div className="mb-6 sm:mb-8">
+        {/* Zone Performance Analytics */}
+        <div className="mb-8 sm:mb-10">
           <DynamicZonePerformanceAnalytics 
             dashboardData={dashboardData} 
             onRefresh={handleRefresh} 
             isRefreshing={isRefreshing} 
           />
         </div>
+
+        {/* Footer Spacer */}
+        <div className="h-8" />
       </div>
     </div>
   );
