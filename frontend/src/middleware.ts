@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const refreshToken = request.cookies.get('refreshToken')?.value;
   const userRole = request.cookies.get('userRole')?.value as UserRole | undefined;
-  
+
   // Use fallback token logic like other parts of the app
   const authToken = accessToken || token;
 
@@ -33,9 +33,9 @@ export async function middleware(request: NextRequest) {
     try {
       const body = await requestClone.text();
       if (body) {
-        }
-    } catch (error) {
       }
+    } catch (error) {
+    }
 
     // Skip authentication check for PIN auth endpoints
     const pinAuthEndpoints = [
@@ -43,7 +43,7 @@ export async function middleware(request: NextRequest) {
       '/api/auth/pin-status',
       '/api/auth/generate-pin'
     ];
-    
+
     const isPinAuthEndpoint = pinAuthEndpoints.some(endpoint => pathname === endpoint);
 
     // Block access to API routes if not authenticated (except PIN auth endpoints)
@@ -74,17 +74,23 @@ export async function middleware(request: NextRequest) {
   if (!shouldRedirectToLogin(pathname)) {
     return NextResponse.next();
   }
-  
+
   // Special handling for root path - let client-side routing handle it
   if (pathname === '/') {
     return NextResponse.next();
   }
 
   // Require authentication for protected routes
-  if (!authToken || !refreshToken) {
-    const loginUrl = new URL('/auth/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
+  // Only redirect if both access token AND refresh token are missing
+  // If we have a valid access token, allow the request even without refresh token
+  if (!authToken) {
+    // No access token at all - check if we have refresh token to try refreshing
+    if (!refreshToken) {
+      const loginUrl = new URL('/auth/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    // Has refresh token but no access token - let the page load and the client will refresh
   }
 
   // Check if user has access to the requested route

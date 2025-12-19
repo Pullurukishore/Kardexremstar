@@ -155,7 +155,7 @@ export class TargetController {
 
       // Get ALL zones first
       const whereZones: any = { isActive: true };
-      
+
       // For zone users, only show their zone
       if ((req.user?.role === 'ZONE_USER' || req.user?.role === 'ZONE_MANAGER') && req.user?.zoneId) {
         whereZones.id = parseInt(req.user.zoneId.toString());
@@ -175,7 +175,7 @@ export class TargetController {
         targetPeriod: targetPeriod as string,
         periodType: periodType as any
       };
-      
+
       if ((req.user?.role === 'ZONE_USER' || req.user?.role === 'ZONE_MANAGER') && req.user?.zoneId) {
         whereTargets.serviceZoneId = parseInt(req.user.zoneId.toString());
       }
@@ -203,12 +203,12 @@ export class TargetController {
       const targetsWithActuals = await Promise.all(
         allZones.map(async (zone: any) => {
           const zoneTargets = targetsByZone.get(zone.id) || [];
-          
+
           // Calculate actual performance for this zone
           // Use actualValuePeriod for monthly view, otherwise use targetPeriod
           const actualPeriod = actualValuePeriod as string || targetPeriod as string;
           const actualPeriodType = actualValuePeriod ? 'MONTHLY' : periodType as string;
-          
+
           // Skip if trying to use yearly period with monthly period type
           if (actualPeriodType === 'MONTHLY' && !actualPeriod.includes('-')) {
             return {
@@ -225,7 +225,7 @@ export class TargetController {
               targetCount: 0
             };
           }
-          
+
           const actual = await TargetController.getZoneActualPerformance(
             zone.id,
             actualPeriod,
@@ -281,7 +281,7 @@ export class TargetController {
       // If grouped, aggregate by zone
       if (grouped === 'true') {
         const groupedTargets: any = {};
-        
+
         targetsWithActuals.forEach((target) => {
           const key = target.serviceZoneId;
           if (!groupedTargets[key]) {
@@ -313,14 +313,14 @@ export class TargetController {
           const displayTargetValue = isMonthlyView ? Math.round(t.targetValue / 12) : t.targetValue;
           const variance = t.actualValue - displayTargetValue;
           const variancePercentage = displayTargetValue > 0 ? (variance / displayTargetValue) * 100 : 0;
-          
+
           // Get comprehensive metrics for this zone
           const metrics = await TargetController.getZoneMetrics(
             t.serviceZoneId,
             t.targetPeriod,
             t.periodType
           );
-          
+
           // Calculate achievement percentages
           const achievement = displayTargetValue > 0 ? (t.actualValue / displayTargetValue) * 100 : 0;
           const expectedAchievement = displayTargetValue > 0 ? (metrics.expectedOffers / displayTargetValue) * 100 : 0;
@@ -366,7 +366,7 @@ export class TargetController {
           // Use actualValuePeriod for monthly view, otherwise use target's period
           const actualPeriod = actualValuePeriod as string || target.targetPeriod;
           const actualPeriodType = actualValuePeriod ? 'MONTHLY' : target.periodType;
-          
+
           // Skip if trying to use yearly period with monthly period type
           if (actualPeriodType === 'MONTHLY' && !actualPeriod.includes('-')) {
             const isMonthlyView = actualValuePeriod && String(actualValuePeriod).includes('-');
@@ -388,7 +388,7 @@ export class TargetController {
               serviceZone: target.serviceZone
             };
           }
-          
+
           const actual = await TargetController.getZoneActualPerformance(
             target.serviceZoneId,
             actualPeriod,
@@ -504,7 +504,7 @@ export class TargetController {
   }
 
   // ==================== USER TARGETS ====================
-  
+
   /**
    * Set or update user target
    */
@@ -600,11 +600,11 @@ export class TargetController {
       }
 
       // Get ALL active zone users and zone managers
-      const whereUsers: any = { 
+      const whereUsers: any = {
         isActive: true,
         role: { in: ['ZONE_USER', 'ZONE_MANAGER'] }
       };
-      
+
       // For zone managers viewing their zone, also include zone manager targets
       if ((req.user?.role === 'ZONE_USER' || req.user?.role === 'ZONE_MANAGER') && req.user?.zoneId) {
         whereUsers.serviceZones = {
@@ -623,10 +623,10 @@ export class TargetController {
 
       const allUsers = await prisma.user.findMany({
         where: whereUsers,
-        select: { 
-          id: true, 
-          name: true, 
-          email: true, 
+        select: {
+          id: true,
+          name: true,
+          email: true,
           role: true,
           serviceZones: {
             select: {
@@ -644,7 +644,7 @@ export class TargetController {
         targetPeriod: targetPeriod as string,
         periodType: periodType as any
       };
-      
+
       if ((req.user?.role === 'ZONE_USER' || req.user?.role === 'ZONE_MANAGER') && req.user?.zoneId) {
         whereTargets.user = {
           serviceZones: {
@@ -659,10 +659,10 @@ export class TargetController {
         where: whereTargets,
         include: {
           user: {
-            select: { 
-              id: true, 
-              name: true, 
-              email: true, 
+            select: {
+              id: true,
+              name: true,
+              email: true,
               role: true,
               serviceZones: {
                 select: {
@@ -690,12 +690,12 @@ export class TargetController {
       const targetsWithActuals = await Promise.all(
         allUsers.map(async (user: any) => {
           const userTargets = targetsByUser.get(user.id) || [];
-          
+
           // Calculate actual performance for this user
           // Use actualValuePeriod for monthly view, otherwise use targetPeriod
           const actualPeriod = actualValuePeriod as string || targetPeriod as string;
           const actualPeriodType = actualValuePeriod ? 'MONTHLY' : periodType as string;
-          
+
           // Skip if trying to use yearly period with monthly period type
           if (actualPeriodType === 'MONTHLY' && !actualPeriod.includes('-')) {
             return {
@@ -712,7 +712,7 @@ export class TargetController {
               targetCount: 0
             };
           }
-          
+
           const actual = await TargetController.getUserActualPerformance(
             user.id,
             actualPeriod,
@@ -768,7 +768,7 @@ export class TargetController {
       // If grouped, aggregate by user
       if (grouped === 'true') {
         const groupedTargets: any = {};
-        
+
         targetsWithActuals.forEach((target) => {
           const key = target.userId;
           if (!groupedTargets[key]) {
@@ -799,18 +799,18 @@ export class TargetController {
           const displayTargetValue = isMonthlyView ? Math.round(t.targetValue / 12) : t.targetValue;
           const variance = t.actualValue - displayTargetValue;
           const variancePercentage = displayTargetValue > 0 ? (variance / displayTargetValue) * 100 : 0;
-          
+
           // Get comprehensive metrics for this user
           const metrics = await TargetController.getUserMetrics(
             t.userId,
             t.targetPeriod,
             t.periodType
           );
-          
+
           // Calculate achievement percentage (user-specific only)
           const achievement = displayTargetValue > 0 ? (t.actualValue / displayTargetValue) * 100 : 0;
           const expectedAchievement = displayTargetValue > 0 ? (metrics.expectedOffers / displayTargetValue) * 100 : 0;
-          
+
           return {
             id: t.id,
             userId: t.userId,
@@ -852,7 +852,7 @@ export class TargetController {
           // Use actualValuePeriod for monthly view, otherwise use target's period
           const actualPeriod = actualValuePeriod as string || target.targetPeriod;
           const actualPeriodType = actualValuePeriod ? 'MONTHLY' : target.periodType;
-          
+
           // Skip if trying to use yearly period with monthly period type
           if (actualPeriodType === 'MONTHLY' && !actualPeriod.includes('-')) {
             const isMonthlyView = actualValuePeriod && String(actualValuePeriod).includes('-');
@@ -874,7 +874,7 @@ export class TargetController {
               user: target.user
             };
           }
-          
+
           const actual = await TargetController.getUserActualPerformance(
             target.userId,
             actualPeriod,
@@ -990,7 +990,7 @@ export class TargetController {
   }
 
   // ==================== PRODUCT TYPE TARGETS ====================
-  
+
   // ==================== ANALYTICS & DASHBOARD ====================
 
   /**
@@ -1045,7 +1045,7 @@ export class TargetController {
 
       // Get all product types from the system
       const dateFilter = TargetController.buildDateFilter(targetPeriod as string, periodType as string);
-      
+
       // All possible product types from the enum
       const allPossibleProductTypes = [
         'RELOCATION',
@@ -1063,7 +1063,7 @@ export class TargetController {
       const offerProductTypes = await prisma.offer.findMany({
         where: {
           zoneId: serviceZoneId,
-          stage: { in: ['WON', 'PO_RECEIVED', 'ORDER_BOOKED'] },
+          stage: { in: ['WON', 'PO_RECEIVED'] },
           OR: [
             { poDate: { gte: dateFilter.gte, lte: dateFilter.lte } },
             { bookingDateInSap: { gte: dateFilter.gte, lte: dateFilter.lte } },
@@ -1085,7 +1085,7 @@ export class TargetController {
       allPossibleProductTypes.forEach(pt => allProductTypesSet.add(pt));
       offerProductTypes.forEach(pt => allProductTypesSet.add(pt.productType));
       targetProductTypes.forEach(pt => allProductTypesSet.add(pt.productType));
-      
+
       const allProductTypes = Array.from(allProductTypesSet)
         .sort((a, b) => {
           // Sort with 'Overall' first, then alphabetically
@@ -1159,8 +1159,8 @@ export class TargetController {
         totalActualValue: targetDetails.reduce((sum, t) => sum + t.actualValue, 0),
         totalAchievement: 0
       };
-      summary.totalAchievement = summary.totalTargetValue > 0 
-        ? (summary.totalActualValue / summary.totalTargetValue) * 100 
+      summary.totalAchievement = summary.totalTargetValue > 0
+        ? (summary.totalActualValue / summary.totalTargetValue) * 100
         : 0;
 
       return res.json({
@@ -1201,9 +1201,9 @@ export class TargetController {
       // Get user info
       const user = await prisma.user.findUnique({
         where: { id: uid },
-        select: { 
-          id: true, 
-          name: true, 
+        select: {
+          id: true,
+          name: true,
           email: true,
           serviceZones: {
             select: {
@@ -1245,7 +1245,7 @@ export class TargetController {
 
       // Get all product types from the system
       const dateFilter = TargetController.buildDateFilter(targetPeriod as string, periodType as string);
-      
+
       // All possible product types from the enum
       const allPossibleProductTypes = [
         'RELOCATION',
@@ -1263,7 +1263,7 @@ export class TargetController {
       const offerProductTypes = await prisma.offer.findMany({
         where: {
           createdById: uid,
-          stage: { in: ['WON', 'PO_RECEIVED', 'ORDER_BOOKED'] },
+          stage: { in: ['WON', 'PO_RECEIVED'] },
           OR: [
             { poDate: { gte: dateFilter.gte, lte: dateFilter.lte } },
             { bookingDateInSap: { gte: dateFilter.gte, lte: dateFilter.lte } },
@@ -1285,7 +1285,7 @@ export class TargetController {
       allPossibleProductTypes.forEach(pt => allProductTypesSet.add(pt));
       offerProductTypes.forEach(pt => allProductTypesSet.add(pt.productType));
       targetProductTypes.forEach(pt => allProductTypesSet.add(pt.productType));
-      
+
       const allProductTypes = Array.from(allProductTypesSet)
         .sort((a, b) => {
           // Sort with 'Overall' first, then alphabetically
@@ -1359,8 +1359,8 @@ export class TargetController {
         totalActualValue: targetDetails.reduce((sum, t) => sum + t.actualValue, 0),
         totalAchievement: 0
       };
-      summary.totalAchievement = summary.totalTargetValue > 0 
-        ? (summary.totalActualValue / summary.totalTargetValue) * 100 
+      summary.totalAchievement = summary.totalTargetValue > 0
+        ? (summary.totalActualValue / summary.totalTargetValue) * 100
         : 0;
 
       return res.json({
@@ -1449,11 +1449,11 @@ export class TargetController {
       );
 
       // Calculate overall statistics
-      const totalTargetValue = 
+      const totalTargetValue =
         zonePerformance.reduce((sum, z) => sum + z.targetValue, 0) +
         userPerformance.reduce((sum, u) => sum + u.targetValue, 0);
 
-      const totalActualValue = 
+      const totalActualValue =
         zonePerformance.reduce((sum, z) => sum + z.actualValue, 0) +
         userPerformance.reduce((sum, u) => sum + u.actualValue, 0);
 
@@ -1532,21 +1532,14 @@ export class TargetController {
       // Build where clause using correct period fields
       const whereClause: any = {
         zoneId: serviceZoneId,
-        stage: { in: ['WON', 'PO_RECEIVED', 'ORDER_BOOKED'] },
+        stage: { in: ['WON', 'PO_RECEIVED'] },
         ...(productType ? { productType } : {}),
         OR: [
           // PO-based stages: use poDate
           {
             AND: [
-              { stage: { in: ['PO_RECEIVED', 'ORDER_BOOKED'] } },
+              { stage: 'PO_RECEIVED' },
               { poDate: { gte: startDate, lte: endDate } },
-            ],
-          },
-          // ORDER_BOOKED: prefer bookingDateInSap when available
-          {
-            AND: [
-              { stage: 'ORDER_BOOKED' },
-              { bookingDateInSap: { gte: startDate, lte: endDate } },
             ],
           },
           // WON stage: use offerClosedInCrm
@@ -1559,11 +1552,13 @@ export class TargetController {
           // Fallback: if above dates missing, use createdAt
           {
             AND: [
-              { OR: [
-                { poDate: null },
-                { offerClosedInCrm: null },
-                { bookingDateInSap: null },
-              ] },
+              {
+                OR: [
+                  { poDate: null },
+                  { offerClosedInCrm: null },
+                  { bookingDateInSap: null },
+                ]
+              },
               { createdAt: { gte: startDate, lte: endDate } },
             ],
           },
@@ -1584,22 +1579,22 @@ export class TargetController {
         },
       });
 
-    // Filter and calculate actual performance
-    let totalValue = 0;
-    let count = 0;
+      // Filter and calculate actual performance
+      let totalValue = 0;
+      let count = 0;
 
-    for (const offer of offers) {
-      const value = offer.poValue ? Number(offer.poValue) : (offer.offerValue ? Number(offer.offerValue) : 0);
-      if (value > 0) {
-        totalValue += value;
-        count++;
+      for (const offer of offers) {
+        const value = offer.poValue ? Number(offer.poValue) : (offer.offerValue ? Number(offer.offerValue) : 0);
+        if (value > 0) {
+          totalValue += value;
+          count++;
+        }
       }
-    }
 
-    return {
-      value: totalValue,
-      count: count
-    };
+      return {
+        value: totalValue,
+        count: count
+      };
     } catch (error: any) {
       logger.error(`Error getting zone actual performance: ${error.message}`, { serviceZoneId, targetPeriod, periodType, productType });
       return { value: 0, count: 0 };
@@ -1653,19 +1648,13 @@ export class TargetController {
 
       const whereClause: any = {
         createdById: userId,
-        stage: { in: ['WON', 'PO_RECEIVED', 'ORDER_BOOKED'] },
+        stage: { in: ['WON', 'PO_RECEIVED'] },
         ...(productType ? { productType } : {}),
         OR: [
           {
             AND: [
-              { stage: { in: ['PO_RECEIVED', 'ORDER_BOOKED'] } },
+              { stage: 'PO_RECEIVED' },
               { poDate: { gte: startDate, lte: endDate } },
-            ],
-          },
-          {
-            AND: [
-              { stage: 'ORDER_BOOKED' },
-              { bookingDateInSap: { gte: startDate, lte: endDate } },
             ],
           },
           {
@@ -1676,11 +1665,13 @@ export class TargetController {
           },
           {
             AND: [
-              { OR: [
-                { poDate: null },
-                { offerClosedInCrm: null },
-                { bookingDateInSap: null },
-              ] },
+              {
+                OR: [
+                  { poDate: null },
+                  { offerClosedInCrm: null },
+                  { bookingDateInSap: null },
+                ]
+              },
               { createdAt: { gte: startDate, lte: endDate } },
             ],
           },
@@ -1701,28 +1692,28 @@ export class TargetController {
         }
       });
 
-    // Filter and calculate actual performance
-    let totalValue = 0;
-    let count = 0;
+      // Filter and calculate actual performance
+      let totalValue = 0;
+      let count = 0;
 
-    for (const offer of offers) {
-      // Only count offers that are in successful stages
-      if (['WON', 'PO_RECEIVED', 'ORDER_BOOKED'].includes(offer.stage)) {
-        // Use poValue if available, otherwise use offerValue (but not both)
-        const value = offer.poValue ? Number(offer.poValue) : 
-                     (offer.offerValue ? Number(offer.offerValue) : 0);
-        
-        if (value > 0) {
-          totalValue += value;
-          count++;
+      for (const offer of offers) {
+        // Only count offers that are in successful stages
+        if (['WON', 'PO_RECEIVED'].includes(offer.stage)) {
+          // Use poValue if available, otherwise use offerValue (but not both)
+          const value = offer.poValue ? Number(offer.poValue) :
+            (offer.offerValue ? Number(offer.offerValue) : 0);
+
+          if (value > 0) {
+            totalValue += value;
+            count++;
+          }
         }
       }
-    }
 
-    return {
-      value: totalValue,
-      count: count
-    };
+      return {
+        value: totalValue,
+        count: count
+      };
     } catch (error: any) {
       logger.error(`Error getting user actual performance: ${error.message}`, { userId, targetPeriod, periodType, productType });
       return { value: 0, count: 0 };
@@ -1739,30 +1730,30 @@ export class TargetController {
         logger.error(`Invalid monthly period format: ${targetPeriod}. Expected YYYY-MM`);
         throw new Error(`Invalid monthly period format: ${targetPeriod}. Expected YYYY-MM`);
       }
-      
+
       const parts = targetPeriod.split('-');
       if (parts.length !== 2) {
         logger.error(`Invalid monthly period format: ${targetPeriod}. Expected YYYY-MM`);
         throw new Error(`Invalid monthly period format: ${targetPeriod}. Expected YYYY-MM`);
       }
-      
+
       const year = parseInt(parts[0]);
       const month = parseInt(parts[1]);
-      
+
       if (isNaN(year) || isNaN(month) || month < 1 || month > 12 || year < 1900 || year > 2100) {
         logger.error(`Invalid date values: year=${year}, month=${month} from period=${targetPeriod}`);
         throw new Error(`Invalid date values in period: ${targetPeriod}`);
       }
-      
+
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
-      
+
       // Validate the created dates
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         logger.error(`Failed to create valid dates from period: ${targetPeriod}`);
         throw new Error(`Failed to create valid dates from period: ${targetPeriod}`);
       }
-      
+
       return {
         gte: startDate,
         lte: endDate
@@ -1770,21 +1761,21 @@ export class TargetController {
     } else {
       // Format: "YYYY"
       const year = parseInt(targetPeriod);
-      
+
       if (isNaN(year) || year < 1900 || year > 2100) {
         logger.error(`Invalid yearly period: ${targetPeriod}. Expected YYYY`);
         throw new Error(`Invalid yearly period: ${targetPeriod}. Expected YYYY`);
       }
-      
+
       const startDate = new Date(year, 0, 1);
       const endDate = new Date(year, 11, 31, 23, 59, 59);
-      
+
       // Validate the created dates
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         logger.error(`Failed to create valid dates from year: ${year}`);
         throw new Error(`Failed to create valid dates from year: ${year}`);
       }
-      
+
       return {
         gte: startDate,
         lte: endDate
@@ -1818,6 +1809,7 @@ export class TargetController {
           stage: true,
           offerValue: true,
           poValue: true,
+          poDate: true,
           bookingDateInSap: true,
           probabilityPercentage: true,
           poExpectedMonth: true
@@ -1828,7 +1820,7 @@ export class TargetController {
       // For YEARLY: match all months in the year (e.g., "2025-01" to "2025-12" for period "2025")
       // For MONTHLY: match exact month (e.g., "2025-11" for period "2025-11")
       let expectedMonthFilter: any;
-      
+
       if (periodType === 'YEARLY') {
         // For yearly, match all months starting with the year (e.g., "2025-")
         expectedMonthFilter = {
@@ -1860,32 +1852,32 @@ export class TargetController {
       // Calculate metrics
       const totalOffers = offers.length;
       const totalOffersValue = offers.reduce((sum, o) => sum + (Number(o.offerValue) || 0), 0);
-      
+
       // Orders Received = WON stage offers (count)
       const ordersReceived = offers.filter(o => o.stage === 'WON').length;
-      
+
       // Orders Received Value = Sum of WON stage offer values
       const ordersReceivedValue = offers
         .filter(o => o.stage === 'WON')
         .reduce((sum, o) => sum + (Number(o.offerValue) || 0), 0);
-      
+
       // Open Funnel = Offers Value – Orders Received Value (CORRECT FORMULA)
       const openFunnel = totalOffersValue - ordersReceivedValue;
-      
+
       // Expected Offers = Sum of (Offer Value × Probability / 100) WHERE Probability > 50% AND poExpectedMonth matches period
       const offersWithHighProbability = offersWithExpectedMonth.filter(o => (o.probabilityPercentage || 0) > 50);
       const expectedOffers = offersWithHighProbability
         .reduce((sum, o) => sum + (Number(o.offerValue) || 0) * ((Number(o.probabilityPercentage) || 0) / 100), 0);
-      
+
       // YTD (Year-to-Date) - orders booked in current year
       const currentYear = new Date().getFullYear();
       const ytdStart = new Date(currentYear, 0, 1);
       const ytdEnd = new Date(currentYear, 11, 31, 23, 59, 59);
-      const orderBookingYTD = offers.filter(o => 
-        o.stage === 'ORDER_BOOKED' && 
-        o.bookingDateInSap && 
-        new Date(o.bookingDateInSap) >= ytdStart && 
-        new Date(o.bookingDateInSap) <= ytdEnd
+      const orderBookingYTD = offers.filter(o =>
+        (o.stage === 'WON' || o.stage === 'PO_RECEIVED') &&
+        o.poDate &&
+        new Date(o.poDate) >= ytdStart &&
+        new Date(o.poDate) <= ytdEnd
       ).length;
 
       return {
@@ -1935,6 +1927,7 @@ export class TargetController {
           stage: true,
           offerValue: true,
           poValue: true,
+          poDate: true,
           bookingDateInSap: true,
           probabilityPercentage: true,
           poExpectedMonth: true
@@ -1943,7 +1936,7 @@ export class TargetController {
 
       // Get offers with expected PO month matching the period (for expectedOffers calculation)
       let expectedMonthFilter: any;
-      
+
       if (periodType === 'YEARLY') {
         // For yearly, match all months starting with the year (e.g., "2025-")
         expectedMonthFilter = {
@@ -1974,32 +1967,32 @@ export class TargetController {
       // Calculate metrics
       const totalOffers = offers.length;
       const totalOffersValue = offers.reduce((sum, o) => sum + (Number(o.offerValue) || 0), 0);
-      
+
       // Orders Received = WON stage offers (count)
       const ordersReceived = offers.filter(o => o.stage === 'WON').length;
-      
+
       // Orders Received Value = Sum of WON stage offer values
       const ordersReceivedValue = offers
         .filter(o => o.stage === 'WON')
         .reduce((sum, o) => sum + (Number(o.offerValue) || 0), 0);
-      
+
       // Open Funnel = Offers Value – Orders Received Value
       const openFunnel = totalOffersValue - ordersReceivedValue;
-      
+
       // Expected Offers = Sum of (Offer Value × Probability / 100) WHERE Probability > 50% AND poExpectedMonth matches period
       const offersWithHighProbability = offersWithExpectedMonth.filter(o => (o.probabilityPercentage || 0) > 50);
       const expectedOffers = offersWithHighProbability
         .reduce((sum, o) => sum + (Number(o.offerValue) || 0) * ((Number(o.probabilityPercentage) || 0) / 100), 0);
-      
+
       // YTD (Year-to-Date) - orders booked in current year
       const currentYear = new Date().getFullYear();
       const ytdStart = new Date(currentYear, 0, 1);
       const ytdEnd = new Date(currentYear, 11, 31, 23, 59, 59);
-      const orderBookingYTD = offers.filter(o => 
-        o.stage === 'ORDER_BOOKED' && 
-        o.bookingDateInSap && 
-        new Date(o.bookingDateInSap) >= ytdStart && 
-        new Date(o.bookingDateInSap) <= ytdEnd
+      const orderBookingYTD = offers.filter(o =>
+        (o.stage === 'WON' || o.stage === 'PO_RECEIVED') &&
+        o.poDate &&
+        new Date(o.poDate) >= ytdStart &&
+        new Date(o.poDate) <= ytdEnd
       ).length;
 
       return {
@@ -2072,13 +2065,13 @@ export class TargetController {
           // First try monthly targets, then fall back to yearly/12
           const monthlyZoneTargets = monthlyTargets.filter(t => t.serviceZoneId === zone.id);
           let totalTarget = monthlyZoneTargets.reduce((sum, t) => sum + Number(t.targetValue), 0);
-          
+
           // If no monthly targets, use yearly targets divided by 12
           if (totalTarget === 0) {
             const yearlyZoneTargets = yearlyTargetsForMonthly.filter(t => t.serviceZoneId === zone.id);
             totalTarget = yearlyZoneTargets.reduce((sum, t) => sum + Math.round(Number(t.targetValue) / 12), 0);
           }
-          
+
           const actual = await TargetController.getZoneActualPerformance(
             zone.id,
             currentMonthPeriod,
@@ -2116,7 +2109,7 @@ export class TargetController {
         allZones.map(async (zone) => {
           const zoneTargets = yearlyTargets.filter(t => t.serviceZoneId === zone.id);
           const totalTarget = zoneTargets.reduce((sum, t) => sum + Number(t.targetValue), 0);
-          
+
           const actual = await TargetController.getZoneActualPerformance(
             zone.id,
             currentYearPeriod,
@@ -2167,15 +2160,15 @@ export class TargetController {
           // Monthly - with fallback to yearly/12
           const monthlyTargetsForPT = monthlyTargets.filter(t => t.productType === productType);
           let monthlyTargetValue = monthlyTargetsForPT.reduce((sum, t) => sum + Number(t.targetValue), 0);
-          
+
           // If no monthly targets, use yearly targets divided by 12
           if (monthlyTargetValue === 0) {
             const yearlyTargetsForPTFallback = yearlyTargets.filter(t => t.productType === productType);
             monthlyTargetValue = yearlyTargetsForPTFallback.reduce((sum, t) => sum + Math.round(Number(t.targetValue) / 12), 0);
           }
-          
+
           const monthlyActualPT = await Promise.all(
-            allZones.map(zone => 
+            allZones.map(zone =>
               TargetController.getZoneActualPerformance(zone.id, currentMonthPeriod, 'MONTHLY', productType)
             )
           );
@@ -2185,9 +2178,9 @@ export class TargetController {
           // Yearly
           const yearlyTargetsForPT = yearlyTargets.filter(t => t.productType === productType);
           const yearlyTargetValue = yearlyTargetsForPT.reduce((sum, t) => sum + Number(t.targetValue), 0);
-          
+
           const yearlyActualPT = await Promise.all(
-            allZones.map(zone => 
+            allZones.map(zone =>
               TargetController.getZoneActualPerformance(zone.id, currentYearPeriod, 'YEARLY', productType)
             )
           );

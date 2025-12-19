@@ -40,9 +40,8 @@ const OFFER_STAGES = [
   { value: 'INITIAL', label: 'Initial' },
   { value: 'PROPOSAL_SENT', label: 'Proposal Sent' },
   { value: 'NEGOTIATION', label: 'Negotiation' },
-  { value: 'FINAL_APPROVAL', label: 'Final Approval' },
   { value: 'PO_RECEIVED', label: 'PO Received' },
-  { value: 'ORDER_BOOKED', label: 'Order Booked' },
+  // Note: ORDER_BOOKED removed - PO_RECEIVED leads directly to WON
   { value: 'WON', label: 'Won' },
   { value: 'LOST', label: 'Lost' },
 ];
@@ -164,11 +163,11 @@ const ReportsFilters: React.FC<ReportsFiltersProps> = ({
           <Label className="text-sm font-medium text-foreground">Customer</Label>
           <SearchableSelect
             options={customers.map((customer) => ({
-              id: customer.id,
+              id: customer.id.toString(),
               label: customer.companyName,
               searchText: customer.companyName
             }))}
-            value={filters.customerId ? parseInt(filters.customerId) : ''}
+            value={filters.customerId || ''}
             onValueChange={(value) => onFilterChange({ customerId: value ? value.toString() : undefined })}
             placeholder="Select customer..."
             emptyText={isLoadingCustomers ? "Loading customers..." : "No customers found"}

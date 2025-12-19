@@ -34,10 +34,14 @@ router.post('/', requireRole(['SERVICE_PERSON']), async (req: Request, res: Resp
       });
     }
 
-    if (!activityScheduleId) {
+    // Activity types that don't require scheduling (ad-hoc activities)
+    const AD_HOC_ACTIVITY_TYPES = ['WORK_FROM_HOME', 'OTHER', 'BREAK', 'DOCUMENTATION'];
+
+    // Validate that scheduled activity is provided for non-ad-hoc types
+    if (!activityScheduleId && !AD_HOC_ACTIVITY_TYPES.includes(activityType)) {
       return res.status(400).json({
         success: false,
-        message: 'Scheduled activity is required',
+        message: 'Scheduled activity is required for this activity type',
       });
     }
 
@@ -372,6 +376,34 @@ router.post('/:activityId/stages', requireRole(['SERVICE_PERSON']), async (req: 
       },
     });
 
+    // If this is a COMPLETED stage, automatically end the stage and the activity
+    if (stage === 'COMPLETED') {
+      console.log('COMPLETED stage created, auto-ending stage and activity:', activityId);
+
+      // End the COMPLETED stage
+      await prisma.activityStage.update({
+        where: { id: activityStage.id },
+        data: {
+          endTime: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      // End the activity itself
+      await prisma.dailyActivityLog.update({
+        where: { id: parseInt(activityId) },
+        data: {
+          endTime: new Date(),
+          duration: Math.floor(
+            (new Date().getTime() - new Date(activity.startTime).getTime()) /
+            (1000 * 60) // Convert to minutes
+          ),
+        },
+      });
+
+      console.log('Activity auto-ended successfully:', activityId);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Activity stage created successfully',
@@ -444,7 +476,7 @@ router.put('/:activityId/stages/:stageId', requireRole(['SERVICE_PERSON']), asyn
       });
     }
 
-    
+
     if (stage.endTime) {
       console.log('Stage already ended at:', stage.endTime);
       return res.status(400).json({
@@ -492,7 +524,7 @@ router.put('/:activityId/stages/:stageId', requireRole(['SERVICE_PERSON']), asyn
     });
   } catch (error: any) {
     console.error('Error ending activity stage:', error);
-    
+
     // Handle specific Prisma errors
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -500,7 +532,7 @@ router.put('/:activityId/stages/:stageId', requireRole(['SERVICE_PERSON']), asyn
         message: 'Stage not found',
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to end activity stage',
@@ -536,7 +568,7 @@ router.put('/:activityId/complete', requireRole(['SERVICE_PERSON']), async (req:
 
     // Find and update the activity
     const activity = await prisma.dailyActivityLog.findFirst({
-      where: { 
+      where: {
         id: parseInt(activityId),
         userId: user.id // Ensure user can only complete their own activities
       },
@@ -561,7 +593,7 @@ router.put('/:activityId/complete', requireRole(['SERVICE_PERSON']), async (req:
       data: {
         endTime: endTime ? new Date(endTime) : new Date(),
         duration: Math.floor(
-          (new Date(endTime || new Date()).getTime() - new Date(activity.startTime).getTime()) / 
+          (new Date(endTime || new Date()).getTime() - new Date(activity.startTime).getTime()) /
           (1000 * 60) // Convert to minutes
         ),
       },

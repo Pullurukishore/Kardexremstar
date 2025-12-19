@@ -50,7 +50,7 @@ export class OfferController {
   static async getNextOfferReferenceNumber(req: AuthenticatedRequest, res: Response) {
     try {
       const { zoneId, productType } = req.query;
-      
+
       if (!zoneId || !productType) {
         return res.status(400).json({ error: 'Zone ID and product type are required' });
       }
@@ -125,7 +125,7 @@ export class OfferController {
           if (!userShortForm && user.name) {
             // Auto-generate from name (first letter of first two words)
             const nameParts = user.name.trim().split(' ');
-            userShortForm = nameParts.length >= 2 
+            userShortForm = nameParts.length >= 2
               ? (nameParts[0].charAt(0) + nameParts[1].charAt(0)).toUpperCase()
               : nameParts[0].substring(0, 2).toUpperCase();
           } else if (!userShortForm) {
@@ -153,31 +153,31 @@ export class OfferController {
 
           // Generate the new offer reference number
           const newOfferRef = `${companyPrefix}/${zoneAbbr}/${productAbbr}/${userShortForm}${String(nextNumber).padStart(5, '0')}`;
-          
+
           // Double-check uniqueness within the transaction
           const existingWithSameRef = await tx.offer.findUnique({
             where: { offerReferenceNumber: newOfferRef },
             select: { id: true }
           });
-          
+
           if (existingWithSameRef) {
             throw new Error('Generated offer reference number already exists, retrying...');
           }
-          
+
           return newOfferRef;
         });
-        
+
         return result;
-        
+
       } catch (error: any) {
         attempts++;
         logger.warn(`Offer ID generation attempt ${attempts} failed:`, error.message);
-        
+
         if (attempts >= maxRetries) {
           logger.error('Failed to generate unique offer ID after maximum retries');
           throw new Error('Unable to generate unique offer reference number. Please try again.');
         }
-        
+
         // Wait a small random amount before retrying to reduce collision probability
         await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50));
       }
@@ -189,14 +189,14 @@ export class OfferController {
   // Get all offers (filtered by zone for zone users)
   static async getOffers(req: AuthenticatedRequest, res: Response) {
     try {
-      const { 
-        status, 
-        stage, 
-        customerId, 
+      const {
+        status,
+        stage,
+        customerId,
         assignedToId,
-        createdById, 
-        search, 
-        page = 1, 
+        createdById,
+        search,
+        page = 1,
         limit = 20,
         productType,
         offerMonth,
@@ -459,7 +459,7 @@ export class OfferController {
         stage,
         status,
         spareParts,
-        
+
         // Optional fields for later stages
         offerReferenceDate,
         assignedToId,
@@ -476,7 +476,7 @@ export class OfferController {
 
       // Validate required fields
       if (!customerId || !contactId || !zoneId || !productType || !lead) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Missing required fields',
           required: { customerId, contactId, zoneId, productType, lead }
         });
@@ -489,14 +489,14 @@ export class OfferController {
       });
 
       if (!contact) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Contact not found',
-          contactId 
+          contactId
         });
       }
 
       if (contact.customerId !== parseInt(customerId)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Contact does not belong to the selected customer',
           contactCustomerId: contact.customerId,
           selectedCustomerId: parseInt(customerId)
@@ -541,55 +541,55 @@ export class OfferController {
           description: `${productType} offer for ${company}`, // Auto-generate description
           productType,
           lead,
-          
+
           // Customer Information (duplicated for easy access)
           registrationDate: new Date(), // Auto-generate current date
           company,
           location,
           department,
-          
+
           // Contact Information (duplicated for easy access)
           contactPersonName,
           contactNumber,
           email,
-          
+
           // Asset Information (duplicated for easy access)
           machineSerialNumber,
-          
+
           // Relations
           customerId: parseInt(customerId),
           contactId: parseInt(contactId),
           zoneId: parseInt(zoneId),
           assignedToId: assignedToId ? parseInt(assignedToId) : null,
-          
+
           // Financial Information (optional for initial stage)
           offerValue: offerValue ? parseFloat(offerValue) : null,
           offerMonth,
           poExpectedMonth,
           probabilityPercentage: probabilityPercentage ? parseInt(probabilityPercentage) : null,
-          
+
           // PO Information (optional for initial stage)
           poNumber,
           poDate: poDateObj,
           poValue: poValue ? parseFloat(poValue) : null,
           poReceivedMonth,
-          
+
           // Remarks
           remarks: remarks || null,
-          
+
           // Business Information
           openFunnel: true, // Default to true for all new offers
-          
+
           // System Dates
           bookingDateInSap: null,
           offerEnteredInCrm: new Date(),
           offerClosedInCrm: null,
-          
+
           // Status & Progress (use provided values or defaults)
           status: status || 'DRAFT',
           stage: stage || 'INITIAL',
           priority: 'MEDIUM',
-          
+
           // Tracking
           createdById: req.user.id,
           updatedById: req.user.id,
@@ -639,8 +639,20 @@ export class OfferController {
         logger.info(`Created ${sparePartEntries.length} spare part entries for offer ${offer.id}`);
       }
 
-      // TODO: Create offer-asset relationships after schema migration
-      // For now, we'll store asset info in the machineSerialNumber field
+      // Create offer-asset relationships if assetIds provided
+      if (assetIds && Array.isArray(assetIds) && assetIds.length > 0) {
+        const assetEntries = assetIds.map((assetId: number | string) => ({
+          offerId: offer.id,
+          assetId: typeof assetId === 'string' ? parseInt(assetId) : assetId,
+        }));
+
+        await prisma.offerAsset.createMany({
+          data: assetEntries,
+          skipDuplicates: true, // Avoid errors if same asset is linked twice
+        });
+
+        logger.info(`Created ${assetEntries.length} asset links for offer ${offer.id}`);
+      }
 
       // Log offer creation to audit trail
       await ActivityController.logOfferCreate({
@@ -652,7 +664,7 @@ export class OfferController {
         userAgent: req.headers['user-agent'],
       });
 
-      // Fetch the complete offer with spare parts to return
+      // Fetch the complete offer with spare parts and assets to return
       const completeOffer = await prisma.offer.findUnique({
         where: { id: offer.id },
         include: {
@@ -677,6 +689,11 @@ export class OfferController {
               sparePart: true,
             },
           },
+          offerAssets: {
+            include: {
+              asset: true,
+            },
+          },
         },
       });
 
@@ -689,18 +706,18 @@ export class OfferController {
         code: error.code,
         meta: error.meta
       });
-      
+
       // Return more detailed error message for debugging
       if (error.code === 'P2003') {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Foreign key constraint failed',
           details: 'One of the referenced records (customer, contact, zone, etc.) does not exist'
         });
       }
-      
-      res.status(500).json({ 
+
+      res.status(500).json({
         error: 'Failed to create offer',
-        details: error.message 
+        details: error.message
       });
       return;
     }
@@ -739,8 +756,23 @@ export class OfferController {
       const isStageChanging = updates.stage && updates.stage !== existingOffer.stage;
       const hasRemarks = updates.remarks && updates.remarks.trim();
 
-      // If stage is changing and remarks are provided, save stage-specific remarks
-      if (isStageChanging && hasRemarks) {
+      // Check if remarks is JSON quoteData (from quote generation page)
+      // If so, don't create a StageRemark - this is quote metadata, not a stage comment
+      let isQuoteData = false;
+      if (hasRemarks) {
+        try {
+          const parsed = JSON.parse(updates.remarks.trim());
+          if (parsed.quoteData) {
+            isQuoteData = true;
+            logger.info(`Skipping StageRemark creation for offer ${id} - remarks contains quoteData JSON`);
+          }
+        } catch (e) {
+          // Not JSON, treat as regular remarks
+        }
+      }
+
+      // If stage is changing and remarks are provided (and not quoteData), save stage-specific remarks
+      if (isStageChanging && hasRemarks && !isQuoteData) {
         await prisma.stageRemark.create({
           data: {
             offerId: parseInt(id),
@@ -749,13 +781,13 @@ export class OfferController {
             createdById: req.user!.id,
           },
         });
-        
+
         logger.info(`Stage remark saved for offer ${id}, stage: ${updates.stage}`);
-        
+
         // Clear the remarks field after saving to StageRemark to avoid duplication
         updates.remarks = null;
-      } else if (!isStageChanging && hasRemarks) {
-        // If stage is NOT changing but remarks are provided, save for current stage
+      } else if (!isStageChanging && hasRemarks && !isQuoteData) {
+        // If stage is NOT changing but remarks are provided (and not quoteData), save for current stage
         await prisma.stageRemark.create({
           data: {
             offerId: parseInt(id),
@@ -764,11 +796,56 @@ export class OfferController {
             createdById: req.user!.id,
           },
         });
-        
+
         logger.info(`Stage remark updated for offer ${id}, stage: ${existingOffer.stage}`);
-        
+
         // Clear the remarks field after saving to StageRemark
         updates.remarks = null;
+      }
+
+      // Automatic stage transition: PO_RECEIVED -> WON
+      // ORDER_BOOKED stage removed - when PO is received, the deal is won!
+      if (updates.stage === 'PO_RECEIVED' && existingOffer.stage !== 'WON') {
+        logger.info(`Auto-transitioning offer ${id} from PO_RECEIVED to WON`);
+        updates.stage = 'WON';
+        updates.offerClosedInCrm = new Date();
+      }
+
+      // Handle spare parts update if provided
+      if (updates.spareParts && Array.isArray(updates.spareParts)) {
+        // Delete existing spare parts for this offer
+        await prisma.offerSparePart.deleteMany({
+          where: { offerId: parseInt(id) }
+        });
+
+        // Create new spare parts entries if any are provided
+        if (updates.spareParts.length > 0) {
+          const sparePartEntries = updates.spareParts.map((part: any) => {
+            const quantity = parseInt(part.quantity) || 1;
+            const unitPrice = parseFloat(part.unitPrice) || 0;
+            const totalPrice = parseFloat(part.totalPrice) || (quantity * unitPrice);
+
+            return {
+              offerId: parseInt(id),
+              sparePartId: parseInt(part.sparePartId),
+              quantity: quantity,
+              unitPrice: unitPrice,
+              totalPrice: totalPrice,
+              notes: part.notes || null,
+            };
+          });
+
+          await prisma.offerSparePart.createMany({
+            data: sparePartEntries,
+          });
+
+          logger.info(`Updated ${sparePartEntries.length} spare part entries for offer ${id}`);
+        } else {
+          logger.info(`Cleared all spare parts for offer ${id}`);
+        }
+
+        // Remove spareParts from updates as it's not a direct field on Offer model
+        delete updates.spareParts;
       }
 
       const offer = await prisma.offer.update({
@@ -784,6 +861,14 @@ export class OfferController {
           assignedTo: true,
           createdBy: true,
           updatedBy: true,
+          offerSpareParts: {
+            include: {
+              sparePart: true,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
         },
       });
 
@@ -934,8 +1019,8 @@ export class OfferController {
         userAgent: req.headers['user-agent']
       });
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: 'Note added successfully',
         note: {
           content,

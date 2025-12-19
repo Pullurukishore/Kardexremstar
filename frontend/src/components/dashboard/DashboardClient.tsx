@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,6 +36,10 @@ export default function DashboardClient({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
+  
+  // Refs to prevent duplicate API calls (Strict Mode / double render protection)
+  const hasInitialized = useRef(false);
+  const isFetching = useRef(false);
 
   // Monitor online status
   useEffect(() => {
@@ -57,8 +61,15 @@ export default function DashboardClient({
     };
   }, []);
 
-  const fetchDashboardData = async () => {
+  // Memoized fetch function with deduplication
+  const fetchDashboardData = useCallback(async (showToast: boolean = true) => {
+    // Prevent duplicate concurrent fetches
+    if (isFetching.current) {
+      return false;
+    }
+    
     try {
+      isFetching.current = true;
       setIsRefreshing(true);
       setError(null);
       
@@ -72,36 +83,51 @@ export default function DashboardClient({
       setStatusDistribution(statusRes.data || { distribution: [] });
       setTicketTrends(trendsRes.data || { trends: [] });
       
-      toast.success('Dashboard data refreshed');
+      if (showToast) {
+        toast.success('Dashboard data refreshed');
+      }
       return true;
     } catch (err) {
       setError('Failed to load dashboard data. Please try again.');
       toast.error('Failed to refresh dashboard data');
       return false;
     } finally {
+      isFetching.current = false;
       setIsRefreshing(false);
     }
-  };
+  }, []);
 
+  // Initial data fetch - with strict mode protection
   useEffect(() => {
+    // Skip if already initialized (React Strict Mode protection)
+    if (hasInitialized.current) {
+      return;
+    }
+    
     const hasValidInitialData = 
       initialDashboardData && 
       initialDashboardData.stats && 
       Object.keys(initialDashboardData).length > 0;
     
+    // Only fetch if no valid initial data was provided from server
     if (!hasValidInitialData) {
-      fetchDashboardData();
+      hasInitialized.current = true;
+      fetchDashboardData(false); // Don't show toast on initial load
+    } else {
+      hasInitialized.current = true;
     }
-    
-    // Auto-refresh every 5 minutes
+  }, [initialDashboardData, fetchDashboardData]);
+
+  // Auto-refresh every 5 minutes - separate effect for clarity
+  useEffect(() => {
     const refreshInterval = setInterval(() => {
-      if (isOnline) {
-        fetchDashboardData();
+      if (isOnline && !isFetching.current) {
+        fetchDashboardData(false); // Silent refresh
       }
     }, 5 * 60 * 1000);
     
     return () => clearInterval(refreshInterval);
-  }, []);
+  }, [isOnline, fetchDashboardData]);
 
   const handleRefresh = async () => {
     await fetchDashboardData();

@@ -37,7 +37,7 @@ export function isRouteAccessible(route: string, userRole?: UserRole): boolean {
 
   // Get allowed routes for the user's role
   const allowedRoutes = roleRoutes[userRole as keyof typeof roleRoutes] || [];
-  
+
   // Check if the route starts with any of the allowed paths for the user's role
   return allowedRoutes.some(prefix => route.startsWith(prefix));
 }

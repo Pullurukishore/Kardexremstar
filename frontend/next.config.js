@@ -6,7 +6,17 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   generateEtags: true,
-  
+
+  // Modular imports for better tree-shaking
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+    },
+    'date-fns': {
+      transform: 'date-fns/{{member}}',
+    },
+  },
+
   // Webpack configuration for performance
   webpack: (config, { isServer, dev }) => {
     // Skip complex optimizations in development
@@ -31,8 +41,46 @@ const nextConfig = {
     if (!isServer) {
       config.optimization.splitChunks = {
         chunks: 'all',
+        maxInitialRequests: 25,
+        minSize: 20000,
         cacheGroups: {
-          // Vendor chunk for stable dependencies
+          // Framework chunk (React, Next.js core)
+          framework: {
+            test: /[\\/]node_modules[\\/](react|react-dom|scheduler|next)[\\/]/,
+            name: 'framework',
+            priority: 40,
+            chunks: 'all',
+            enforce: true,
+          },
+          // Icons chunk (lucide-react is typically large)
+          icons: {
+            test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
+            name: 'icons',
+            priority: 35,
+            chunks: 'all',
+          },
+          // Date utilities
+          dateutils: {
+            test: /[\\/]node_modules[\\/]date-fns[\\/]/,
+            name: 'dateutils',
+            priority: 35,
+            chunks: 'all',
+          },
+          // Radix UI components
+          radix: {
+            test: /[\\/]node_modules[\\/]@radix-ui[\\/]/,
+            name: 'radix',
+            priority: 35,
+            chunks: 'all',
+          },
+          // Charts (if using recharts or similar)
+          charts: {
+            test: /[\\/]node_modules[\\/](recharts|d3|victory)[\\/]/,
+            name: 'charts',
+            priority: 35,
+            chunks: 'all',
+          },
+          // Other vendor libraries
           vendor: {
             test: /[\\/]node_modules[\\/]/,
             name: 'vendors',
@@ -52,13 +100,6 @@ const nextConfig = {
             test: /[\\/]components[\\/]ui[\\/]/,
             name: 'ui',
             priority: 15,
-            chunks: 'all',
-          },
-          // Customer-specific chunk
-          customer: {
-            test: /[\\/]components[\\/]customer[\\/]/,
-            name: 'customer',
-            priority: 12,
             chunks: 'all',
           },
         },
@@ -92,7 +133,7 @@ const nextConfig = {
 
     return config;
   },
-  
+
   // Enable CSS source maps in development
   productionBrowserSourceMaps: process.env.NODE_ENV === 'development',
   // Enable styled-components support
@@ -103,13 +144,13 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5003',
   },
-  
+
   // Output configuration for different deployment targets
   output: process.env.BUILD_STANDALONE === 'true' ? 'standalone' : undefined,
-  
+
   // Disable trailing slash for proper routing
   trailingSlash: false,
-  
+
   // Image domains for production
   images: {
     domains: ['localhost', 'your-backend-domain.run.app'],
@@ -117,22 +158,22 @@ const nextConfig = {
     minimumCacheTTL: 60,
     unoptimized: process.env.NEXT_EXPORT === 'true',
   },
-  
+
   // Enable TypeScript checking
   typescript: {
     ignoreBuildErrors: false,
   },
-  
+
   // Enable ESLint checking
   eslint: {
     ignoreDuringBuilds: false,
   },
-  
+
   // Development optimizations
   devIndicators: {
     buildActivityPosition: 'bottom-right',
   },
-  
+
   // Add headers for Google Fonts optimization (disabled since we use system fonts)
   // async headers() {
   //   return [

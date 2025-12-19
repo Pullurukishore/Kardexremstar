@@ -41,9 +41,8 @@ const OFFER_STAGES = [
   { value: 'INITIAL', label: 'Initial' },
   { value: 'PROPOSAL_SENT', label: 'Proposal Sent' },
   { value: 'NEGOTIATION', label: 'Negotiation' },
-  { value: 'FINAL_APPROVAL', label: 'Final Approval' },
   { value: 'PO_RECEIVED', label: 'PO Received' },
-  { value: 'ORDER_BOOKED', label: 'Order Booked' },
+  // Note: ORDER_BOOKED removed - PO_RECEIVED leads directly to WON
   { value: 'WON', label: 'Won' },
   { value: 'LOST', label: 'Lost' },
 ];

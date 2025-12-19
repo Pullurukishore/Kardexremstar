@@ -690,13 +690,23 @@ const AdminAttendancePage = memo(function AdminAttendancePage() {
                   <SelectTrigger className="border-slate-200 focus:border-orange-500 focus:ring-orange-500/20 transition-all duration-200">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-80">
                     <SelectItem value="all">📋 All Types</SelectItem>
                     <SelectItem value="TICKET_WORK">🎫 Ticket Work</SelectItem>
+                    <SelectItem value="BD_VISIT">🏢 BD Visit</SelectItem>
+                    <SelectItem value="PO_DISCUSSION">📋 PO Discussion</SelectItem>
+                    <SelectItem value="SPARE_REPLACEMENT">🔧 Spare Replacement</SelectItem>
                     <SelectItem value="TRAVEL">🚗 Travel</SelectItem>
-                    <SelectItem value="MEETING">👥 Meeting</SelectItem>
                     <SelectItem value="TRAINING">📚 Training</SelectItem>
-                    <SelectItem value="OTHER">📝 Other</SelectItem>
+                    <SelectItem value="MEETING">👥 Meeting</SelectItem>
+                    <SelectItem value="MAINTENANCE">🛠️ Maintenance</SelectItem>
+                    <SelectItem value="DOCUMENTATION">📝 Documentation</SelectItem>
+                    <SelectItem value="OTHER">📌 Other</SelectItem>
+                    <SelectItem value="WORK_FROM_HOME">🏠 Work From Home</SelectItem>
+                    <SelectItem value="INSTALLATION">⚙️ Installation</SelectItem>
+                    <SelectItem value="MAINTENANCE_PLANNED">📅 Planned Maint.</SelectItem>
+                    <SelectItem value="REVIEW_MEETING">📊 Review Meeting</SelectItem>
+                    <SelectItem value="RELOCATION">🚚 Relocation</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -829,13 +839,23 @@ const AdminAttendancePage = memo(function AdminAttendancePage() {
                   <SelectTrigger className="border-slate-200 focus:border-orange-500 focus:ring-orange-500/20 transition-all duration-200">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-80">
                     <SelectItem value="all">📋 All Types</SelectItem>
                     <SelectItem value="TICKET_WORK">🎫 Ticket Work</SelectItem>
+                    <SelectItem value="BD_VISIT">🏢 BD Visit</SelectItem>
+                    <SelectItem value="PO_DISCUSSION">📋 PO Discussion</SelectItem>
+                    <SelectItem value="SPARE_REPLACEMENT">🔧 Spare Replacement</SelectItem>
                     <SelectItem value="TRAVEL">🚗 Travel</SelectItem>
-                    <SelectItem value="MEETING">👥 Meeting</SelectItem>
                     <SelectItem value="TRAINING">📚 Training</SelectItem>
-                    <SelectItem value="OTHER">📝 Other</SelectItem>
+                    <SelectItem value="MEETING">👥 Meeting</SelectItem>
+                    <SelectItem value="MAINTENANCE">🛠️ Maintenance</SelectItem>
+                    <SelectItem value="DOCUMENTATION">📝 Documentation</SelectItem>
+                    <SelectItem value="OTHER">📌 Other</SelectItem>
+                    <SelectItem value="WORK_FROM_HOME">🏠 Work From Home</SelectItem>
+                    <SelectItem value="INSTALLATION">⚙️ Installation</SelectItem>
+                    <SelectItem value="MAINTENANCE_PLANNED">📅 Planned Maint.</SelectItem>
+                    <SelectItem value="REVIEW_MEETING">📊 Review Meeting</SelectItem>
+                    <SelectItem value="RELOCATION">🚚 Relocation</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

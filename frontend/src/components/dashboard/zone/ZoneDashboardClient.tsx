@@ -91,7 +91,10 @@ const transformZoneDataToDashboardData = (zoneData: ZoneDashboardData): Partial<
         totalTickets: totalTickets,
         servicePersonCount: zoneData.zone?.totalTechnicians || 0,
         customerCount: zoneData.zone?.totalCustomers || 0,
-        avgResolutionTimeHours: avgResolutionTimeHours
+        avgResolutionTimeHours: avgResolutionTimeHours,
+        zoneManagerCount: 0,
+        zoneUserCount: 0,
+        assetCount: zoneData.zone?.totalAssets || 0
       }]
     },
     recentTickets: (zoneData.recentActivities || []).map(activity => ({

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { RefreshCw, FileText, Download, FileDown, BarChart3, Info, Trophy, CheckCircle2, DollarSign, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiService } from '@/services/api';
@@ -10,17 +10,19 @@ import ReportsTable from './ReportsTable';
 import OfferDetailsDialog from './OfferDetailsDialog';
 import ZoneTargetDetailsDialog from './ZoneTargetDetailsDialog';
 import UserTargetDetailsDialog from './UserTargetDetailsDialog';
-import ProductTypeAnalysisReport from './ProductTypeAnalysisReport';
-import CustomerPerformanceReport from './CustomerPerformanceReport';
 import ReportsFilters from './ReportsFilters';
-import TargetReportAnalytics from './TargetReportAnalytics';
-// Import Advanced/New Reports
-import { AdvancedTicketSummaryReport } from './AdvancedTicketSummaryReport';
-import { CustomerSatisfactionReport } from './CustomerSatisfactionReport';
-import { AdvancedMachineAnalyticsReport } from './AdvancedMachineAnalyticsReport';
-import { AdvancedZonePerformanceReport } from './AdvancedZonePerformanceReport';
-import { ServicePersonPerformanceReport } from './ServicePersonPerformanceReport';
-import { ServicePersonAttendanceReport } from './ServicePersonAttendanceReport';
+// Dynamic imports for heavy report components (lazy loaded for better performance)
+import {
+  DynamicAdvancedTicketSummaryReport as AdvancedTicketSummaryReport,
+  DynamicCustomerSatisfactionReport as CustomerSatisfactionReport,
+  DynamicAdvancedMachineAnalyticsReport as AdvancedMachineAnalyticsReport,
+  DynamicAdvancedZonePerformanceReport as AdvancedZonePerformanceReport,
+  DynamicServicePersonPerformanceReport as ServicePersonPerformanceReport,
+  DynamicServicePersonAttendanceReport as ServicePersonAttendanceReport,
+  DynamicProductTypeAnalysisReport as ProductTypeAnalysisReport,
+  DynamicCustomerPerformanceReport as CustomerPerformanceReport,
+  DynamicTargetReportAnalytics as TargetReportAnalytics,
+} from './DynamicReportComponents';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -123,6 +125,11 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
 
   // Fetch zones and customers on mount
   useEffect(() => {
+    // Skip if already fetched (React Strict Mode protection)
+    if (hasInitialCustomersFetched.current) {
+      return;
+    }
+    
     const fetchInitialData = async () => {
       // Fetch zones
       if (!zones || zones.length === 0) {
@@ -139,8 +146,9 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
         }
       }
 
-      // Fetch customers
-      if (!customers || customers.length === 0) {
+      // Fetch customers (only if not already fetching)
+      if ((!customers || customers.length === 0) && !isCustomersFetching.current) {
+        isCustomersFetching.current = true;
         setIsLoadingCustomers(true);
         try {
           const response = await apiService.getCustomers({ isActive: 'true', limit: 1000 });
@@ -151,7 +159,11 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
           setCustomers([]);
         } finally {
           setIsLoadingCustomers(false);
+          isCustomersFetching.current = false;
+          hasInitialCustomersFetched.current = true;
         }
+      } else {
+        hasInitialCustomersFetched.current = true;
       }
     };
 
@@ -206,38 +218,62 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
   const [servicePersonPerformanceData, setServicePersonPerformanceData] = useState<any>(null);
   const [servicePersonAttendanceData, setServicePersonAttendanceData] = useState<any>(null);
   
+  // Refs for preventing duplicate fetches and handling retries
+  const isFetching = useRef(false);
+  const retryCountRef = useRef(0);
+  const maxRetries = 2;
+  const hasInitialCustomersFetched = useRef(false);
+  const isCustomersFetching = useRef(false);
+
   // Function to fetch customers for a specific zone
-  const fetchCustomersForZone = useCallback(async (zoneId?: string) => {
-    if (!zoneId) {
-      // Reset to all customers
-      try {
-        const response = await apiService.getCustomers({ isActive: 'true', limit: 1000 });
-        const customersData = Array.isArray(response) ? response : (response.data || response.customers || []);
-        setCustomers(customersData);
-      } catch (error) {
-        console.error('Error fetching all customers:', error);
-        setCustomers([]);
-      }
+  const fetchCustomersForZone = useCallback(async (zoneId?: string, isZoneChange: boolean = false) => {
+    // Prevent duplicate concurrent fetches
+    if (isCustomersFetching.current) {
+      console.log('Customers fetch already in progress, skipping...');
       return;
     }
     
-    setIsLoadingCustomers(true);
+    // Skip if this is from zone change effect but initial customers already fetched
+    if (isZoneChange && !hasInitialCustomersFetched.current) {
+      // Don't run zone change effect until initial fetch is done
+      return;
+    }
+    
     try {
+      isCustomersFetching.current = true;
+      
+      if (!zoneId) {
+        // Reset to all customers
+        const response = await apiService.getCustomers({ isActive: 'true', limit: 1000 });
+        const customersData = Array.isArray(response) ? response : (response.data || response.customers || []);
+        setCustomers(customersData);
+        return;
+      }
+      
+      setIsLoadingCustomers(true);
       const response = await apiService.getCustomers({ isActive: 'true', zoneId, limit: 1000 });
       const customersData = Array.isArray(response) ? response : (response.data || response.customers || []);
       setCustomers(customersData);
       // Clear customer filter when zone changes
       setFilters(prev => ({ ...prev, customerId: undefined }));
     } catch (error) {
-      console.error('Error fetching customers for zone:', error);
+      console.error('Error fetching customers:', error);
       setCustomers([]);
     } finally {
+      isCustomersFetching.current = false;
       setIsLoadingCustomers(false);
     }
   }, []);
 
-  const fetchReport = useCallback(async () => {
+  const fetchReport = useCallback(async (isRetry: boolean = false) => {
+    // Prevent duplicate concurrent fetches (but allow retries)
+    if (isFetching.current && !isRetry) {
+      console.log('Fetch already in progress, skipping...');
+      return;
+    }
+    
     try {
+      isFetching.current = true;
       setLoading(true);
       
       // Handle target report differently
@@ -712,7 +748,7 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
         const params: any = {
           reportType: reportType,
           page: currentPage,
-          limit: 50,
+          limit: 500,
         };
 
         if (filters.dateRange?.from) {
@@ -781,15 +817,33 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
     } catch (error: any) {
       console.error('Error fetching report:', error);
       
-      // Don't show error for 401 responses as they're handled by the interceptor
+      // Handle 401 with automatic retry logic (token refresh case)
       if (error?.response?.status === 401) {
-        // Let the axios interceptor handle token refresh and retry
+        if (retryCountRef.current < maxRetries) {
+          retryCountRef.current++;
+          console.log(`Token refresh detected, retrying (attempt ${retryCountRef.current}/${maxRetries})...`);
+          
+          // Wait for token refresh to complete (the axios interceptor handles this)
+          // and then retry the request
+          setTimeout(() => {
+            fetchReport(true); // Pass true to indicate this is a retry
+          }, 1000 * retryCountRef.current); // Exponential backoff: 1s, 2s
+          return;
+        }
+        // Max retries reached, let user know
+        toast.error('Session expired. Please refresh the page or log in again.');
+        retryCountRef.current = 0;
         return;
       }
       
       toast.error(error?.response?.data?.error || 'Failed to load report');
     } finally {
+      isFetching.current = false;
       setLoading(false);
+      // Reset retry count on successful completion
+      if (retryCountRef.current > 0) {
+        retryCountRef.current = 0;
+      }
     }
   }, [filters, currentPage]);
 
@@ -798,9 +852,12 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
   //   fetchReport();
   // }, [fetchReport]);
 
-  // Fetch customers when zone changes
+  // Fetch customers when zone changes (but not on initial mount - that's handled separately)
   useEffect(() => {
-    fetchCustomersForZone(filters.zoneId);
+    // Only fetch if initial customers were already loaded (prevents duplicate on mount)
+    if (hasInitialCustomersFetched.current) {
+      fetchCustomersForZone(filters.zoneId, true);
+    }
   }, [filters.zoneId, fetchCustomersForZone]);
 
   // Client-side filtering for search and stage (live filter without API call)
@@ -1205,7 +1262,7 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Offers Value - Orders Received (pending opportunities)">
                         Open Funnel
                       </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Count of ORDER_BOOKED stage offers in current year">
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Count of WON/PO_RECEIVED stage offers in current year">
                         Order Booking
                       </th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Target BU</th>
@@ -1302,7 +1359,7 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Offers Value - Orders Received (pending opportunities)">
                         Open Funnel
                       </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Count of ORDER_BOOKED stage offers in current year">
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Count of WON/PO_RECEIVED stage offers in current year">
                         Order Booking
                       </th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Target BU</th>

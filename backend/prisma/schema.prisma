@@ -235,6 +235,10 @@ model Ticket {
   visitResolvedAt         DateTime?
   visitStartedAt          DateTime?
   callType                CallType?
+  // Assignment Acceptance
+  assignmentStatus        AssignmentStatus?     @default(PENDING)
+  assignmentRespondedAt   DateTime?
+  assignmentNotes         String?
   attachments             Attachment[]          @relation("TicketAttachments")
   auditLogs               AuditLog[]            @relation("TicketAuditLogs")
   callLogs                CallLog[]             @relation("TicketCallLogs")
@@ -1015,6 +1019,12 @@ enum ScheduleStatus {
   CANCELLED
 }
 
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 enum SchedulePriority {
   LOW
   MEDIUM
@@ -1045,9 +1055,7 @@ enum OfferStage {
   INITIAL
   PROPOSAL_SENT
   NEGOTIATION
-  FINAL_APPROVAL
   PO_RECEIVED
-  ORDER_BOOKED
   WON
   LOST
 }

@@ -11,7 +11,7 @@ import {
   XCircle,
   Loader,
   ArrowLeft,
-  Edit2,
+  Pencil as Edit2,
   Trash2,
   CheckCheck,
   X,

@@ -11,7 +11,7 @@ import {
   MapPin,
   AlertTriangle,
   CheckCircle,
-  Edit3,
+  Pencil as Edit3,
   ChevronRight,
   FileText,
   Sparkles,

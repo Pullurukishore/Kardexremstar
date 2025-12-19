@@ -131,8 +131,8 @@ export const createActivitySchedule = async (req: Request, res: Response) => {
     const user = (req as any).user;
 
     // Support both single and multiple service persons
-    const personIds = servicePersonIds && Array.isArray(servicePersonIds) 
-      ? servicePersonIds 
+    const personIds = servicePersonIds && Array.isArray(servicePersonIds)
+      ? servicePersonIds
       : (servicePersonId ? [servicePersonId] : []);
 
     if (personIds.length === 0) {
@@ -278,28 +278,16 @@ export const getActivitySchedules = async (req: Request, res: Response) => {
       }
     }
 
-    // Zone filtering for non-admin users
-    if (user.role === 'ZONE_MANAGER' || user.role === 'ZONE_USER') {
-      // Get zones for this user from ServicePersonZone relationship
-      const userZones = await prisma.servicePersonZone.findMany({
-        where: { userId: user.id },
-        select: { serviceZoneId: true }
-      });
-      
-      if (userZones.length > 0) {
-        // Include both user's zones AND null zoneIds (non-zone-specific schedules)
-        const userZoneIds = userZones.map(uz => uz.serviceZoneId.toString());
-        // We need to handle null separately - create an OR condition
-        where.OR = [
-          { zoneId: { in: userZoneIds } },
-          { zoneId: null }
-        ];
-      } else {
-        // If user has no zones, show only non-zone-specific schedules (null zoneId)
-        where.zoneId = null;
-      }
+    // Role-based filtering for non-admin users
+    if (user.role === 'SERVICE_PERSON') {
+      // Service Person can only see schedules assigned to them
+      where.servicePersonId = user.id;
+    } else if (user.role === 'ZONE_MANAGER' || user.role === 'ZONE_USER') {
+      // Only show schedules created by this user
+      // This is preferred since there can be many zone users/managers in one zone
+      where.scheduledById = user.id;
     } else if (zoneId) {
-      where.zoneId = zoneId.toString();
+      where.zoneId = Number(zoneId);
     }
 
     // Build orderBy clause based on request parameters
@@ -518,7 +506,8 @@ export const getActivityScheduleById = async (req: Request, res: Response) => {
     // Fetch related activities for this schedule (activities linked via metadata.activityScheduleId)
     let relatedActivities: any[] = [];
     if (schedule) {
-      const allActivities = await prisma.dailyActivityLog.findMany({
+      // Query 1: Find activities linked via metadata.activityScheduleId
+      const activitiesByScheduleId = await prisma.dailyActivityLog.findMany({
         where: {
           userId: schedule.servicePersonId,
           metadata: {
@@ -551,6 +540,23 @@ export const getActivityScheduleById = async (req: Request, res: Response) => {
               id: true,
               title: true,
               status: true,
+              statusHistory: {
+                orderBy: {
+                  changedAt: 'asc',
+                },
+                select: {
+                  id: true,
+                  status: true,
+                  changedAt: true,
+                  notes: true,
+                  changedBy: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -559,7 +565,70 @@ export const getActivityScheduleById = async (req: Request, res: Response) => {
         },
       });
 
-      // Deduplicate by activity ID to avoid showing the same activity multiple times
+      // Query 2: For TICKET_WORK schedules, also find activities linked via ticketId
+      let activitiesByTicketId: any[] = [];
+      if (schedule.ticketId) {
+        activitiesByTicketId = await prisma.dailyActivityLog.findMany({
+          where: {
+            userId: schedule.servicePersonId,
+            ticketId: schedule.ticketId,
+            activityType: 'TICKET_WORK',
+          },
+          include: {
+            ActivityStage: {
+              orderBy: {
+                startTime: 'asc',
+              },
+              select: {
+                id: true,
+                stage: true,
+                startTime: true,
+                endTime: true,
+                duration: true,
+                location: true,
+                latitude: true,
+                longitude: true,
+                notes: true,
+                metadata: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+            ticket: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                statusHistory: {
+                  orderBy: {
+                    changedAt: 'asc',
+                  },
+                  select: {
+                    id: true,
+                    status: true,
+                    changedAt: true,
+                    notes: true,
+                    changedBy: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            startTime: 'desc',
+          },
+        });
+      }
+
+      // Merge and deduplicate results
+      const allActivities = [...activitiesByScheduleId, ...activitiesByTicketId];
+
+      // Deduplicate by activity ID and enhance with ticket status history as stages
       const seenIds = new Set<number>();
       relatedActivities = allActivities.filter(activity => {
         if (seenIds.has(activity.id)) {
@@ -567,6 +636,37 @@ export const getActivityScheduleById = async (req: Request, res: Response) => {
         }
         seenIds.add(activity.id);
         return true;
+      }).map(activity => {
+        // For TICKET_WORK activities, merge ticket status history into stages for timeline display
+        if (activity.activityType === 'TICKET_WORK' && activity.ticket?.statusHistory) {
+          const ticketStatusStages = activity.ticket.statusHistory.map((history: any) => ({
+            id: `status-${history.id}`,
+            stage: history.status,
+            startTime: history.changedAt,
+            endTime: null,
+            duration: null,
+            location: null,
+            latitude: null,
+            longitude: null,
+            notes: history.notes,
+            metadata: {
+              isTicketStatus: true,
+              changedBy: history.changedBy,
+            },
+            createdAt: history.changedAt,
+            updatedAt: history.changedAt,
+          }));
+
+          // Merge activity stages and ticket status changes, sorted by time
+          const allStages = [...(activity.ActivityStage || []), ...ticketStatusStages]
+            .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+          return {
+            ...activity,
+            ActivityStage: allStages,
+          };
+        }
+        return activity;
       });
     }
 
@@ -577,7 +677,7 @@ export const getActivityScheduleById = async (req: Request, res: Response) => {
       const assetIds = schedule.assetIds
         .map((id: any) => typeof id === 'string' ? parseInt(id, 10) : id)
         .filter((id: any): id is number => !isNaN(id) && typeof id === 'number');
-      
+
       if (assetIds.length > 0) {
         assetDetails = await prisma.asset.findMany({
           where: {
@@ -650,7 +750,7 @@ export const updateActivitySchedule = async (req: Request, res: Response) => {
     if (scheduledDate) {
       const newDate = new Date(scheduledDate);
       const endTime = addMinutes(newDate, 60); // Default 1 hour duration
-      
+
       const isAvailable = await isTimeSlotAvailable(schedule.servicePersonId, newDate, endTime, Number(id));
       if (!isAvailable) {
         return res.status(409).json({

@@ -1,744 +1,690 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import api from '@/lib/api/axios';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { MobilePageHeader, MobileCard, MobileTable } from '@/components/ui/mobile-responsive';
-import { Plus, Search, Filter, RefreshCw, List, AlertCircle, Users, Clock, CheckCircle, XCircle, Eye, MapPin } from 'lucide-react';
-import { format } from 'date-fns';
-import { useToast } from '@/components/ui/use-toast';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { UserRole } from '@/types/user.types'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { 
+  Search, 
+  MoreHorizontal, 
+  Plus,
+  RefreshCw,
+  Loader2,
+  Eye,
+  Building2,
+  TrendingUp,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  X,
+  AlertCircle,
+  Clock,
+  CheckCircle,
+  Users,
+  Wrench,
+  Calendar,
+  XCircle,
+  Flag,
+  Ticket,
+} from 'lucide-react'
+import Link from 'next/link'
+import api from '@/lib/api/axios'
+import { toast } from 'sonner'
+import { format } from 'date-fns'
 
-type TicketStatus = 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'WAITING_CUSTOMER' | 'ONSITE_VISIT' | 
-  'ONSITE_VISIT_PLANNED' | 'PO_NEEDED' | 'PO_RECEIVED' | 'SPARE_PARTS_NEEDED' | 
-  'SPARE_PARTS_BOOKED' | 'SPARE_PARTS_DELIVERED' | 'CLOSED_PENDING' | 'CLOSED' | 
-  'CANCELLED' | 'REOPENED' | 'ON_HOLD' | 'ESCALATED' | 'RESOLVED';
+// Ticket statuses
+const statuses = [
+  'All Status',
+  'OPEN',
+  'ASSIGNED',
+  'IN_PROGRESS',
+  'ONSITE_VISIT_PLANNED',
+  'ONSITE_VISIT',
+  'CLOSED_PENDING',
+  'CLOSED',
+  'SPARE_PARTS_NEEDED',
+  'SPARE_PARTS_BOOKED',
+  'SPARE_PARTS_DELIVERED',
+  'PO_NEEDED',
+  'PO_RECEIVED'
+]
 
-type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-
-type Ticket = {
-  id: number;
-  title: string;
-  description: string;
-  status: TicketStatus;
-  priority: Priority;
-  createdAt: string;
-  updatedAt: string;
-  customer?: {
-    id: number;
-    companyName: string;
-  };
-  assignedTo?: {
-    id: number;
-    email: string;
-    name?: string;
-  };
-  zone?: {
-    id: number;
-    name: string;
-  };
-};
-
-type ApiResponse = {
-  data: Ticket[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-};
+const priorities = ['All Priority', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 
 export default function ZoneTicketsPage() {
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'assigned' | 'unassigned'>('all');
-  const [filters, setFilters] = useState({
-    status: '',
-    priority: '',
-    search: '',
-    page: 1,
-    limit: 30,
-  });
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    limit: 30,
-    totalPages: 1,
-  });
+  const router = useRouter()
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   
-  const router = useRouter();
-  const { toast } = useToast();
-
-  const fetchTickets = async () => {
-    try {
-      setLoading(true);
-      const queryParams = new URLSearchParams({
-        page: filters.page.toString(),
-        limit: filters.limit.toString(),
-        ...(filters.status && { status: filters.status }),
-        ...(filters.priority && { priority: filters.priority }),
-        ...(filters.search && { search: filters.search }),
-        ...(activeTab === 'assigned' && { view: 'assigned' }),
-        ...(activeTab === 'unassigned' && { view: 'unassigned' }),
-      });
-
-      const response = await api.get(`/tickets?${queryParams}`);
-      const data: ApiResponse = response.data;
-      setTickets(data.data);
-      setPagination(data.pagination);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load tickets. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Protect this page - only ZONE_USER or ZONE_MANAGER can access
   useEffect(() => {
-    fetchTickets();
-  }, [filters.page, filters.status, filters.priority, filters.limit, activeTab]);
-
-  const handleSearch = () => {
-    setFilters({ ...filters, page: 1 });
-    fetchTickets();
-  };
-
-  const getStatusBadgeVariant = (status: TicketStatus) => {
-    switch (status) {
-      case 'OPEN':
-        return 'default';
-      case 'ASSIGNED':
-        return 'secondary';
-      case 'IN_PROGRESS':
-        return 'default';
-      case 'ONSITE_VISIT_PLANNED':
-        return 'outline';
-      case 'ONSITE_VISIT':
-        return 'default';
-      case 'CLOSED_PENDING':
-        return 'secondary';
-      case 'CLOSED':
-        return 'secondary';
-      case 'SPARE_PARTS_NEEDED':
-        return 'outline';
-      case 'SPARE_PARTS_BOOKED':
-        return 'secondary';
-      case 'SPARE_PARTS_DELIVERED':
-        return 'default';
-      case 'PO_NEEDED':
-        return 'outline';
-      case 'PO_RECEIVED':
-        return 'secondary';
-      default:
-        return 'outline';
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        router.push('/auth/login?callbackUrl=' + encodeURIComponent('/zone/tickets'))
+        return
+      }
+      if (user?.role !== UserRole.ZONE_USER && user?.role !== UserRole.ZONE_MANAGER) {
+        router.push('/zone/dashboard')
+        return
+      }
     }
-  };
+  }, [authLoading, isAuthenticated, user?.role, router])
 
-  const getPriorityBadgeVariant = (priority: Priority) => {
-    switch (priority) {
-      case 'LOW':
-        return 'outline';
-      case 'MEDIUM':
-        return 'secondary';
-      case 'HIGH':
-        return 'default';
-      case 'CRITICAL':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
-  };
-
-  // Calculate stats
-  const totalTickets = tickets.length;
-  const openTickets = tickets.filter(t => t.status === 'OPEN').length;
-  const assignedTickets = tickets.filter(t => t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS').length;
-  const closedTickets = tickets.filter(t => t.status === 'CLOSED').length;
-  const criticalTickets = tickets.filter(t => t.priority === 'CRITICAL').length;
-
-  // Mobile ticket card component
-  const TicketMobileCard = ({ ticket }: { ticket: Ticket }) => (
-    <MobileCard className="hover:shadow-md transition-shadow duration-200">
-      <div className="space-y-4">
-        {/* Header with ticket info */}
-        <div className="flex items-start gap-3">
-          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-            #{ticket.id}
-          </div>
-          <div className="min-w-0 flex-1">
-            <button 
-              onClick={() => router.push(`/zone/tickets/${ticket.id}`)}
-              className="font-semibold text-lg text-gray-900 hover:text-indigo-600 transition-colors block leading-tight text-left"
-            >
-              {ticket.title}
-            </button>
-            <div className="text-sm text-gray-500 mt-1">
-              {ticket.customer?.companyName || 'No customer'}
+  // Show loading state while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/20">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="relative mx-auto w-16 h-16">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 opacity-20 animate-ping" />
+              <div className="relative w-16 h-16 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
             </div>
-          </div>
-          <div className="flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push(`/zone/tickets/${ticket.id}`)}
-              className="hover:bg-indigo-50 hover:text-indigo-600 btn-touch"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Status and Priority */}
-        <div className="flex flex-wrap gap-2">
-          <Badge 
-            variant={getStatusBadgeVariant(ticket.status)}
-            className={
-              ticket.status === 'OPEN' ? 'bg-orange-100 text-orange-800' :
-              ticket.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800' :
-              ticket.status === 'IN_PROGRESS' ? 'bg-purple-100 text-purple-800' :
-              ticket.status === 'CLOSED' ? 'bg-green-100 text-green-800' :
-              'bg-gray-100 text-gray-600'
-            }
-          >
-            {ticket.status.replace(/_/g, ' ')}
-          </Badge>
-          <Badge 
-            variant={getPriorityBadgeVariant(ticket.priority)}
-            className={
-              ticket.priority === 'CRITICAL' ? 'bg-red-100 text-red-800' :
-              ticket.priority === 'HIGH' ? 'bg-orange-100 text-orange-800' :
-              ticket.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-gray-100 text-gray-600'
-            }
-          >
-            {ticket.priority}
-          </Badge>
-        </div>
-
-        {/* Assignment and Date */}
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-500">Assigned to:</span>
-            <span className="font-medium">
-              {ticket.assignedTo ? 
-                (ticket.assignedTo.name || ticket.assignedTo.email.split('@')[0]) : 
-                'Unassigned'
-              }
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-gray-500">Created:</span>
-            <span className="font-medium">
-              {format(new Date(ticket.createdAt), 'MMM d, yyyy')}
-            </span>
+            <p className="text-gray-600 font-medium mt-4">Loading...</p>
           </div>
         </div>
       </div>
-    </MobileCard>
-  );
+    )
+  }
+
+  // Don't render if not authenticated or not ZONE_USER/ZONE_MANAGER
+  if (!isAuthenticated || (user?.role !== UserRole.ZONE_USER && user?.role !== UserRole.ZONE_MANAGER)) {
+    return null
+  }
+  
+  const [tickets, setTickets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState({ page: 1, limit: 100, total: 0, totalPages: 0 })
+
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState('All Status')
+  const [selectedPriority, setSelectedPriority] = useState('All Priority')
+  const [sortField, setSortField] = useState<string>('')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  // Debounce search to prevent excessive API calls
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchTickets()
+    }, searchTerm ? 500 : 0)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, selectedStatus, selectedPriority, pagination.page])
+
+  const fetchTickets = async () => {
+    setLoading(true)
+    try {
+      const params: any = {
+        page: pagination.page,
+        limit: pagination.limit,
+      }
+      
+      if (searchTerm) params.search = searchTerm
+      if (selectedStatus !== 'All Status') params.status = selectedStatus
+      if (selectedPriority !== 'All Priority') params.priority = selectedPriority
+      // Backend now automatically filters by assignedToId for zone users
+
+      const response = await api.get('/tickets', { params })
+      setTickets(response.data?.data || [])
+      setPagination(response.data?.pagination || { page: 1, limit: 100, total: 0, totalPages: 0 })
+    } catch (error: any) {
+      console.error('Failed to fetch tickets:', error)
+      toast.error(error.response?.data?.error || 'Failed to fetch tickets')
+      setTickets([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setSelectedStatus('All Status')
+    setSelectedPriority('All Priority')
+    setPagination(prev => ({ ...prev, page: 1 }))
+  }
+
+  const hasActiveFilters = searchTerm || selectedStatus !== 'All Status' || selectedPriority !== 'All Priority'
+
+  // Sort tickets
+  const sortedTickets = useMemo(() => {
+    if (!sortField) return tickets
+    
+    return [...tickets].sort((a, b) => {
+      let aValue = a[sortField]
+      let bValue = b[sortField]
+      
+      // Handle nested properties
+      if (sortField === 'customer') {
+        aValue = a.customer?.companyName || ''
+        bValue = b.customer?.companyName || ''
+      } else if (sortField === 'zone') {
+        aValue = a.zone?.name || ''
+        bValue = b.zone?.name || ''
+      } else if (sortField === 'assignedTo') {
+        aValue = a.assignedTo?.name || ''
+        bValue = b.assignedTo?.name || ''
+      }
+      
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [tickets, sortField, sortDirection])
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  // Calculate statistics
+  const stats = {
+    total: pagination.total,
+    open: tickets.filter(t => t.status === 'OPEN').length,
+    inProgress: tickets.filter(t => ['ASSIGNED', 'IN_PROGRESS', 'ONSITE_VISIT_PLANNED', 'ONSITE_VISIT'].includes(t.status)).length,
+    closed: tickets.filter(t => ['CLOSED', 'CLOSED_PENDING'].includes(t.status)).length,
+    critical: tickets.filter(t => t.priority === 'CRITICAL').length,
+  }
+
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      // Open/New
+      case 'OPEN':
+        return 'bg-blue-500 text-white'
+      // Assignment
+      case 'ASSIGNED':
+        return 'bg-teal-500 text-white'
+      // In Progress
+      case 'IN_PROGRESS':
+        return 'bg-indigo-500 text-white'
+      // Onsite Visit stages
+      case 'ONSITE_VISIT_PLANNED':
+        return 'bg-cyan-500 text-white'
+      case 'ONSITE_VISIT':
+        return 'bg-emerald-500 text-white'
+      case 'ONSITE_VISIT_STARTED':
+        return 'bg-sky-500 text-white'
+      case 'ONSITE_VISIT_REACHED':
+        return 'bg-violet-500 text-white'
+      case 'ONSITE_VISIT_IN_PROGRESS':
+        return 'bg-amber-500 text-white'
+      case 'ONSITE_VISIT_RESOLVED':
+        return 'bg-lime-500 text-white'
+      case 'ONSITE_VISIT_PENDING':
+        return 'bg-orange-400 text-white'
+      case 'ONSITE_VISIT_COMPLETED':
+        return 'bg-green-600 text-white'
+      // Spare Parts stages
+      case 'SPARE_PARTS_NEEDED':
+        return 'bg-rose-500 text-white'
+      case 'SPARE_PARTS_BOOKED':
+        return 'bg-fuchsia-500 text-white'
+      case 'SPARE_PARTS_DELIVERED':
+        return 'bg-emerald-600 text-white'
+      // PO stages
+      case 'PO_NEEDED':
+        return 'bg-orange-600 text-white'
+      case 'PO_REACHED':
+        return 'bg-purple-500 text-white'
+      case 'PO_RECEIVED':
+        return 'bg-teal-600 text-white'
+      // Closure stages
+      case 'CLOSED_PENDING':
+        return 'bg-yellow-500 text-white'
+      case 'CLOSED':
+        return 'bg-slate-500 text-white'
+      case 'CANCELLED':
+        return 'bg-red-500 text-white'
+      case 'RESOLVED':
+        return 'bg-green-500 text-white'
+      // Other
+      case 'REOPENED':
+        return 'bg-purple-600 text-white'
+      case 'ON_HOLD':
+        return 'bg-gray-500 text-white'
+      case 'ESCALATED':
+        return 'bg-red-600 text-white'
+      case 'WAITING_CUSTOMER':
+        return 'bg-amber-400 text-white'
+      case 'PENDING':
+        return 'bg-yellow-400 text-white'
+      default:
+        return 'bg-slate-400 text-white'
+    }
+  }
+
+  const getPriorityStyle = (priority: string) => {
+    switch (priority) {
+      case 'CRITICAL':
+        return 'bg-red-100 text-red-700 border-red-300'
+      case 'HIGH':
+        return 'bg-orange-100 text-orange-700 border-orange-300'
+      case 'MEDIUM':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-300'
+      case 'LOW':
+        return 'bg-green-100 text-green-700 border-green-300'
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-300'
+    }
+  }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-4 md:space-y-6"
-    >
-      {/* Header with Gradient - Mobile Responsive */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="relative overflow-hidden rounded-lg bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 p-4 md:p-6 text-white"
-      >
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative header-mobile">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">Zone Tickets</h1>
-            <p className="text-indigo-100 text-sm md:text-base">
-              Manage and track tickets in your service zone
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/20">
+      <div className="w-full p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Premium Header with Glassmorphism */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 rounded-2xl shadow-2xl shadow-emerald-500/20 p-6 text-white">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-400/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+          <div className="relative z-10 flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl ring-2 ring-white/30">
+                <Ticket className="h-8 w-8" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">My Assigned Tickets</h1>
+                <p className="text-emerald-100 mt-1">Tickets assigned to you in your service zone</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="grid grid-cols-5 gap-3">
+                <div className="bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 border border-white/20 text-center">
+                  <p className="text-emerald-100 text-xs font-medium">Total</p>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 border border-white/20 text-center">
+                  <p className="text-emerald-100 text-xs font-medium">Open</p>
+                  <p className="text-2xl font-bold">{stats.open}</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 border border-white/20 text-center">
+                  <p className="text-emerald-100 text-xs font-medium">In Progress</p>
+                  <p className="text-2xl font-bold">{stats.inProgress}</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 border border-white/20 text-center">
+                  <p className="text-emerald-100 text-xs font-medium">Closed</p>
+                  <p className="text-2xl font-bold">{stats.closed}</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 border border-white/20 text-center">
+                  <p className="text-emerald-100 text-xs font-medium">Critical</p>
+                  <p className="text-2xl font-bold">{stats.critical}</p>
+                </div>
+              </div>
+              <Button onClick={() => router.push('/zone/tickets/create')} className="bg-white text-emerald-700 hover:bg-emerald-50 shadow-lg hover:shadow-xl transition-all">
+                <Plus className="h-4 w-4 mr-2" />
+                New Ticket
+              </Button>
+            </div>
           </div>
-          <Button 
-            onClick={() => router.push('/zone/tickets/create')}
-            className="bg-white text-indigo-600 hover:bg-indigo-50 shadow-lg btn-touch"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">New Ticket</span>
-            <span className="sm:hidden">New</span>
-          </Button>
         </div>
-      </motion.div>
 
-      {/* Stats Cards */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
-      >
-        <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
-          <CardContent className="p-6">
+        {/* No view tabs needed - users only see their assigned tickets */}
+
+        {/* Filters */}
+        <Card className="border-0 shadow-lg bg-white" style={{backgroundColor: 'white'}}>
+          <CardHeader className="bg-white border-b border-slate-200" style={{backgroundColor: 'white'}}>
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-indigo-600">Total Tickets</p>
-                <p className="text-2xl font-bold text-indigo-900">{totalTickets}</p>
+              <div className="flex items-center gap-2">
+                <Filter className="h-5 w-5 text-emerald-600" />
+                <CardTitle className="text-lg">Search & Filter</CardTitle>
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-2">Active</Badge>
+                )}
               </div>
-              <div className="h-12 w-12 rounded-full bg-indigo-500 flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-600">Open Tickets</p>
-                <p className="text-2xl font-bold text-orange-900">{openTickets}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-orange-500 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">In Progress</p>
-                <p className="text-2xl font-bold text-blue-900">{assignedTickets}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center">
-                <Users className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">Closed</p>
-                <p className="text-2xl font-bold text-green-900">{closedTickets}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-red-600">Critical</p>
-                <p className="text-2xl font-bold text-red-900">{criticalTickets}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-red-500 flex items-center justify-center">
-                <XCircle className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Enhanced Tab Navigation */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-      >
-        <Card className="shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-t-lg pb-3">
-            <div className="tabs-mobile">
-              <Button
-                variant={activeTab === 'all' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('all')}
-                className={`btn-touch ${activeTab === 'all' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'hover:bg-indigo-50'}`}
-                size="sm"
-              >
-                <List className="mr-1 md:mr-2 h-4 w-4" />
-                <span className="text-xs md:text-sm">All</span>
-              </Button>
-              <Button
-                variant={activeTab === 'assigned' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('assigned')}
-                className={`btn-touch ${activeTab === 'assigned' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'hover:bg-blue-50'}`}
-                size="sm"
-              >
-                <Users className="mr-1 md:mr-2 h-4 w-4" />
-                <span className="text-xs md:text-sm">Assigned</span>
-              </Button>
-              <Button
-                variant={activeTab === 'unassigned' ? 'default' : 'ghost'}
-                onClick={() => setActiveTab('unassigned')}
-                className={`btn-touch ${activeTab === 'unassigned' ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'hover:bg-orange-50'}`}
-                size="sm"
-              >
-                <AlertCircle className="mr-1 md:mr-2 h-4 w-4" />
-                <span className="text-xs md:text-sm">Unassigned</span>
-              </Button>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+                  <X className="h-4 w-4 mr-1" />
+                  Clear All
+                </Button>
+              )}
             </div>
           </CardHeader>
-          {/* Enhanced Search and Filters */}
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
+          <CardContent className="pt-6 bg-white" style={{backgroundColor: 'white'}}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Search */}
+              <div className="space-y-2">
+                <Label htmlFor="search" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Search className="h-4 w-4 text-emerald-600" />
+                  Search Tickets
+                </Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
-                    type="search"
-                    placeholder="Search tickets by ID, title, or customer..."
-                    value={filters.search}
-                    onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    id="search"
+                    placeholder="Search by ticket #, title..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    disabled={loading}
+                    className="pl-10 h-11 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Select
-                  value={filters.status}
-                  onValueChange={(value) => setFilters({ ...filters, status: value, page: 1 })}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue placeholder="Filter by status" />
+
+              {/* Status Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                  Status
+                </Label>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus} disabled={loading}>
+                  <SelectTrigger className="h-11 border-gray-200 focus:border-purple-500 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px] overflow-y-auto">
-                    <SelectItem value="">All Statuses</SelectItem>
-                    <SelectItem value="OPEN">Open</SelectItem>
-                    <SelectItem value="ASSIGNED">Assigned</SelectItem>
-                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                    <SelectItem value="ONSITE_VISIT_PLANNED">Onsite Visit Planned</SelectItem>
-                    <SelectItem value="ONSITE_VISIT">Onsite Visit</SelectItem>
-                    <SelectItem value="RESOLVED">Resolved</SelectItem>
-                    <SelectItem value="CLOSED_PENDING">Closed Pending</SelectItem>
-                    <SelectItem value="SPARE_PARTS_NEEDED">Spare Parts Needed</SelectItem>
-                    <SelectItem value="SPARE_PARTS_BOOKED">Spare Parts Booked</SelectItem>
-                    <SelectItem value="SPARE_PARTS_DELIVERED">Spare Parts Delivered</SelectItem>
-                    <SelectItem value="PO_NEEDED">PO Needed</SelectItem>
-                    <SelectItem value="PO_RECEIVED">PO Received</SelectItem>
-                    <SelectItem value="CLOSED">Closed</SelectItem>
+                    {statuses.map(status => (
+                      <SelectItem key={status} value={status}>{status.replace(/_/g, ' ')}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                
-                <Select
-                  value={filters.priority}
-                  onValueChange={(value) => setFilters({ ...filters, priority: value, page: 1 })}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue placeholder="Filter by priority" />
+              </div>
+
+              {/* Priority Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Flag className="h-4 w-4 text-pink-600" />
+                  Priority
+                </Label>
+                <Select value={selectedPriority} onValueChange={setSelectedPriority} disabled={loading}>
+                  <SelectTrigger className="h-11 border-gray-200 focus:border-pink-500 focus:ring-pink-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All Priorities</SelectItem>
-                    <SelectItem value="LOW">Low</SelectItem>
-                    <SelectItem value="MEDIUM">Medium</SelectItem>
-                    <SelectItem value="HIGH">High</SelectItem>
-                    <SelectItem value="CRITICAL">Critical</SelectItem>
+                  <SelectContent className="max-h-[300px] overflow-y-auto">
+                    {priorities.map(priority => (
+                      <SelectItem key={priority} value={priority}>{priority}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={fetchTickets}
-                  className="hover:bg-indigo-50 hover:border-indigo-300"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
-      </motion.div>
 
-      {/* Desktop Table View */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-        className="hidden md:block"
-      >
-        <Card className="shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-t-lg">
-            <CardTitle className="text-gray-800 flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-indigo-600" />
-              Zone Tickets ({tickets.length})
-            </CardTitle>
-            <CardDescription>
-              Track and manage tickets in your service zone
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {tickets.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="mx-auto h-24 w-24 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-4">
-                  <AlertCircle className="h-12 w-12 text-indigo-500" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No tickets found</h3>
-                <p className="text-gray-500 mb-6">
-                  {activeTab === 'assigned' ? 'No tickets are currently assigned.' : 
-                   activeTab === 'unassigned' ? 'All tickets in your zone are assigned.' :
-                   'Create your first support ticket to get started.'}
-                </p>
-                <Button 
-                  onClick={() => router.push('/zone/tickets/create')}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Ticket
-                </Button>
-              </div>
-            ) : (
-              <MobileTable>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="text-left py-4 px-6 font-semibold text-gray-700 min-w-[250px]">Ticket Details</th>
-                        <th className="text-left py-4 px-6 font-semibold text-gray-700 min-w-[150px]">Customer</th>
-                        <th className="text-left py-4 px-6 font-semibold text-gray-700 min-w-[180px]">Status & Priority</th>
-                        <th className="text-left py-4 px-6 font-semibold text-gray-700 min-w-[180px]">Assigned To</th>
-                        <th className="text-left py-4 px-6 font-semibold text-gray-700 w-32">Created</th>
-                        <th className="text-right py-4 px-6 font-semibold text-gray-700 w-24">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {loading ? (
-                        <tr>
-                          <td colSpan={6} className="text-center py-8">
-                            <div className="flex items-center justify-center">
-                              <RefreshCw className="h-6 w-6 animate-spin text-indigo-500 mr-2" />
-                              Loading tickets...
-                            </div>
-                          </td>
-                        </tr>
-                      ) : (
-                        tickets.map((ticket) => (
-                          <motion.tr 
-                            key={ticket.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.3 }}
-                            className="hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/50 transition-all duration-200"
-                          >
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold">
-                                  #{ticket.id}
-                                </div>
-                                <div className="min-w-0">
-                                  <button 
-                                    onClick={() => router.push(`/zone/tickets/${ticket.id}`)}
-                                    className="font-semibold text-gray-900 hover:text-indigo-600 transition-colors text-left break-all"
-                                  >
-                                    {ticket.title}
-                                  </button>
-                                  <div className="text-sm text-gray-500">Ticket #{ticket.id}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-4 px-6">
-                              <div className="font-medium text-gray-900 break-all">
-                                {ticket.customer?.companyName || 'N/A'}
-                              </div>
-                            </td>
-                            <td className="py-4 px-6">
-                              <div className="space-y-2">
-                                <Badge 
-                                  variant={getStatusBadgeVariant(ticket.status)}
-                                  className={
-                                    ticket.status === 'OPEN' ? 'bg-orange-100 text-orange-800 hover:bg-orange-200' :
-                                    ticket.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
-                                    ticket.status === 'IN_PROGRESS' ? 'bg-purple-100 text-purple-800 hover:bg-purple-200' :
-                                    ticket.status === 'CLOSED' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
-                                    'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                  }
-                                >
-                                  {ticket.status.replace(/_/g, ' ')}
-                                </Badge>
-                                <div>
-                                  <Badge 
-                                    variant={getPriorityBadgeVariant(ticket.priority)}
-                                    className={
-                                      ticket.priority === 'CRITICAL' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
-                                      ticket.priority === 'HIGH' ? 'bg-orange-100 text-orange-800 hover:bg-orange-200' :
-                                      ticket.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
-                                      'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }
-                                  >
-                                    {ticket.priority}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-4 px-6">
-                              {ticket.assignedTo ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-semibold">
-                                    {ticket.assignedTo.name?.charAt(0) || ticket.assignedTo.email.charAt(0)}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="font-medium text-gray-900 break-all">
-                                      {ticket.assignedTo.name || ticket.assignedTo.email.split('@')[0]}
-                                    </div>
-                                    <div className="text-xs text-gray-500 break-all">
-                                      {ticket.assignedTo.email}
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-gray-500 italic">Unassigned</span>
-                              )}
-                            </td>
-                            <td className="py-4 px-6">
-                              <div className="text-sm text-gray-900">
-                                {format(new Date(ticket.createdAt), 'MMM d, yyyy')}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {format(new Date(ticket.createdAt), 'h:mm a')}
-                              </div>
-                            </td>
-                            <td className="py-4 px-6 text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => router.push(`/zone/tickets/${ticket.id}`)}
-                                className="hover:bg-indigo-50 hover:text-indigo-600"
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Button>
-                            </td>
-                          </motion.tr>
-                        ))
+        {/* Tickets Table - Premium Design */}
+        <Card className="border-0 shadow-2xl overflow-hidden bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white">
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-emerald-600/50 transition-colors" onClick={() => handleSort('id')}>
+                    <div className="flex items-center gap-1.5">
+                      Ticket #
+                      {sortField === 'id' && (
+                        <span className="text-cyan-300">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
-                    </tbody>
-                  </table>
-                </div>
-              </MobileTable>
-            )}
-            
-            {/* Enhanced Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="border-t bg-gray-50 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    Showing page <span className="font-semibold">{filters.page}</span> of{' '}
-                    <span className="font-semibold">{pagination.totalPages}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFilters({ ...filters, page: Math.max(1, filters.page - 1) })}
-                      disabled={filters.page === 1}
-                      className="hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50"
-                    >
-                      Previous
-                    </Button>
-                    <div className="flex items-center space-x-1">
-                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                        const page = i + 1;
-                        return (
-                          <Button
-                            key={page}
-                            variant={filters.page === page ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setFilters({ ...filters, page })}
-                            className={
-                              filters.page === page
-                                ? "bg-indigo-600 hover:bg-indigo-700"
-                                : "hover:bg-indigo-50 hover:border-indigo-300"
-                            }
-                          >
-                            {page}
-                          </Button>
-                        );
-                      })}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFilters({ ...filters, page: Math.min(pagination.totalPages, filters.page + 1) })}
-                      disabled={filters.page >= pagination.totalPages}
-                      className="hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50"
-                    >
-                      Next
-                    </Button>
-                  </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-emerald-600/50 transition-colors" onClick={() => handleSort('title')}>
+                    <div className="flex items-center gap-1.5">
+                      <Ticket className="h-3.5 w-3.5 text-cyan-300" />
+                      Title
+                      {sortField === 'title' && (
+                        <span className="text-cyan-300">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-emerald-600/50 transition-colors" onClick={() => handleSort('customer')}>
+                    <div className="flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-emerald-300" />
+                      Customer
+                      {sortField === 'customer' && (
+                        <span className="text-cyan-300">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-emerald-600/50 transition-colors" onClick={() => handleSort('status')}>
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-purple-300" />
+                      Status
+                      {sortField === 'status' && (
+                        <span className="text-cyan-300">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-emerald-600/50 transition-colors" onClick={() => handleSort('priority')}>
+                    <div className="flex items-center gap-1.5">
+                      <Flag className="h-3.5 w-3.5 text-amber-300" />
+                      Priority
+                      {sortField === 'priority' && (
+                        <span className="text-cyan-300">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-emerald-600/50 transition-colors" onClick={() => handleSort('assignedTo')}>
+                    <div className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-cyan-300" />
+                      Assigned
+                      {sortField === 'assignedTo' && (
+                        <span className="text-cyan-300">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-300" />
+                      Response
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-emerald-600/50 transition-colors" onClick={() => handleSort('createdAt')}>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-pink-300" />
+                      Created
+                      {sortField === 'createdAt' && (
+                        <span className="text-cyan-300">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-16 text-center bg-gradient-to-br from-slate-50 to-emerald-50/30">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="relative">
+                          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                            <Loader2 className="h-8 w-8 animate-spin text-white" />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900">Loading tickets...</p>
+                          <p className="text-sm text-gray-500 mt-1">Please wait while we fetch the data</p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : tickets.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-16 text-center bg-gradient-to-br from-slate-50 to-emerald-50/30">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                          <Ticket className="h-8 w-8 text-gray-500" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900">No tickets found</p>
+                          <p className="text-sm text-gray-500 mt-1">Try adjusting your filters or create a new ticket</p>
+                        </div>
+                        <Button onClick={() => router.push('/zone/tickets/create')} className="mt-4 bg-gradient-to-r from-emerald-600 to-teal-600">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Your First Ticket
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  sortedTickets.map((ticket: any, index: number) => (
+                  <tr 
+                    key={ticket.id} 
+                    className={`
+                      ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}
+                      hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50/50 
+                      transition-all duration-200 group
+                    `}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Link href={`/zone/tickets/${ticket.id}`} className="font-mono font-bold text-emerald-600 hover:text-emerald-700 text-sm hover:underline">
+                          #{ticket.id}
+                        </Link>
+                        {ticket.status === 'OPEN' && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded">NEW</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="min-w-0">
+                        <Link href={`/zone/tickets/${ticket.id}`} className="font-semibold text-gray-900 hover:text-emerald-600 text-sm truncate max-w-[200px] block hover:underline">
+                          {ticket.title}
+                        </Link>
+                        {ticket.description && <p className="text-xs text-gray-400 truncate max-w-[200px]">{ticket.description}</p>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
+                          {(ticket.customer?.companyName || 'U')?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm truncate max-w-[120px]">{ticket.customer?.companyName || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <span className={`
+                        inline-flex px-2.5 py-1 text-xs font-bold rounded-full shadow-sm
+                        ${getStatusStyle(ticket.status)}
+                      `}>
+                        {ticket.status?.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <span className={`
+                        inline-flex px-2 py-1 text-xs font-bold rounded-md border
+                        ${getPriorityStyle(ticket.priority)}
+                      `}>
+                        {ticket.priority}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {ticket.assignedTo ? (
+                          <>
+                            <div className="h-6 w-6 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-slate-700 font-semibold text-[10px] flex-shrink-0">
+                              {ticket.assignedTo?.name?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                            <span className="text-gray-700 text-sm truncate max-w-[80px]">{ticket.assignedTo?.name?.split(' ')[0]}</span>
+                          </>
+                        ) : (
+                          <span className="text-gray-400 text-sm italic">Unassigned</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {ticket.assignedTo ? (
+                        ticket.assignmentStatus === 'PENDING' ? (
+                          <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-[10px] px-2 py-0.5 animate-pulse">
+                            Pending
+                          </Badge>
+                        ) : ticket.assignmentStatus === 'ACCEPTED' ? (
+                          <Badge className="bg-green-100 text-green-700 border-green-300 text-[10px] px-2 py-0.5">
+                            ✓ Accepted
+                          </Badge>
+                        ) : ticket.assignmentStatus === 'REJECTED' ? (
+                          <Badge className="bg-red-100 text-red-700 border-red-300 text-[10px] px-2 py-0.5">
+                            ✗ Rejected
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-gray-500 text-sm">{ticket.createdAt ? format(new Date(ticket.createdAt), 'dd MMM') : '-'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-slate-200 rounded-lg">
+                            <MoreHorizontal className="h-4 w-4 text-gray-600" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44 rounded-xl shadow-xl border-slate-200">
+                          <DropdownMenuItem 
+                            onClick={() => router.push(`/zone/tickets/${ticket.id}`)}
+                            className="cursor-pointer rounded-lg"
+                          >
+                            <Eye className="h-4 w-4 mr-2 text-blue-600" />
+                            View Details
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          {!loading && tickets.length > 0 && (
+            <div className="bg-gradient-to-r from-slate-50 via-emerald-50 to-teal-50/30 px-6 py-4 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700 font-medium">
+                  Showing <span className="font-bold text-slate-900">{((pagination.page - 1) * pagination.limit) + 1}</span> to <span className="font-semibold">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> of <span className="font-semibold">{pagination.total}</span> results
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                    disabled={pagination.page === 1}
+                    className="hover:bg-emerald-50 hover:border-emerald-300 disabled:opacity-50 rounded-xl transition-all"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-gray-700 font-medium px-3">
+                    Page <span className="font-bold text-slate-900">{pagination.page}</span> of <span className="font-semibold">{pagination.totalPages}</span>
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPagination(prev => ({ ...prev, page: Math.min(pagination.totalPages, prev.page + 1) }))}
+                    disabled={pagination.page === pagination.totalPages}
+                    className="hover:bg-emerald-50 hover:border-emerald-300 disabled:opacity-50 rounded-xl transition-all"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-            )}
-          </CardContent>
+            </div>
+          )}
         </Card>
-      </motion.div>
-
-      {/* Mobile Card View */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-        className="md:hidden space-y-4"
-      >
-        <div className="flex items-center gap-2 mb-4">
-          <AlertCircle className="h-5 w-5 text-indigo-600" />
-          <h2 className="text-lg font-semibold text-gray-800">
-            Zone Tickets ({tickets.length})
-          </h2>
-        </div>
-        {tickets.length === 0 ? (
-          <MobileCard className="text-center py-8">
-            <div className="mx-auto h-20 w-20 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-4">
-              <AlertCircle className="h-10 w-10 text-indigo-500" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No tickets found</h3>
-            <p className="text-gray-500 mb-6 text-sm">
-              {activeTab === 'assigned' ? 'No tickets are currently assigned.' : 
-               activeTab === 'unassigned' ? 'All tickets in your zone are assigned.' :
-               'Create your first support ticket to get started.'}
-            </p>
-            <Button 
-              onClick={() => router.push('/zone/tickets/create')}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg w-full"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create Ticket
-            </Button>
-          </MobileCard>
-        ) : loading ? (
-          <MobileCard className="text-center py-8">
-            <div className="flex items-center justify-center">
-              <RefreshCw className="h-6 w-6 animate-spin text-indigo-500 mr-2" />
-              Loading tickets...
-            </div>
-          </MobileCard>
-        ) : (
-          <div className="space-y-4">
-            {tickets.map((ticket) => (
-              <TicketMobileCard key={ticket.id} ticket={ticket} />
-            ))}
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  );
+      </div>
+    </div>
+  )
 }

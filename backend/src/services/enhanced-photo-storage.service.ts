@@ -1,3 +1,15 @@
+/**
+ * ⚠️ DEPRECATED - DO NOT USE ⚠️
+ * 
+ * This service uploads photos to CLOUDINARY (external cloud).
+ * Company policy requires all images to stay within the network.
+ * 
+ * Use PhotoStorageService or LocalPhotoStorageService instead,
+ * which store files locally on the server.
+ * 
+ * @deprecated Use PhotoStorageService for local storage
+ */
+
 import prisma from '../config/db';
 import CloudinaryService, { PhotoUploadData, CloudinaryUploadResult } from './cloudinary.service';
 
@@ -11,10 +23,15 @@ export interface StoredPhotoResult {
   createdAt: Date;
 }
 
+/**
+ * @deprecated This class uploads to Cloudinary. Use PhotoStorageService instead.
+ */
 export class EnhancedPhotoStorageService {
   /**
+   * @deprecated Use PhotoStorageService.storePhotos() instead
    * Store photos in Cloudinary and save metadata to database
    */
+
   static async storePhotos(
     photos: PhotoUploadData[],
     context: {
@@ -27,14 +44,14 @@ export class EnhancedPhotoStorageService {
     try {
       // Upload to Cloudinary
       const cloudinaryResults = await CloudinaryService.uploadPhotos(photos, context);
-      
+
       // Store metadata in database
       const storedPhotos: StoredPhotoResult[] = [];
-      
+
       for (let i = 0; i < cloudinaryResults.length; i++) {
         const cloudinaryResult = cloudinaryResults[i];
         const originalPhoto = photos[i];
-        
+
         // Create attachment record with Cloudinary public_id in filename for reference
         if (context.ticketId) {
           // For ticket photos, store in Attachment table
@@ -76,7 +93,7 @@ export class EnhancedPhotoStorageService {
 
     } catch (error) {
       if (error instanceof Error) {
-        }
+      }
       throw new Error(`Failed to store photos: ${error}`);
     }
   }
@@ -101,7 +118,7 @@ export class EnhancedPhotoStorageService {
       return attachments.map(attachment => {
         // Extract public_id from filename (stored as originalname_publicid)
         const publicId = attachment.filename.split('_').pop() || '';
-        
+
         return {
           id: attachment.id,
           filename: attachment.filename,

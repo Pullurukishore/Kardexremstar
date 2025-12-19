@@ -10,7 +10,7 @@ import {
   Download,
   Printer,
   Loader2,
-  Edit,
+  Pencil as Edit,
   Save,
   Upload,
   X

@@ -4,1241 +4,1066 @@ import { logger } from '../utils/logger';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import * as ExcelJS from 'exceljs';
 
-const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+// ============================================================================
+// CONSTANTS & UTILITIES
+// ============================================================================
+
+const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const ZONE_ORDER = ['WEST', 'SOUTH', 'NORTH', 'EAST'];
 
-function pad2(n: number) { return n.toString().padStart(2, '0'); }
+const PRODUCT_TYPES = [
+    'CONTRACT', 'BD_SPARE', 'SPP', 'RELOCATION', 'SOFTWARE',
+    'BD_CHARGES', 'RETROFIT_KIT', 'UPGRADE_KIT', 'MIDLIFE_UPGRADE'
+];
 
-function sortZones<T extends { name?: string; zoneName?: string }>(zones: T[]): T[] {
-    return [...zones].sort((a, b) => {
+const PRODUCT_TYPE_LABELS: Record<string, string> = {
+    'CONTRACT': 'Contract',
+    'BD_SPARE': 'BD Spare',
+    'SPP': 'SPP',
+    'RELOCATION': 'Relocation',
+    'SOFTWARE': 'Software',
+    'BD_CHARGES': 'BD Charges',
+    'RETROFIT_KIT': 'Retrofit Kit',
+    'UPGRADE_KIT': 'Upgrade Kit',
+    'MIDLIFE_UPGRADE': 'Midlife Upgrade'
+};
+
+const OFFER_STAGES = ['INITIAL', 'PROPOSAL_SENT', 'NEGOTIATION', 'PO_RECEIVED', 'WON', 'LOST'];
+
+// Utility functions
+const pad2 = (n: number): string => n.toString().padStart(2, '0');
+
+const getYearDateRange = (year: number) => ({
+    start: new Date(year, 0, 1),
+    end: new Date(year, 11, 31, 23, 59, 59, 999)
+});
+
+const sortByZoneOrder = <T extends { name?: string; zoneName?: string }>(items: T[]): T[] => {
+    return [...items].sort((a, b) => {
         const aName = a.name || a.zoneName || '';
         const bName = b.name || b.zoneName || '';
         const aIdx = ZONE_ORDER.indexOf(aName);
         const bIdx = ZONE_ORDER.indexOf(bName);
         return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
     });
-}
-
-// Product types as per the Excel sheets
-const PRODUCT_TYPES = [
-    'CONTRACT', 'BD_SPARE', 'SPP', 'RELOCATION', 'SOFTWARE',
-    'BD_CHARGES', 'RETROFIT_KIT', 'UPGRADE_KIT', 'TRAINING', 'MIDLIFE_UPGRADE'
-];
-
-const formatProductType = (pt: string): string => {
-    const mapping: Record<string, string> = {
-        'CONTRACT': 'Contract',
-        'BD_SPARE': 'BD Spare',
-        'SPP': 'SPP',
-        'RELOCATION': 'Relocation',
-        'SOFTWARE': 'Software',
-        'BD_CHARGES': 'BD Charges',
-        'RETROFIT_KIT': 'Retrofit kit',
-        'UPGRADE_KIT': 'Upgrade kit',
-        'TRAINING': 'Training',
-        'MIDLIFE_UPGRADE': 'Midlife Upgrade'
-    };
-    return mapping[pt] || pt;
 };
 
+const formatProductType = (pt: string): string => PRODUCT_TYPE_LABELS[pt] || pt;
+
+const calculatePercentage = (value: number, total: number): number => {
+    return total > 0 ? (value / total) * 100 : 0;
+};
+
+const calculateDeviation = (actual: number, target: number): number => {
+    return target > 0 ? ((actual - target) / target) * 100 : 0;
+};
+
+// ============================================================================
+// DATA SERVICE - Centralized data fetching
+// ============================================================================
+
+class ForstDataService {
+    static async getZones() {
+        return prisma.serviceZone.findMany({
+            select: { id: true, name: true, shortForm: true },
+            orderBy: { name: 'asc' }
+        });
+    }
+
+    static async getOffersForYear(year: number, additionalFilters: any = {}) {
+        const { start, end } = getYearDateRange(year);
+        return prisma.offer.findMany({
+            where: {
+                OR: [
+                    { poExpectedMonth: { startsWith: `${year}-` } },
+                    { offerMonth: { startsWith: `${year}-` } },
+                    { createdAt: { gte: start, lte: end } }
+                ],
+                status: { notIn: ['CANCELLED', 'LOST'] as any },
+                ...additionalFilters
+            },
+            include: {
+                zone: { select: { id: true, name: true, shortForm: true } },
+                assignedTo: { select: { id: true, name: true } },
+                createdBy: { select: { id: true, name: true } },
+                customer: { select: { id: true, companyName: true } }
+            }
+        });
+    }
+
+    static async getWonOrdersForYear(year: number, additionalFilters: any = {}) {
+        const { start, end } = getYearDateRange(year);
+        return prisma.offer.findMany({
+            where: {
+                OR: [
+                    { poReceivedMonth: { startsWith: `${year}-` } },
+                    { poDate: { gte: start, lte: end } }
+                ],
+                stage: { in: ['WON', 'PO_RECEIVED'] as any },
+                ...additionalFilters
+            },
+            include: {
+                zone: { select: { id: true, name: true } }
+            }
+        });
+    }
+
+    static async getZoneTargets(year: number) {
+        // Try yearly targets first, then monthly
+        const yearlyTargets = await prisma.zoneTarget.findMany({
+            where: { periodType: 'YEARLY' as any, targetPeriod: `${year}` },
+            select: { serviceZoneId: true, targetPeriod: true, targetValue: true, productType: true }
+        });
+
+        if (yearlyTargets.length > 0) {
+            return { type: 'yearly', targets: yearlyTargets };
+        }
+
+        const monthlyTargets = await prisma.zoneTarget.findMany({
+            where: { periodType: 'MONTHLY' as any, targetPeriod: { startsWith: `${year}-` } },
+            select: { serviceZoneId: true, targetPeriod: true, targetValue: true, productType: true }
+        });
+
+        return { type: 'monthly', targets: monthlyTargets };
+    }
+
+    static async getOffersByStage(year: number) {
+        const { start, end } = getYearDateRange(year);
+        return prisma.offer.groupBy({
+            by: ['stage', 'zoneId'],
+            where: {
+                createdAt: { gte: start, lte: end }
+            },
+            _count: { id: true },
+            _sum: { offerValue: true }
+        });
+    }
+}
+
+// ============================================================================
+// FORST CONTROLLER
+// ============================================================================
+
 export class ForstController {
-    // Wrapper methods for routes without authentication
-    static async getOffersHighlightsWrapper(req: any, res: Response) {
-        return ForstController.getOffersHighlights(req as AuthenticatedRequest, res);
-    }
 
-    static async getZoneMonthlyBreakdownWrapper(req: any, res: Response) {
-        return ForstController.getZoneMonthlyBreakdown(req as AuthenticatedRequest, res);
-    }
+    // -------------------------------------------------------------------------
+    // DASHBOARD SUMMARY - Main KPI overview
+    // -------------------------------------------------------------------------
 
-    static async getForecastQuarterlyWrapper(req: any, res: Response) {
-        return ForstController.getForecastQuarterly(req as AuthenticatedRequest, res);
-    }
-
-    static async getProductTypeSummaryWrapper(req: any, res: Response) {
-        return ForstController.getProductTypeSummary(req as AuthenticatedRequest, res);
-    }
-
-    static async getPersonWisePerformanceWrapper(req: any, res: Response) {
-        return ForstController.getPersonWisePerformance(req as AuthenticatedRequest, res);
-    }
-
-    static async getProductForecastWrapper(req: any, res: Response) {
-        return ForstController.getProductForecast(req as AuthenticatedRequest, res);
-    }
-
-    static async getCompleteReportWrapper(req: any, res: Response) {
-        return ForstController.getCompleteReport(req as AuthenticatedRequest, res);
-    }
-
-    static async exportExcelWrapper(req: any, res: Response) {
-        return ForstController.exportExcel(req as AuthenticatedRequest, res);
-    }
-
-    /**
-     * Get Offers Highlights - Zone-wise summary (Image 1 - Top section)
-     * Returns: Zone, No. of Offers, Offers Value, Orders Received, Open Funnel, Order Booking, BU, %, Balance BU
-     */
-    static async getOffersHighlights(req: AuthenticatedRequest, res: Response) {
+    static async getDashboardSummary(req: AuthenticatedRequest, res: Response) {
         try {
-            const { year: yearParam } = req.query as any;
-            const now = new Date();
-            const year = yearParam ? parseInt(yearParam as string) : now.getFullYear();
+            const year = parseInt(req.query.year as string) || new Date().getFullYear();
 
-            const zones = await prisma.serviceZone.findMany({
-                select: { id: true, name: true, shortForm: true },
-                orderBy: { name: 'asc' }
-            });
-
-            // All offers in the year (by expected month, offer month, or createdAt) excluding cancelled/lost
-            const offers = await prisma.offer.findMany({
-                where: {
-                    OR: [
-                        { poExpectedMonth: { startsWith: `${year}-` } },
-                        { offerMonth: { startsWith: `${year}-` } },
-                        { createdAt: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59, 999) } },
-                    ],
-                    status: { notIn: ['CANCELLED', 'LOST'] as any },
-                },
-                select: { zoneId: true, offerValue: true, openFunnel: true, productType: true, createdAt: true },
-            });
-
-
-            // Orders received/booked in the year
-            const orders = await prisma.offer.findMany({
-                where: {
-                    OR: [
-                        { poReceivedMonth: { startsWith: `${year}-` } },
-                        { poDate: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59, 999) } },
-                    ],
-                    stage: { in: ['WON', 'PO_RECEIVED', 'ORDER_BOOKED'] as any },
-                },
-                select: { zoneId: true, poValue: true, stage: true },
-            });
-
-            // Get BU targets for the year
-            const buByZone: Record<number, number> = {};
-            for (const z of zones) buByZone[z.id] = 0;
-
-            // Prefer yearly target; fallback to monthly sum
-            const yearlyTargets = await prisma.zoneTarget.findMany({
-                where: { periodType: 'YEARLY' as any, targetPeriod: `${year}` },
-                select: { serviceZoneId: true, targetValue: true },
-            });
-
-            if (yearlyTargets.length > 0) {
-                for (const t of yearlyTargets) {
-                    buByZone[t.serviceZoneId] = (buByZone[t.serviceZoneId] || 0) + Number(t.targetValue || 0);
-                }
-            } else {
-                const monthlyTargets = await prisma.zoneTarget.findMany({
-                    where: { periodType: 'MONTHLY' as any, targetPeriod: { startsWith: `${year}-` } },
-                    select: { serviceZoneId: true, targetValue: true },
-                });
-                for (const t of monthlyTargets) {
-                    buByZone[t.serviceZoneId] = (buByZone[t.serviceZoneId] || 0) + Number(t.targetValue || 0);
-                }
-            }
-
-            // Aggregate by zone
-            const offersByZone: Record<number, { count: number; value: number; openFunnel: number }> = {};
-            const ordersByZone: Record<number, { received: number; booked: number }> = {};
-
-            for (const z of zones) {
-                offersByZone[z.id] = { count: 0, value: 0, openFunnel: 0 };
-                ordersByZone[z.id] = { received: 0, booked: 0 };
-            }
-
-            for (const o of offers) {
-                const z = o.zoneId || 0;
-                if (!offersByZone[z]) offersByZone[z] = { count: 0, value: 0, openFunnel: 0 };
-                offersByZone[z].count += 1;
-                offersByZone[z].value += Number(o.offerValue || 0);
-                if (o.openFunnel) offersByZone[z].openFunnel += Number(o.offerValue || 0);
-            }
-
-            for (const o of orders) {
-                const z = o.zoneId || 0;
-                if (!ordersByZone[z]) ordersByZone[z] = { received: 0, booked: 0 };
-                ordersByZone[z].received += Number(o.poValue || 0);
-                if ((o as any).stage === 'ORDER_BOOKED') {
-                    ordersByZone[z].booked += Number(o.poValue || 0);
-                }
-            }
-
-            const rows = sortZones(zones).map(z => {
-                const o = offersByZone[z.id] || { count: 0, value: 0, openFunnel: 0 };
-                const ord = ordersByZone[z.id] || { received: 0, booked: 0 };
-                const bu = buByZone[z.id] || 0;
-                const devPercent = bu > 0 ? ((ord.received - bu) / bu) * 100 : 0;
-                const balanceBu = bu - ord.received;
-                const openFunnel = o.value - ord.received;
-
-                return {
-                    zoneId: z.id,
-                    zoneName: z.name,
-                    shortForm: z.shortForm,
-                    numOffers: o.count,
-                    offersValue: o.value,
-                    ordersReceived: ord.received,
-                    openFunnel: Math.max(0, openFunnel),
-                    orderBooking: ord.booked,
-                    utForBooking: bu,
-                    devPercent,
-                    balanceBu,
-                };
-            });
-
-            // Calculate hit rate (total offers won / total offers)
-            const totalOffers = offers.length;
-            const totalWon = orders.length;
-            const hitRate = totalOffers > 0 ? (totalWon / totalOffers) * 100 : 0;
+            const [zones, offers, orders, targetData] = await Promise.all([
+                ForstDataService.getZones(),
+                ForstDataService.getOffersForYear(year),
+                ForstDataService.getWonOrdersForYear(year),
+                ForstDataService.getZoneTargets(year)
+            ]);
 
             // Calculate totals
-            const total = rows.reduce((acc, r) => ({
-                numOffers: acc.numOffers + r.numOffers,
-                offersValue: acc.offersValue + r.offersValue,
-                ordersReceived: acc.ordersReceived + r.ordersReceived,
-                openFunnel: acc.openFunnel + r.openFunnel,
-                orderBooking: acc.orderBooking + r.orderBooking,
-                utForBooking: acc.utForBooking + r.utForBooking,
-                balanceBu: acc.balanceBu + r.balanceBu,
-            }), { numOffers: 0, offersValue: 0, ordersReceived: 0, openFunnel: 0, orderBooking: 0, utForBooking: 0, balanceBu: 0 });
+            const totalOffers = offers.length;
+            const totalOffersValue = offers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
+            const totalOrdersValue = orders.reduce((sum, o) => sum + Number(o.poValue || 0), 0);
+            const openFunnelValue = totalOffersValue - totalOrdersValue;
 
-            const totalDevPercent = total.utForBooking > 0
-                ? ((total.ordersReceived - total.utForBooking) / total.utForBooking) * 100
-                : 0;
-
-            res.json({
-                success: true,
-                data: {
-                    year,
-                    rows,
-                    total: { ...total, devPercent: totalDevPercent },
-                    hitRate: Math.round(hitRate),
-                },
-            });
-        } catch (error) {
-            logger.error('FORST offers highlights error:', error);
-            res.status(500).json({ error: 'Failed to compute offers highlights' });
-        }
-    }
-
-    /**
-     * Get Zone Monthly Breakdown (Image 1 - Zone-wise monthly tables)
-     * Returns monthly data for each zone with offers, orders, BU, deviations
-     */
-    static async getZoneMonthlyBreakdown(req: AuthenticatedRequest, res: Response) {
-        try {
-            const { year: yearParam, zoneId: zoneIdParam } = req.query as any;
-            const now = new Date();
-            const year = yearParam ? parseInt(yearParam as string) : now.getFullYear();
-            const zoneId = zoneIdParam ? parseInt(zoneIdParam as string) : null;
-
-            const zones = await prisma.serviceZone.findMany({
-                where: zoneId ? { id: zoneId } : {},
-                select: { id: true, name: true, shortForm: true },
-                orderBy: { name: 'asc' }
-            });
-
-            // Get all offers for the year
-            const offers = await prisma.offer.findMany({
-                where: {
-                    OR: [
-                        { poExpectedMonth: { startsWith: `${year}-` } },
-                        { offerMonth: { startsWith: `${year}-` } },
-                        { createdAt: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59, 999) } },
-                    ],
-                    status: { notIn: ['CANCELLED', 'LOST'] as any },
-                    ...(zoneId ? { zoneId } : {}),
-                },
-                select: { zoneId: true, poExpectedMonth: true, offerMonth: true, offerValue: true, createdAt: true },
-            });
-
-
-            // Get all orders for the year
-            const orders = await prisma.offer.findMany({
-                where: {
-                    OR: [
-                        { poReceivedMonth: { startsWith: `${year}-` } },
-                        { poDate: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59, 999) } },
-                    ],
-                    stage: { in: ['WON', 'PO_RECEIVED', 'ORDER_BOOKED'] as any },
-                    ...(zoneId ? { zoneId } : {}),
-                },
-                select: { zoneId: true, poReceivedMonth: true, poDate: true, poValue: true, stage: true },
-            });
-
-            // Get monthly targets
-            const monthlyTargets = await prisma.zoneTarget.findMany({
-                where: {
-                    periodType: 'MONTHLY' as any,
-                    targetPeriod: { startsWith: `${year}-` },
-                    ...(zoneId ? { serviceZoneId: zoneId } : {}),
-                },
-                select: { serviceZoneId: true, targetPeriod: true, targetValue: true },
-            });
-
-            // Build monthly breakdown per zone
-            const zoneData = sortZones(zones).map(zone => {
-                const monthly = [];
-                let runningOpenFunnel = 0;
-
-                for (let m = 1; m <= 12; m++) {
-                    const mm = pad2(m);
-                    const monthKey = `${year}-${mm}`;
-
-                    // Offers for this zone and month (use poExpectedMonth, offerMonth, or createdAt)
-                    const monthOffers = offers.filter(o => {
-                        if (o.zoneId !== zone.id) return false;
-                        const offerMonth = o.poExpectedMonth || o.offerMonth ||
-                            (o.createdAt ? `${new Date(o.createdAt).getFullYear()}-${pad2(new Date(o.createdAt).getMonth() + 1)}` : null);
-                        return offerMonth && offerMonth.endsWith(`-${mm}`);
-                    });
-                    const offersValue = monthOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
-
-
-                    // Orders received in this month
-                    const monthOrders = orders.filter(o => {
-                        if (o.zoneId !== zone.id) return false;
-                        const month = o.poReceivedMonth ||
-                            (o.poDate ? `${o.poDate.getFullYear()}-${pad2(o.poDate.getMonth() + 1)}` : null);
-                        return month === monthKey;
-                    });
-                    const ordersReceived = monthOrders.reduce((sum, o) => sum + Number(o.poValue || 0), 0);
-
-                    // Orders booked
-                    const ordersBooked = monthOrders
-                        .filter(o => (o as any).stage === 'ORDER_BOOKED')
-                        .reduce((sum, o) => sum + Number(o.poValue || 0), 0);
-
-                    // BU for this month
-                    const monthTarget = monthlyTargets.find(
-                        t => t.serviceZoneId === zone.id && t.targetPeriod === monthKey
-                    );
-                    const buMonthly = Number(monthTarget?.targetValue || 0);
-
-                    // Calculate deviations
-                    const devOrVsBooked = ordersReceived - ordersBooked;
-                    const ordersInHand = offersValue - ordersReceived;
-                    const bookedVsBu = ordersBooked - buMonthly;
-                    const bookedVsBuPercent = buMonthly > 0 ? ((ordersBooked - buMonthly) / buMonthly) * 100 : 0;
-                    const offerBuMonthly = offersValue;
-                    const offerVsBuPercent = buMonthly > 0 ? ((offersValue - buMonthly) / buMonthly) * 100 : 0;
-
-                    monthly.push({
-                        month: m,
-                        monthName: monthNames[m - 1],
-                        offersValue,
-                        ordersReceived,
-                        ordersBooked,
-                        devOrVsBooked,
-                        ordersInHand: Math.max(0, ordersInHand),
-                        buMonthly,
-                        bookedVsBu,
-                        bookedVsBuPercent,
-                        offerBuMonthly,
-                        offerVsBuPercent,
-                    });
-                }
-
-                // Calculate totals
-                const totals = monthly.reduce((acc, m) => ({
-                    offersValue: acc.offersValue + m.offersValue,
-                    ordersReceived: acc.ordersReceived + m.ordersReceived,
-                    ordersBooked: acc.ordersBooked + m.ordersBooked,
-                    buMonthly: acc.buMonthly + m.buMonthly,
-                }), { offersValue: 0, ordersReceived: 0, ordersBooked: 0, buMonthly: 0 });
-
-                // Calculate hit rate for zone
-                const zoneOfferCount = offers.filter(o => o.zoneId === zone.id).length;
-                const zoneOrderCount = orders.filter(o => o.zoneId === zone.id).length;
-                const hitRate = zoneOfferCount > 0 ? (zoneOrderCount / zoneOfferCount) * 100 : 0;
-
-                return {
-                    zoneId: zone.id,
-                    zoneName: zone.name,
-                    monthly,
-                    totals,
-                    hitRate: Math.round(hitRate),
-                };
-            });
-
-            res.json({
-                success: true,
-                data: {
-                    year,
-                    zones: zoneData,
-                },
-            });
-        } catch (error) {
-            logger.error('FORST zone monthly breakdown error:', error);
-            res.status(500).json({ error: 'Failed to compute zone monthly breakdown' });
-        }
-    }
-
-    /**
-     * Get Forecast Quarterly (Image 2 - Top section)
-     * Returns quarterly forecast vs BU with zone breakdown
-     */
-    static async getForecastQuarterly(req: AuthenticatedRequest, res: Response) {
-        try {
-            const { year: yearParam } = req.query as any;
-            const now = new Date();
-            const year = yearParam ? parseInt(yearParam as string) : now.getFullYear();
-
-            const zones = await prisma.serviceZone.findMany({
-                select: { id: true, name: true },
-                orderBy: { name: 'asc' }
-            });
-
-            // Get offers forecast
-            const offers = await prisma.offer.findMany({
-                where: {
-                    poExpectedMonth: { startsWith: `${year}-` },
-                    status: { notIn: ['CANCELLED', 'LOST'] as any },
-                },
-                select: { zoneId: true, poExpectedMonth: true, offerValue: true },
-            });
-
-            // Get quarterly BU targets
-            const yearlyTargets = await prisma.zoneTarget.findMany({
-                where: { periodType: 'YEARLY' as any, targetPeriod: `${year}` },
-                select: { serviceZoneId: true, targetValue: true },
-            });
-
-            // Calculate total yearly BU
-            let totalYearlyBu = yearlyTargets.reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
-
-            // If no yearly targets, use monthly
-            if (totalYearlyBu === 0) {
-                const monthlyTargets = await prisma.zoneTarget.findMany({
-                    where: { periodType: 'MONTHLY' as any, targetPeriod: { startsWith: `${year}-` } },
-                    select: { targetValue: true },
-                });
-                totalYearlyBu = monthlyTargets.reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
+            // Calculate target
+            let totalTarget = 0;
+            if (targetData.type === 'yearly') {
+                totalTarget = targetData.targets.reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
+            } else {
+                totalTarget = targetData.targets.reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
             }
 
-            const quarterlyBu = totalYearlyBu / 4;
+            // Hit rate
+            const hitRate = calculatePercentage(orders.length, totalOffers);
 
-            // Build monthly data with zone breakdown
-            const monthly: { month: number; monthName: string; forecast: number; byZone: Record<string, number> }[] = [];
-            for (let m = 1; m <= 12; m++) {
-                const mm = pad2(m);
-                const byZone: Record<string, number> = {};
-                let total = 0;
+            // Deviation from target
+            const targetDeviation = calculateDeviation(totalOrdersValue, totalTarget);
+            const balanceToTarget = totalTarget - totalOrdersValue;
 
-                for (const zone of sortZones(zones)) {
-                    const zoneValue = offers
-                        .filter(o => o.zoneId === zone.id && (o.poExpectedMonth || '').endsWith(`-${mm}`))
-                        .reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
-                    byZone[zone.name] = zoneValue;
-                    total += zoneValue;
-                }
+            // Pipeline stages
+            const pipeline = {
+                open: { count: 0, value: 0 },
+                negotiation: { count: 0, value: 0 },
+                poReceived: { count: 0, value: 0 },
+                won: { count: 0, value: 0 },
+                lost: { count: 0, value: 0 }
+            };
 
-                monthly.push({
-                    month: m,
-                    monthName: monthNames[m - 1],
-                    forecast: total,
-                    byZone,
-                });
-            }
-
-            // Build quarterly data
-            const quarters = [
-                { q: 'Q1', months: [1, 2, 3] },
-                { q: 'Q2', months: [4, 5, 6] },
-                { q: 'Q3', months: [7, 8, 9] },
-                { q: 'Q4', months: [10, 11, 12] },
-            ].map(q => {
-                const quarterMonths = monthly.filter(m => q.months.includes(m.month));
-                const forecast = quarterMonths.reduce((sum, m) => sum + m.forecast, 0);
-                const bu = quarterlyBu;
-                const devPercent = bu > 0 ? ((forecast - bu) / bu) * 100 : 0;
-
-                return {
-                    quarter: q.q,
-                    forecast,
-                    bu,
-                    devPercent,
-                };
-            });
-
-            res.json({
-                success: true,
-                data: {
-                    year,
-                    monthly,
-                    quarters,
-                    zones: sortZones(zones).map(z => z.name),
-                },
-            });
-        } catch (error) {
-            logger.error('FORST forecast quarterly error:', error);
-            res.status(500).json({ error: 'Failed to compute forecast quarterly' });
-        }
-    }
-
-    /**
-     * Get Product Type Summary (Image 2 - Product type by person)
-     * Returns product type breakdown by zone and person
-     */
-    static async getProductTypeSummary(req: AuthenticatedRequest, res: Response) {
-        try {
-            const { year: yearParam, zoneId: zoneIdParam } = req.query as any;
-            const now = new Date();
-            const year = yearParam ? parseInt(yearParam as string) : now.getFullYear();
-            const zoneId = zoneIdParam ? parseInt(zoneIdParam as string) : null;
-
-            const zones = await prisma.serviceZone.findMany({
-                where: zoneId ? { id: zoneId } : {},
-                select: { id: true, name: true },
-                orderBy: { name: 'asc' }
-            });
-
-            // Get offers with user info
-            const offers = await prisma.offer.findMany({
-                where: {
-                    poExpectedMonth: { startsWith: `${year}-` },
-                    status: { notIn: ['CANCELLED', 'LOST'] as any },
-                    ...(zoneId ? { zoneId } : {}),
-                },
-                select: {
-                    zoneId: true,
-                    productType: true,
-                    offerValue: true,
-                    assignedToId: true,
-                    createdById: true,
-                    assignedTo: { select: { id: true, name: true } },
-                    createdBy: { select: { id: true, name: true } },
-                },
-            });
-
-            // Get zone users
-            const zoneUsers = await prisma.servicePersonZone.findMany({
-                where: zoneId ? { serviceZoneId: zoneId } : {},
-                include: {
-                    user: { select: { id: true, name: true } },
-                    serviceZone: { select: { id: true, name: true } },
-                },
-            });
-
-            // Build zone data
-            const zoneData = sortZones(zones).map(zone => {
-                const zoneOffers = offers.filter(o => o.zoneId === zone.id);
-
-                // Get users in this zone
-                const usersInZone = zoneUsers
-                    .filter(zu => zu.serviceZoneId === zone.id)
-                    .map(zu => ({ id: zu.user.id, name: zu.user.name || 'Unknown' }));
-
-                // Add users from offers if not in zone users
-                zoneOffers.forEach(o => {
-                    const userId = o.assignedToId || o.createdById;
-                    const userName = o.assignedTo?.name || o.createdBy?.name;
-                    if (userId && userName && !usersInZone.find(u => u.id === userId)) {
-                        usersInZone.push({ id: userId, name: userName });
-                    }
-                });
-
-                // Build matrix: productType -> userId -> value
-                const matrix: Record<string, Record<number, number>> = {};
-                const totalsByUser: Record<number, number> = {};
-                const totalsByProduct: Record<string, number> = {};
-                let zoneTotal = 0;
-
-                // Initialize all product types
-                PRODUCT_TYPES.forEach(pt => {
-                    matrix[pt] = {};
-                    usersInZone.forEach(u => {
-                        matrix[pt][u.id] = 0;
-                    });
-                    totalsByProduct[pt] = 0;
-                });
-
-                usersInZone.forEach(u => {
-                    totalsByUser[u.id] = 0;
-                });
-
-                // Fill in values
-                zoneOffers.forEach(o => {
-                    const pt = o.productType || 'UNKNOWN';
-                    const userId = o.assignedToId || o.createdById || 0;
-                    const value = Number(o.offerValue || 0);
-
-                    if (!matrix[pt]) matrix[pt] = {};
-                    matrix[pt][userId] = (matrix[pt][userId] || 0) + value;
-                    totalsByUser[userId] = (totalsByUser[userId] || 0) + value;
-                    totalsByProduct[pt] = (totalsByProduct[pt] || 0) + value;
-                    zoneTotal += value;
-                });
-
-                return {
-                    zoneId: zone.id,
-                    zoneName: zone.name,
-                    users: usersInZone,
-                    productTypes: PRODUCT_TYPES.map(pt => ({ code: pt, name: formatProductType(pt) })),
-                    matrix,
-                    totals: {
-                        byUser: totalsByUser,
-                        byProductType: totalsByProduct,
-                        zoneTotal,
-                    },
-                };
-            });
-
-            // Calculate grand totals by product type
-            const grandTotalsByProduct: Record<string, number> = {};
-            PRODUCT_TYPES.forEach(pt => {
-                grandTotalsByProduct[pt] = zoneData.reduce((sum, z) => sum + (z.totals.byProductType[pt] || 0), 0);
-            });
-
-            res.json({
-                success: true,
-                data: {
-                    year,
-                    zones: zoneData,
-                    grandTotals: grandTotalsByProduct,
-                },
-            });
-        } catch (error) {
-            logger.error('FORST product type summary error:', error);
-            res.status(500).json({ error: 'Failed to compute product type summary' });
-        }
-    }
-
-    /**
-     * Get Person-wise Performance (Image 4)
-     * Returns monthly breakdown by person and product type
-     */
-    static async getPersonWisePerformance(req: AuthenticatedRequest, res: Response) {
-        try {
-            const { year: yearParam, zoneId: zoneIdParam, userId: userIdParam } = req.query as any;
-            const now = new Date();
-            const year = yearParam ? parseInt(yearParam as string) : now.getFullYear();
-            const zoneId = zoneIdParam ? parseInt(zoneIdParam as string) : null;
-            const userId = userIdParam ? parseInt(userIdParam as string) : null;
-
-            // Get offers with user info
-            const offers = await prisma.offer.findMany({
-                where: {
-                    poExpectedMonth: { startsWith: `${year}-` },
-                    status: { notIn: ['CANCELLED', 'LOST'] as any },
-                    ...(zoneId ? { zoneId } : {}),
-                },
-                select: {
-                    zoneId: true,
-                    productType: true,
-                    offerValue: true,
-                    poExpectedMonth: true,
-                    assignedToId: true,
-                    createdById: true,
-                    assignedTo: { select: { id: true, name: true } },
-                    createdBy: { select: { id: true, name: true } },
-                    zone: { select: { id: true, name: true } },
-                },
-            });
-
-            // Get unique users from offers
-            const userMap = new Map<number, { id: number; name: string; zoneName: string }>();
             offers.forEach(o => {
-                const uid = o.assignedToId || o.createdById;
-                const name = o.assignedTo?.name || o.createdBy?.name;
-                const zoneName = o.zone?.name || 'Unknown';
-                if (uid && name && (!userId || uid === userId)) {
-                    if (!userMap.has(uid)) {
-                        userMap.set(uid, { id: uid, name, zoneName });
-                    }
+                const value = Number(o.offerValue || 0);
+                const stage = (o as any).stage || 'INITIAL';
+
+                if (stage === 'INITIAL' || stage === 'PROPOSAL_SENT') {
+                    pipeline.open.count++;
+                    pipeline.open.value += value;
+                } else if (stage === 'NEGOTIATION') {
+                    pipeline.negotiation.count++;
+                    pipeline.negotiation.value += value;
+                } else if (stage === 'PO_RECEIVED') {
+                    pipeline.poReceived.count++;
+                    pipeline.poReceived.value += value;
+                } else if (stage === 'WON') {
+                    pipeline.won.count++;
+                    pipeline.won.value += value;
+                } else if (stage === 'LOST') {
+                    pipeline.lost.count++;
+                    pipeline.lost.value += value;
                 }
             });
 
-            const users = Array.from(userMap.values());
+            // Zone-wise summary
+            const zoneMap = new Map(zones.map(z => [z.id, { ...z, offers: 0, value: 0, orders: 0, target: 0 }]));
 
-            // Build person-wise data
-            const personData = users.map(user => {
-                const userOffers = offers.filter(o =>
-                    (o.assignedToId === user.id || o.createdById === user.id)
+            offers.forEach(o => {
+                const zone = zoneMap.get(o.zoneId);
+                if (zone) {
+                    zone.offers++;
+                    zone.value += Number(o.offerValue || 0);
+                }
+            });
+
+            orders.forEach(o => {
+                const zone = zoneMap.get(o.zoneId);
+                if (zone) {
+                    zone.orders += Number(o.poValue || 0);
+                }
+            });
+
+            targetData.targets.forEach(t => {
+                const zone = zoneMap.get(t.serviceZoneId);
+                if (zone) {
+                    zone.target += Number(t.targetValue || 0);
+                }
+            });
+
+            const zoneSummary = sortByZoneOrder(Array.from(zoneMap.values())).map(z => ({
+                zoneId: z.id,
+                zoneName: z.name,
+                shortForm: z.shortForm,
+                numOffers: z.offers,
+                offersValue: z.value,
+                ordersReceived: z.orders,
+                openFunnel: Math.max(0, z.value - z.orders),
+                target: z.target,
+                achievement: calculatePercentage(z.orders, z.target),
+                deviation: calculateDeviation(z.orders, z.target),
+                balanceToTarget: z.target - z.orders
+            }));
+
+            // Monthly trends (last 6 months)
+            const monthlyTrends = [];
+            const currentMonth = new Date().getMonth();
+            for (let i = 5; i >= 0; i--) {
+                const month = ((currentMonth - i + 12) % 12) + 1;
+                const monthStr = `${year}-${pad2(month)}`;
+
+                const monthOffers = offers.filter(o =>
+                    (o.poExpectedMonth || '').startsWith(monthStr) ||
+                    (o.offerMonth || '').startsWith(monthStr)
+                );
+                const monthOrders = orders.filter(o =>
+                    (o.poReceivedMonth || '').startsWith(monthStr)
                 );
 
-                // Build monthly breakdown
-                const monthly: Record<number, Record<string, number>> = {};
-                for (let m = 1; m <= 12; m++) {
-                    monthly[m] = {};
-                    PRODUCT_TYPES.forEach(pt => {
-                        monthly[m][pt] = 0;
-                    });
-                }
-
-                userOffers.forEach(o => {
-                    const mm = (o.poExpectedMonth || '').split('-')[1];
-                    if (!mm) return;
-                    const month = parseInt(mm, 10);
-                    const pt = o.productType || 'UNKNOWN';
-                    const value = Number(o.offerValue || 0);
-                    if (!monthly[month]) monthly[month] = {};
-                    monthly[month][pt] = (monthly[month][pt] || 0) + value;
+                monthlyTrends.push({
+                    month,
+                    monthName: MONTH_NAMES[month - 1],
+                    offers: monthOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0),
+                    orders: monthOrders.reduce((sum, o) => sum + Number(o.poValue || 0), 0)
                 });
-
-                // Calculate totals
-                const totals: Record<string, number> = {};
-                PRODUCT_TYPES.forEach(pt => {
-                    totals[pt] = 0;
-                    for (let m = 1; m <= 12; m++) {
-                        totals[pt] += monthly[m][pt] || 0;
-                    }
-                });
-
-                const grandTotal = Object.values(totals).reduce((sum, v) => sum + v, 0);
-
-                return {
-                    userId: user.id,
-                    userName: user.name,
-                    zoneName: user.zoneName,
-                    monthly,
-                    totals,
-                    grandTotal,
-                };
-            });
-
-            res.json({
-                success: true,
-                data: {
-                    year,
-                    months: monthNames,
-                    productTypes: PRODUCT_TYPES.map(pt => ({ code: pt, name: formatProductType(pt) })),
-                    persons: personData,
-                },
-            });
-        } catch (error) {
-            logger.error('FORST person-wise performance error:', error);
-            res.status(500).json({ error: 'Failed to compute person-wise performance' });
-        }
-    }
-
-    /**
-     * Get Product Forecast (Image 3)
-     * Returns product-wise monthly forecast by zone
-     */
-    static async getProductForecast(req: AuthenticatedRequest, res: Response) {
-        try {
-            const { year: yearParam } = req.query as any;
-            const now = new Date();
-            const year = yearParam ? parseInt(yearParam as string) : now.getFullYear();
-
-            const zones = await prisma.serviceZone.findMany({
-                select: { id: true, name: true },
-                orderBy: { name: 'asc' }
-            });
-
-            // Get all offers
-            const offers = await prisma.offer.findMany({
-                where: {
-                    poExpectedMonth: { startsWith: `${year}-` },
-                    status: { notIn: ['CANCELLED', 'LOST'] as any },
-                },
-                select: {
-                    zoneId: true,
-                    productType: true,
-                    offerValue: true,
-                    poExpectedMonth: true,
-                },
-            });
-
-            // Build zone-wise product-wise monthly data
-            const zoneData = sortZones(zones).map(zone => {
-                const zoneOffers = offers.filter(o => o.zoneId === zone.id);
-
-                // Initialize matrix: productType -> month -> value
-                const matrix: Record<string, Record<number, number>> = {};
-                const monthTotals: Record<number, number> = {};
-                const productTotals: Record<string, number> = {};
-
-                PRODUCT_TYPES.forEach(pt => {
-                    matrix[pt] = {};
-                    for (let m = 1; m <= 12; m++) {
-                        matrix[pt][m] = 0;
-                    }
-                    productTotals[pt] = 0;
-                });
-
-                for (let m = 1; m <= 12; m++) {
-                    monthTotals[m] = 0;
-                }
-
-                // Fill in values
-                zoneOffers.forEach(o => {
-                    const mm = (o.poExpectedMonth || '').split('-')[1];
-                    if (!mm) return;
-                    const month = parseInt(mm, 10);
-                    const pt = o.productType || 'UNKNOWN';
-                    const value = Number(o.offerValue || 0);
-
-                    if (!matrix[pt]) matrix[pt] = {};
-                    matrix[pt][month] = (matrix[pt][month] || 0) + value;
-                    monthTotals[month] = (monthTotals[month] || 0) + value;
-                    productTotals[pt] = (productTotals[pt] || 0) + value;
-                });
-
-                const zoneTotal = Object.values(productTotals).reduce((sum, v) => sum + v, 0);
-
-                return {
-                    zoneId: zone.id,
-                    zoneName: zone.name,
-                    matrix,
-                    monthTotals,
-                    productTotals,
-                    zoneTotal,
-                };
-            });
-
-            // Calculate grand totals
-            const grandTotals: Record<string, Record<number, number>> = {};
-            const grandMonthTotals: Record<number, number> = {};
-            const grandProductTotals: Record<string, number> = {};
-
-            PRODUCT_TYPES.forEach(pt => {
-                grandTotals[pt] = {};
-                for (let m = 1; m <= 12; m++) {
-                    grandTotals[pt][m] = zoneData.reduce((sum, z) => sum + (z.matrix[pt]?.[m] || 0), 0);
-                }
-                grandProductTotals[pt] = zoneData.reduce((sum, z) => sum + (z.productTotals[pt] || 0), 0);
-            });
-
-            for (let m = 1; m <= 12; m++) {
-                grandMonthTotals[m] = zoneData.reduce((sum, z) => sum + (z.monthTotals[m] || 0), 0);
             }
 
             res.json({
                 success: true,
                 data: {
                     year,
-                    months: monthNames,
-                    productTypes: PRODUCT_TYPES.map(pt => ({ code: pt, name: formatProductType(pt) })),
-                    zones: zoneData,
-                    grandTotals: {
-                        matrix: grandTotals,
-                        monthTotals: grandMonthTotals,
-                        productTotals: grandProductTotals,
-                        total: Object.values(grandProductTotals).reduce((sum, v) => sum + v, 0),
+                    summary: {
+                        totalOffers,
+                        totalOffersValue,
+                        totalOrdersValue,
+                        openFunnelValue,
+                        totalTarget,
+                        hitRate: Math.round(hitRate * 10) / 10,
+                        targetDeviation: Math.round(targetDeviation * 10) / 10,
+                        balanceToTarget
                     },
-                },
+                    pipeline,
+                    zones: zoneSummary,
+                    monthlyTrends,
+                    productTypes: PRODUCT_TYPES.map(pt => ({ code: pt, name: formatProductType(pt) }))
+                }
             });
+
         } catch (error) {
-            logger.error('FORST product forecast error:', error);
-            res.status(500).json({ error: 'Failed to compute product forecast' });
+            logger.error('FORST dashboard summary error:', error);
+            res.status(500).json({ success: false, error: 'Failed to fetch dashboard summary' });
         }
     }
 
-    /**
-     * Get Complete Report - All data in one call
-     */
-    static async getCompleteReport(req: AuthenticatedRequest, res: Response) {
+    // -------------------------------------------------------------------------
+    // ZONE PERFORMANCE - Detailed zone analytics
+    // -------------------------------------------------------------------------
+
+    static async getZonePerformance(req: AuthenticatedRequest, res: Response) {
         try {
-            const { year: yearParam } = req.query as any;
-            const now = new Date();
-            const year = yearParam ? parseInt(yearParam as string) : now.getFullYear();
+            const year = parseInt(req.query.year as string) || new Date().getFullYear();
+            const zoneId = req.query.zoneId ? parseInt(req.query.zoneId as string) : null;
 
-            // Create mock request/response to call other methods
-            const mockReq = { query: { year: year.toString() } } as any;
+            const [zones, offers, orders, targetData] = await Promise.all([
+                ForstDataService.getZones(),
+                ForstDataService.getOffersForYear(year, zoneId ? { zoneId } : {}),
+                ForstDataService.getWonOrdersForYear(year, zoneId ? { zoneId } : {}),
+                ForstDataService.getZoneTargets(year)
+            ]);
 
-            const highlights = await new Promise<any>((resolve) => {
-                ForstController.getOffersHighlights(mockReq, {
-                    json: (data: any) => resolve(data),
-                    status: () => ({ json: (data: any) => resolve(data) }),
-                } as any);
-            });
+            // Build monthly targets lookup
+            const monthlyTargets = new Map<string, number>();
+            if (targetData.type === 'monthly') {
+                targetData.targets.forEach(t => {
+                    const key = `${t.serviceZoneId}-${t.targetPeriod}`;
+                    monthlyTargets.set(key, (monthlyTargets.get(key) || 0) + Number(t.targetValue || 0));
+                });
+            }
 
-            const zoneMonthly = await new Promise<any>((resolve) => {
-                ForstController.getZoneMonthlyBreakdown(mockReq, {
-                    json: (data: any) => resolve(data),
-                    status: () => ({ json: (data: any) => resolve(data) }),
-                } as any);
-            });
+            const zonePerformance = sortByZoneOrder(zones)
+                .filter(z => !zoneId || z.id === zoneId)
+                .map(zone => {
+                    const zoneOffers = offers.filter(o => o.zoneId === zone.id);
+                    const zoneOrders = orders.filter(o => o.zoneId === zone.id);
 
-            const quarterly = await new Promise<any>((resolve) => {
-                ForstController.getForecastQuarterly(mockReq, {
-                    json: (data: any) => resolve(data),
-                    status: () => ({ json: (data: any) => resolve(data) }),
-                } as any);
-            });
+                    // Monthly breakdown
+                    const monthly = [];
+                    for (let m = 1; m <= 12; m++) {
+                        const monthStr = `${year}-${pad2(m)}`;
 
-            const productTypeSummary = await new Promise<any>((resolve) => {
-                ForstController.getProductTypeSummary(mockReq, {
-                    json: (data: any) => resolve(data),
-                    status: () => ({ json: (data: any) => resolve(data) }),
-                } as any);
-            });
+                        const monthOffers = zoneOffers.filter(o => {
+                            const offerMonth = o.poExpectedMonth || o.offerMonth ||
+                                (o.createdAt ? `${new Date(o.createdAt).getFullYear()}-${pad2(new Date(o.createdAt).getMonth() + 1)}` : null);
+                            return offerMonth === monthStr;
+                        });
 
-            const personWise = await new Promise<any>((resolve) => {
-                ForstController.getPersonWisePerformance(mockReq, {
-                    json: (data: any) => resolve(data),
-                    status: () => ({ json: (data: any) => resolve(data) }),
-                } as any);
-            });
+                        const monthOrders = zoneOrders.filter(o => {
+                            const orderMonth = o.poReceivedMonth ||
+                                (o.poDate ? `${new Date(o.poDate).getFullYear()}-${pad2(new Date(o.poDate).getMonth() + 1)}` : null);
+                            return orderMonth === monthStr;
+                        });
 
-            const productForecast = await new Promise<any>((resolve) => {
-                ForstController.getProductForecast(mockReq, {
-                    json: (data: any) => resolve(data),
-                    status: () => ({ json: (data: any) => resolve(data) }),
-                } as any);
-            });
+                        const offersValue = monthOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
+                        const ordersReceived = monthOrders.reduce((sum, o) => sum + Number(o.poValue || 0), 0);
+
+                        // Get target for this month
+                        let monthTarget = 0;
+                        if (targetData.type === 'yearly') {
+                            const yearlyZoneTarget = targetData.targets
+                                .filter(t => t.serviceZoneId === zone.id)
+                                .reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
+                            monthTarget = yearlyZoneTarget / 12;
+                        } else {
+                            monthTarget = monthlyTargets.get(`${zone.id}-${monthStr}`) || 0;
+                        }
+
+                        monthly.push({
+                            month: m,
+                            monthName: MONTH_NAMES[m - 1],
+                            offersValue,
+                            ordersReceived,
+                            target: monthTarget,
+                            achievement: calculatePercentage(ordersReceived, monthTarget),
+                            deviation: calculateDeviation(ordersReceived, monthTarget),
+                            openPipeline: Math.max(0, offersValue - ordersReceived)
+                        });
+                    }
+
+                    // Totals
+                    const totalOffers = zoneOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
+                    const totalOrders = zoneOrders.reduce((sum, o) => sum + Number(o.poValue || 0), 0);
+                    const totalTarget = targetData.targets
+                        .filter(t => t.serviceZoneId === zone.id)
+                        .reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
+
+                    // Product type breakdown
+                    const productBreakdown = PRODUCT_TYPES.map(pt => {
+                        const ptOffers = zoneOffers.filter(o => o.productType === pt);
+                        return {
+                            productType: pt,
+                            label: formatProductType(pt),
+                            count: ptOffers.length,
+                            value: ptOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0)
+                        };
+                    }).filter(p => p.count > 0);
+
+                    return {
+                        zoneId: zone.id,
+                        zoneName: zone.name,
+                        shortForm: zone.shortForm,
+                        summary: {
+                            totalOffers: zoneOffers.length,
+                            totalOffersValue: totalOffers,
+                            totalOrdersValue: totalOrders,
+                            totalTarget,
+                            hitRate: calculatePercentage(zoneOrders.length, zoneOffers.length),
+                            achievement: calculatePercentage(totalOrders, totalTarget),
+                            deviation: calculateDeviation(totalOrders, totalTarget),
+                            balanceToTarget: totalTarget - totalOrders
+                        },
+                        monthly,
+                        productBreakdown
+                    };
+                });
 
             res.json({
                 success: true,
                 data: {
                     year,
-                    highlights: highlights.data,
-                    zoneMonthly: zoneMonthly.data,
-                    quarterly: quarterly.data,
-                    productTypeSummary: productTypeSummary.data,
-                    personWise: personWise.data,
-                    productForecast: productForecast.data,
+                    zones: zonePerformance
+                }
+            });
+
+        } catch (error) {
+            logger.error('FORST zone performance error:', error);
+            res.status(500).json({ success: false, error: 'Failed to fetch zone performance' });
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // QUARTERLY ANALYSIS
+    // -------------------------------------------------------------------------
+
+    static async getQuarterlyAnalysis(req: AuthenticatedRequest, res: Response) {
+        try {
+            const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+            const [zones, offers, orders, targetData] = await Promise.all([
+                ForstDataService.getZones(),
+                ForstDataService.getOffersForYear(year),
+                ForstDataService.getWonOrdersForYear(year),
+                ForstDataService.getZoneTargets(year)
+            ]);
+
+            // Calculate total yearly target
+            const totalYearlyTarget = targetData.targets.reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
+            const quarterlyTarget = totalYearlyTarget / 4;
+
+            // Monthly data
+            const monthlyData: { month: number; monthName: string; forecast: number; actual: number; byZone: Record<string, number> }[] = [];
+            for (let m = 1; m <= 12; m++) {
+                const monthStr = `${year}-${pad2(m)}`;
+
+                const monthOffers = offers.filter(o =>
+                    (o.poExpectedMonth || '').startsWith(monthStr)
+                );
+                const monthOrders = orders.filter(o =>
+                    (o.poReceivedMonth || '').startsWith(monthStr) ||
+                    (o.poDate && new Date(o.poDate).getMonth() + 1 === m && new Date(o.poDate).getFullYear() === year)
+                );
+
+                // Zone breakdown
+                const byZone: Record<string, number> = {};
+                sortByZoneOrder(zones).forEach(z => {
+                    byZone[z.name] = monthOffers
+                        .filter(o => o.zoneId === z.id)
+                        .reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
+                });
+
+                monthlyData.push({
+                    month: m,
+                    monthName: MONTH_NAMES[m - 1],
+                    forecast: monthOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0),
+                    actual: monthOrders.reduce((sum, o) => sum + Number(o.poValue || 0), 0),
+                    byZone
+                });
+            }
+
+            // Quarterly aggregation
+            const quarters = [
+                { name: 'Q1', months: [1, 2, 3] },
+                { name: 'Q2', months: [4, 5, 6] },
+                { name: 'Q3', months: [7, 8, 9] },
+                { name: 'Q4', months: [10, 11, 12] }
+            ].map((q, idx) => {
+                const qMonths = monthlyData.filter(m => q.months.includes(m.month));
+                const forecast = qMonths.reduce((sum, m) => sum + m.forecast, 0);
+                const actual = qMonths.reduce((sum, m) => sum + m.actual, 0);
+                const target = quarterlyTarget;
+
+                return {
+                    quarter: q.name,
+                    quarterIndex: idx + 1,
+                    forecast,
+                    actual,
+                    target,
+                    forecastAchievement: calculatePercentage(forecast, target),
+                    actualAchievement: calculatePercentage(actual, target),
+                    deviation: calculateDeviation(actual, target),
+                    gap: target - actual
+                };
+            });
+
+            // Current quarter status
+            const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
+            const currentQuarterData = quarters[currentQuarter - 1];
+
+            res.json({
+                success: true,
+                data: {
+                    year,
+                    quarterly: {
+                        target: quarterlyTarget,
+                        currentQuarter,
+                        currentQuarterData,
+                        quarters
+                    },
+                    monthly: monthlyData,
+                    zones: sortByZoneOrder(zones).map(z => z.name)
+                }
+            });
+
+        } catch (error) {
+            logger.error('FORST quarterly analysis error:', error);
+            res.status(500).json({ success: false, error: 'Failed to fetch quarterly analysis' });
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // PRODUCT TYPE ANALYSIS
+    // -------------------------------------------------------------------------
+
+    static async getProductTypeAnalysis(req: AuthenticatedRequest, res: Response) {
+        try {
+            const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+            const [zones, offers] = await Promise.all([
+                ForstDataService.getZones(),
+                ForstDataService.getOffersForYear(year)
+            ]);
+
+            // Overall product type distribution
+            const productDistribution = PRODUCT_TYPES.map(pt => {
+                const ptOffers = offers.filter(o => o.productType === pt);
+                const totalValue = ptOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
+
+                return {
+                    productType: pt,
+                    label: formatProductType(pt),
+                    count: ptOffers.length,
+                    value: totalValue,
+                    percentage: calculatePercentage(totalValue, offers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0))
+                };
+            }).filter(p => p.count > 0).sort((a, b) => b.value - a.value);
+
+            // Zone-wise product breakdown
+            const zoneProductMatrix = sortByZoneOrder(zones).map(zone => {
+                const zoneOffers = offers.filter(o => o.zoneId === zone.id);
+
+                const products: Record<string, { count: number; value: number }> = {};
+                PRODUCT_TYPES.forEach(pt => {
+                    const ptOffers = zoneOffers.filter(o => o.productType === pt);
+                    products[pt] = {
+                        count: ptOffers.length,
+                        value: ptOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0)
+                    };
+                });
+
+                return {
+                    zoneId: zone.id,
+                    zoneName: zone.name,
+                    totalValue: zoneOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0),
+                    products
+                };
+            });
+
+            // User-wise product breakdown
+            const userMap = new Map<number, { id: number; name: string; zone: string; products: Record<string, number> }>();
+
+            offers.forEach(o => {
+                const userId = o.assignedToId || o.createdById;
+                const userName = o.assignedTo?.name || o.createdBy?.name || 'Unknown';
+                const zoneName = o.zone?.name || 'Unknown';
+
+                if (userId) {
+                    if (!userMap.has(userId)) {
+                        const products: Record<string, number> = {};
+                        PRODUCT_TYPES.forEach(pt => products[pt] = 0);
+                        userMap.set(userId, { id: userId, name: userName, zone: zoneName, products });
+                    }
+
+                    const user = userMap.get(userId)!;
+                    const pt = o.productType || 'OTHER';
+                    if (user.products[pt] !== undefined) {
+                        user.products[pt] += Number(o.offerValue || 0);
+                    }
+                }
+            });
+
+            const userBreakdown = Array.from(userMap.values())
+                .map(u => ({
+                    ...u,
+                    total: Object.values(u.products).reduce((sum, v) => sum + v, 0)
+                }))
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 20); // Top 20 users
+
+            res.json({
+                success: true,
+                data: {
+                    year,
+                    distribution: productDistribution,
+                    zoneMatrix: zoneProductMatrix,
+                    userBreakdown,
+                    productTypes: PRODUCT_TYPES.map(pt => ({ code: pt, name: formatProductType(pt) }))
+                }
+            });
+
+        } catch (error) {
+            logger.error('FORST product type analysis error:', error);
+            res.status(500).json({ success: false, error: 'Failed to fetch product type analysis' });
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // TEAM PERFORMANCE - Leaderboard & individual stats
+    // -------------------------------------------------------------------------
+
+    static async getTeamPerformance(req: AuthenticatedRequest, res: Response) {
+        try {
+            const year = parseInt(req.query.year as string) || new Date().getFullYear();
+            const limit = parseInt(req.query.limit as string) || 20;
+
+            const [offers, orders] = await Promise.all([
+                ForstDataService.getOffersForYear(year),
+                ForstDataService.getWonOrdersForYear(year)
+            ]);
+
+            // Build user performance map
+            const userMap = new Map<number, {
+                id: number;
+                name: string;
+                zone: string;
+                offers: number;
+                offersValue: number;
+                ordersValue: number;
+                hitRate: number;
+                monthlyData: Record<number, { offers: number; orders: number }>;
+            }>();
+
+            offers.forEach(o => {
+                const userId = o.assignedToId || o.createdById;
+                const userName = o.assignedTo?.name || o.createdBy?.name || 'Unknown';
+                const zoneName = o.zone?.name || 'Unknown';
+
+                if (userId) {
+                    if (!userMap.has(userId)) {
+                        const monthlyData: Record<number, { offers: number; orders: number }> = {};
+                        for (let m = 1; m <= 12; m++) monthlyData[m] = { offers: 0, orders: 0 };
+                        userMap.set(userId, {
+                            id: userId,
+                            name: userName,
+                            zone: zoneName,
+                            offers: 0,
+                            offersValue: 0,
+                            ordersValue: 0,
+                            hitRate: 0,
+                            monthlyData
+                        });
+                    }
+
+                    const user = userMap.get(userId)!;
+                    user.offers++;
+                    user.offersValue += Number(o.offerValue || 0);
+
+                    // Monthly tracking
+                    const month = o.poExpectedMonth ? parseInt(o.poExpectedMonth.split('-')[1]) :
+                        o.createdAt ? new Date(o.createdAt).getMonth() + 1 : 1;
+                    if (user.monthlyData[month]) {
+                        user.monthlyData[month].offers += Number(o.offerValue || 0);
+                    }
+                }
+            });
+
+            orders.forEach(o => {
+                const userId = (o as any).assignedToId || (o as any).createdById;
+                if (userId && userMap.has(userId)) {
+                    const user = userMap.get(userId)!;
+                    user.ordersValue += Number(o.poValue || 0);
+
+                    // Monthly tracking
+                    const month = o.poReceivedMonth ? parseInt(o.poReceivedMonth.split('-')[1]) :
+                        o.poDate ? new Date(o.poDate).getMonth() + 1 : 1;
+                    if (user.monthlyData[month]) {
+                        user.monthlyData[month].orders += Number(o.poValue || 0);
+                    }
+                }
+            });
+
+            // Calculate hit rates and create leaderboard
+            const leaderboard = Array.from(userMap.values())
+                .map(u => ({
+                    ...u,
+                    hitRate: u.offersValue > 0 ? (u.ordersValue / u.offersValue) * 100 : 0,
+                    conversionRate: u.offers > 0 ? (orders.filter((o: any) =>
+                        o.assignedToId === u.id || o.createdById === u.id
+                    ).length / u.offers) * 100 : 0
+                }))
+                .sort((a, b) => b.offersValue - a.offersValue)
+                .slice(0, limit)
+                .map((u, idx) => ({
+                    rank: idx + 1,
+                    ...u
+                }));
+
+            // Zone leaderboard
+            const zoneLeaderboard = sortByZoneOrder(
+                Array.from(
+                    offers.reduce((acc, o) => {
+                        const zoneName = o.zone?.name || 'Unknown';
+                        if (!acc.has(zoneName)) {
+                            acc.set(zoneName, { name: zoneName, offers: 0, value: 0, orders: 0 });
+                        }
+                        const zone = acc.get(zoneName)!;
+                        zone.offers++;
+                        zone.value += Number(o.offerValue || 0);
+                        return acc;
+                    }, new Map<string, { name: string; offers: number; value: number; orders: number }>())
+                        .values()
+                ).map(z => {
+                    z.orders = orders
+                        .filter(o => o.zone?.name === z.name)
+                        .reduce((sum, o) => sum + Number(o.poValue || 0), 0);
+                    return z;
+                })
+            );
+
+            res.json({
+                success: true,
+                data: {
+                    year,
+                    userLeaderboard: leaderboard,
+                    zoneLeaderboard,
+                    totalUsers: userMap.size
+                }
+            });
+
+        } catch (error) {
+            logger.error('FORST team performance error:', error);
+            res.status(500).json({ success: false, error: 'Failed to fetch team performance' });
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // PIPELINE ANALYSIS - Offer stage tracking
+    // -------------------------------------------------------------------------
+
+    static async getPipelineAnalysis(req: AuthenticatedRequest, res: Response) {
+        try {
+            const year = parseInt(req.query.year as string) || new Date().getFullYear();
+            const { start, end } = getYearDateRange(year);
+
+            const offers = await prisma.offer.findMany({
+                where: {
+                    createdAt: { gte: start, lte: end }
                 },
+                include: {
+                    zone: { select: { id: true, name: true } },
+                    customer: { select: { id: true, companyName: true } }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+
+            // Stage distribution
+            const stageDistribution = OFFER_STAGES.map(stage => {
+                const stageOffers = offers.filter(o => (o as any).stage === stage);
+                return {
+                    stage,
+                    count: stageOffers.length,
+                    value: stageOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0),
+                    percentage: calculatePercentage(stageOffers.length, offers.length)
+                };
+            });
+
+            // Funnel conversion rates
+            const totalOffers = offers.length;
+            const negotiation = offers.filter(o => ['NEGOTIATION', 'PO_RECEIVED', 'WON'].includes((o as any).stage)).length;
+            const poReceived = offers.filter(o => ['PO_RECEIVED', 'WON'].includes((o as any).stage)).length;
+            const won = offers.filter(o => (o as any).stage === 'WON').length;
+
+            const funnel = [
+                { stage: 'All Offers', count: totalOffers, value: offers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0), rate: 100 },
+                { stage: 'In Negotiation+', count: negotiation, value: offers.filter(o => ['NEGOTIATION', 'PO_RECEIVED', 'WON'].includes((o as any).stage)).reduce((sum, o) => sum + Number(o.offerValue || 0), 0), rate: calculatePercentage(negotiation, totalOffers) },
+                { stage: 'PO Received+', count: poReceived, value: offers.filter(o => ['PO_RECEIVED', 'WON'].includes((o as any).stage)).reduce((sum, o) => sum + Number(o.offerValue || 0), 0), rate: calculatePercentage(poReceived, totalOffers) },
+                { stage: 'Won', count: won, value: offers.filter(o => (o as any).stage === 'WON').reduce((sum, o) => sum + Number(o.offerValue || 0), 0), rate: calculatePercentage(won, totalOffers) }
+            ];
+
+            // At risk offers (in negotiation > 60 days)
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+            const atRiskOffers = offers
+                .filter(o =>
+                    (o as any).stage === 'NEGOTIATION' &&
+                    new Date(o.createdAt) < sixtyDaysAgo
+                )
+                .slice(0, 10)
+                .map(o => ({
+                    id: o.id,
+                    referenceNumber: o.offerReferenceNumber,
+                    customer: o.customer?.companyName,
+                    value: Number(o.offerValue || 0),
+                    daysSinceCreation: Math.floor((Date.now() - new Date(o.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+                    zone: o.zone?.name
+                }));
+
+            // Recent wins
+            const recentWins = offers
+                .filter(o => (o as any).stage === 'WON')
+                .sort((a, b) => new Date((b as any).poDate || b.updatedAt).getTime() - new Date((a as any).poDate || a.updatedAt).getTime())
+                .slice(0, 5)
+                .map(o => ({
+                    id: o.id,
+                    referenceNumber: o.offerReferenceNumber,
+                    customer: o.customer?.companyName,
+                    value: Number(o.poValue || o.offerValue || 0),
+                    zone: o.zone?.name
+                }));
+
+            res.json({
+                success: true,
+                data: {
+                    year,
+                    stageDistribution,
+                    funnel,
+                    atRiskOffers,
+                    recentWins,
+                    summary: {
+                        totalOffers,
+                        openPipeline: offers.filter(o => !['WON', 'LOST', 'CANCELLED'].includes((o as any).stage)).length,
+                        openValue: offers.filter(o => !['WON', 'LOST', 'CANCELLED'].includes((o as any).stage)).reduce((sum, o) => sum + Number(o.offerValue || 0), 0),
+                        wonCount: won,
+                        wonValue: offers.filter(o => (o as any).stage === 'WON').reduce((sum, o) => sum + Number(o.poValue || o.offerValue || 0), 0),
+                        conversionRate: calculatePercentage(won, totalOffers)
+                    }
+                }
+            });
+
+        } catch (error) {
+            logger.error('FORST pipeline analysis error:', error);
+            res.status(500).json({ success: false, error: 'Failed to fetch pipeline analysis' });
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // EXPORT TO EXCEL
+    // -------------------------------------------------------------------------
+
+    static async exportToExcel(req: AuthenticatedRequest, res: Response) {
+        try {
+            const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+            const [zones, offers, orders, targetData] = await Promise.all([
+                ForstDataService.getZones(),
+                ForstDataService.getOffersForYear(year),
+                ForstDataService.getWonOrdersForYear(year),
+                ForstDataService.getZoneTargets(year)
+            ]);
+
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'KARDEX LCS';
+            workbook.created = new Date();
+
+            // Summary Sheet
+            const summarySheet = workbook.addWorksheet('Summary');
+            summarySheet.columns = [
+                { header: 'Zone', key: 'zone', width: 15 },
+                { header: 'Offers Count', key: 'offersCount', width: 15 },
+                { header: 'Offers Value', key: 'offersValue', width: 18 },
+                { header: 'Orders Value', key: 'ordersValue', width: 18 },
+                { header: 'Target', key: 'target', width: 18 },
+                { header: 'Achievement %', key: 'achievement', width: 15 },
+                { header: 'Balance', key: 'balance', width: 18 }
+            ];
+
+            sortByZoneOrder(zones).forEach(zone => {
+                const zoneOffers = offers.filter(o => o.zoneId === zone.id);
+                const zoneOrders = orders.filter(o => o.zoneId === zone.id);
+                const zoneTarget = targetData.targets
+                    .filter(t => t.serviceZoneId === zone.id)
+                    .reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
+
+                const offersValue = zoneOffers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
+                const ordersValue = zoneOrders.reduce((sum, o) => sum + Number(o.poValue || 0), 0);
+
+                summarySheet.addRow({
+                    zone: zone.name,
+                    offersCount: zoneOffers.length,
+                    offersValue,
+                    ordersValue,
+                    target: zoneTarget,
+                    achievement: zoneTarget > 0 ? ((ordersValue / zoneTarget) * 100).toFixed(1) + '%' : 'N/A',
+                    balance: zoneTarget - ordersValue
+                });
+            });
+
+            // Style header
+            summarySheet.getRow(1).font = { bold: true };
+            summarySheet.getRow(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF4472C4' }
+            };
+            summarySheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+            // Monthly Sheet
+            const monthlySheet = workbook.addWorksheet('Monthly Breakdown');
+            const monthlyColumns = [
+                { header: 'Zone', key: 'zone', width: 12 },
+                ...MONTH_NAMES.map(m => ({ header: m, key: m.toLowerCase(), width: 12 })),
+                { header: 'Total', key: 'total', width: 15 }
+            ];
+            monthlySheet.columns = monthlyColumns;
+
+            sortByZoneOrder(zones).forEach(zone => {
+                const row: any = { zone: zone.name, total: 0 };
+                MONTH_NAMES.forEach((m, idx) => {
+                    const monthStr = `${year}-${pad2(idx + 1)}`;
+                    const monthValue = offers
+                        .filter(o => o.zoneId === zone.id && (o.poExpectedMonth || '').startsWith(monthStr))
+                        .reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
+                    row[m.toLowerCase()] = monthValue;
+                    row.total += monthValue;
+                });
+                monthlySheet.addRow(row);
+            });
+
+            monthlySheet.getRow(1).font = { bold: true };
+            monthlySheet.getRow(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF4472C4' }
+            };
+            monthlySheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+            // Generate buffer
+            const buffer = await workbook.xlsx.writeBuffer();
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=FORST_Report_${year}.xlsx`);
+            res.send(buffer);
+
+        } catch (error) {
+            logger.error('FORST export error:', error);
+            res.status(500).json({ success: false, error: 'Failed to export data' });
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // LEGACY WRAPPERS - For backward compatibility
+    // -------------------------------------------------------------------------
+
+    static async getOffersHighlights(req: AuthenticatedRequest, res: Response) {
+        return ForstController.getDashboardSummary(req, res);
+    }
+
+    static async getZoneMonthlyBreakdown(req: AuthenticatedRequest, res: Response) {
+        return ForstController.getZonePerformance(req, res);
+    }
+
+    static async getForecastQuarterly(req: AuthenticatedRequest, res: Response) {
+        return ForstController.getQuarterlyAnalysis(req, res);
+    }
+
+    static async getProductTypeSummary(req: AuthenticatedRequest, res: Response) {
+        return ForstController.getProductTypeAnalysis(req, res);
+    }
+
+    static async getPersonWisePerformance(req: AuthenticatedRequest, res: Response) {
+        return ForstController.getTeamPerformance(req, res);
+    }
+
+    static async getProductForecast(req: AuthenticatedRequest, res: Response) {
+        return ForstController.getProductTypeAnalysis(req, res);
+    }
+
+    static async getCompleteReport(req: AuthenticatedRequest, res: Response) {
+        try {
+            const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+            // Aggregate all data
+            const [dashboardRes, zoneRes, quarterlyRes, productRes, teamRes, pipelineRes] = await Promise.allSettled([
+                ForstController.getDashboardSummaryData(year),
+                ForstController.getZonePerformanceData(year),
+                ForstController.getQuarterlyAnalysisData(year),
+                ForstController.getProductTypeAnalysisData(year),
+                ForstController.getTeamPerformanceData(year),
+                ForstController.getPipelineAnalysisData(year)
+            ]);
+
+            res.json({
+                success: true,
+                data: {
+                    year,
+                    dashboard: dashboardRes.status === 'fulfilled' ? dashboardRes.value : null,
+                    zones: zoneRes.status === 'fulfilled' ? zoneRes.value : null,
+                    quarterly: quarterlyRes.status === 'fulfilled' ? quarterlyRes.value : null,
+                    productTypes: productRes.status === 'fulfilled' ? productRes.value : null,
+                    team: teamRes.status === 'fulfilled' ? teamRes.value : null,
+                    pipeline: pipelineRes.status === 'fulfilled' ? pipelineRes.value : null
+                }
             });
         } catch (error) {
             logger.error('FORST complete report error:', error);
-            res.status(500).json({ error: 'Failed to compute complete report' });
+            res.status(500).json({ success: false, error: 'Failed to generate complete report' });
         }
     }
 
-    /**
-     * Export to Excel - Single comprehensive sheet matching the Excel screenshots
-     */
     static async exportExcel(req: AuthenticatedRequest, res: Response) {
-        try {
-            const { year: yearParam } = req.query as any;
-            const now = new Date();
-            const year = yearParam ? parseInt(yearParam as string) : now.getFullYear();
+        return ForstController.exportToExcel(req, res);
+    }
 
-            // Get complete data
-            const mockReq = { query: { year: year.toString() } } as any;
-            const report = await new Promise<any>((resolve) => {
-                ForstController.getCompleteReport(mockReq, {
-                    json: (data: any) => resolve(data),
-                    status: () => ({ json: (data: any) => resolve(data) }),
-                } as any);
-            });
+    // Data-only methods for complete report
+    private static async getDashboardSummaryData(year: number) {
+        const [zones, offers, orders, targetData] = await Promise.all([
+            ForstDataService.getZones(),
+            ForstDataService.getOffersForYear(year),
+            ForstDataService.getWonOrdersForYear(year),
+            ForstDataService.getZoneTargets(year)
+        ]);
 
-            if (!report.success) {
-                return res.status(500).json({ error: 'Failed to generate report data' });
-            }
+        const totalOffers = offers.length;
+        const totalOffersValue = offers.reduce((sum, o) => sum + Number(o.offerValue || 0), 0);
+        const totalOrdersValue = orders.reduce((sum, o) => sum + Number(o.poValue || 0), 0);
+        const totalTarget = targetData.targets.reduce((sum, t) => sum + Number(t.targetValue || 0), 0);
 
-            const workbook = new ExcelJS.Workbook();
-            workbook.creator = 'KardexCare FORST';
-            workbook.created = new Date();
+        return {
+            totalOffers,
+            totalOffersValue,
+            totalOrdersValue,
+            totalTarget,
+            hitRate: calculatePercentage(orders.length, totalOffers),
+            achievement: calculatePercentage(totalOrdersValue, totalTarget)
+        };
+    }
 
-            // Single comprehensive sheet
-            const ws = workbook.addWorksheet('FORST Report');
+    private static async getZonePerformanceData(year: number) {
+        const zones = await ForstDataService.getZones();
+        return zones.map(z => ({ id: z.id, name: z.name }));
+    }
 
-            // Colors
-            const c = {
-                hBlue: 'FF4472C4', hDark: 'FF2F5496', lBlue: 'FFD9E2F3',
-                lGreen: 'FFE2EFDA', lYellow: 'FFFFF2CC', lPurple: 'FFE4DFEC',
-                white: 'FFFFFFFF', red: 'FFFF0000', green: 'FF00B050',
-            };
+    private static async getQuarterlyAnalysisData(year: number) {
+        return { year };
+    }
 
-            // Set column widths
-            ws.columns = [
-                { width: 16 }, { width: 12 }, { width: 12 }, { width: 12 },
-                { width: 12 }, { width: 12 }, { width: 12 }, { width: 10 },
-                { width: 12 }, { width: 12 }, { width: 10 }, { width: 10 },
-                { width: 10 }, { width: 12 }
-            ];
+    private static async getProductTypeAnalysisData(year: number) {
+        return PRODUCT_TYPES.map(pt => ({ code: pt, name: formatProductType(pt) }));
+    }
 
-            let row = 1;
-            const fmtL = (v: number) => Math.round((v || 0) / 100000 * 100) / 100;
+    private static async getTeamPerformanceData(year: number) {
+        return { year };
+    }
 
-            // === TITLE ===
-            ws.mergeCells(`A${row}:I${row}`);
-            const title = ws.getCell(`A${row}`);
-            title.value = `KARDEX LCS: Live Offer Funnel, Actuals, Deviations - ${year}`;
-            title.font = { bold: true, size: 16, color: { argb: c.hDark } };
-            title.alignment = { horizontal: 'center' };
-            ws.getRow(row).height = 30;
-            row += 2;
-
-            // === OFFERS HIGHLIGHTS TABLE ===
-            const hl = report.data.highlights;
-            if (hl?.rows) {
-                const hdrs = ['Zone', 'Offers', 'Value(L)', 'Orders(L)', 'Open(L)', 'Booking(L)', 'BU(L)', '%', 'Balance(L)'];
-                const hr = ws.getRow(row);
-                hdrs.forEach((h, i) => {
-                    const cell = hr.getCell(i + 1);
-                    cell.value = h;
-                    cell.font = { bold: true, color: { argb: c.white }, size: 9 };
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.hBlue } };
-                    cell.alignment = { horizontal: 'center' };
-                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                });
-                row++;
-
-                hl.rows.forEach((r: any, idx: number) => {
-                    const dr = ws.getRow(row);
-                    const vals = [r.zoneName, r.numOffers || 0, fmtL(r.offersValue), fmtL(r.ordersReceived),
-                    fmtL(r.openFunnel), fmtL(r.orderBooking), fmtL(r.utForBooking),
-                    `${(r.devPercent || 0).toFixed(0)}%`, fmtL(r.balanceBu)];
-                    vals.forEach((v, i) => {
-                        const cell = dr.getCell(i + 1);
-                        cell.value = v;
-                        cell.alignment = { horizontal: i === 0 ? 'left' : 'center' };
-                        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                        if (idx % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lBlue } };
-                        if (i === 7 && (r.devPercent || 0) < 0) cell.font = { color: { argb: c.red }, bold: true };
-                        if (i === 7 && (r.devPercent || 0) > 0) cell.font = { color: { argb: c.green }, bold: true };
-                    });
-                    row++;
-                });
-
-                // Total
-                if (hl.total) {
-                    const tr = ws.getRow(row);
-                    const tvals = ['TOTAL', hl.total.numOffers || 0, fmtL(hl.total.offersValue), fmtL(hl.total.ordersReceived),
-                        fmtL(hl.total.openFunnel), fmtL(hl.total.orderBooking), fmtL(hl.total.utForBooking),
-                        `${(hl.total.devPercent || 0).toFixed(0)}%`, fmtL(hl.total.balanceBu)];
-                    tvals.forEach((v, i) => {
-                        const cell = tr.getCell(i + 1);
-                        cell.value = v;
-                        cell.font = { bold: true };
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lYellow } };
-                        cell.alignment = { horizontal: i === 0 ? 'left' : 'center' };
-                        cell.border = { top: { style: 'medium' }, left: { style: 'thin' }, bottom: { style: 'medium' }, right: { style: 'thin' } };
-                    });
-                    row++;
-                }
-
-                row++;
-                ws.getCell(`A${row}`).value = `Hit Rate: ${hl.hitRate || 0}%`;
-                ws.getCell(`A${row}`).font = { bold: true, size: 12, color: { argb: c.hDark } };
-                row += 3;
-            }
-
-            // === ZONE MONTHLY BREAKDOWN ===
-            const zm = report.data.zoneMonthly;
-            if (zm?.zones) {
-                for (const zone of zm.zones) {
-                    ws.mergeCells(`A${row}:I${row}`);
-                    const zt = ws.getCell(`A${row}`);
-                    zt.value = `${zone.zoneName} - Monthly (Hit: ${zone.hitRate || 0}%)`;
-                    zt.font = { bold: true, size: 11, color: { argb: c.white } };
-                    zt.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.hDark } };
-                    zt.alignment = { horizontal: 'center' };
-                    row++;
-
-                    const mhdrs = ['Month', 'Offer(L)', 'Recv(L)', 'Book(L)', 'Dev(L)', 'InHand(L)', 'BU(L)', 'vs BU(L)', '%'];
-                    const mhr = ws.getRow(row);
-                    mhdrs.forEach((h, i) => {
-                        const cell = mhr.getCell(i + 1);
-                        cell.value = h;
-                        cell.font = { bold: true, color: { argb: c.white }, size: 8 };
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.hBlue } };
-                        cell.alignment = { horizontal: 'center' };
-                        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                    });
-                    row++;
-
-                    if (zone.monthly) {
-                        zone.monthly.forEach((m: any, idx: number) => {
-                            const mr = ws.getRow(row);
-                            const mvals = [m.monthName, fmtL(m.offersValue), fmtL(m.ordersReceived), fmtL(m.ordersBooked),
-                            fmtL(m.devOrVsBooked), fmtL(m.ordersInHand), fmtL(m.buMonthly), fmtL(m.bookedVsBu),
-                            `${(m.bookedVsBuPercent || 0).toFixed(0)}%`];
-                            mvals.forEach((v, i) => {
-                                const cell = mr.getCell(i + 1);
-                                cell.value = v;
-                                cell.alignment = { horizontal: i === 0 ? 'left' : 'center' };
-                                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                                if (idx % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lBlue } };
-                                if (i === 8 && (m.bookedVsBuPercent || 0) < 0) cell.font = { color: { argb: c.red }, bold: true };
-                                if (i === 8 && (m.bookedVsBuPercent || 0) > 0) cell.font = { color: { argb: c.green }, bold: true };
-                            });
-                            row++;
-                        });
-                    }
-
-                    if (zone.totals) {
-                        const ztr = ws.getRow(row);
-                        const ztvals = ['Total', fmtL(zone.totals.offersValue), fmtL(zone.totals.ordersReceived),
-                            fmtL(zone.totals.ordersBooked), '', '', fmtL(zone.totals.buMonthly), '', ''];
-                        ztvals.forEach((v, i) => {
-                            const cell = ztr.getCell(i + 1);
-                            cell.value = v;
-                            cell.font = { bold: true };
-                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lYellow } };
-                            cell.border = { top: { style: 'medium' }, left: { style: 'thin' }, bottom: { style: 'medium' }, right: { style: 'thin' } };
-                        });
-                        row++;
-                    }
-                    row += 2;
-                }
-            }
-
-            // === QUARTERLY FORECAST ===
-            const q = report.data.quarterly;
-            if (q?.quarters) {
-                ws.mergeCells(`A${row}:E${row}`);
-                ws.getCell(`A${row}`).value = `Quarterly Forecast vs BU`;
-                ws.getCell(`A${row}`).font = { bold: true, size: 12, color: { argb: c.hDark } };
-                row += 2;
-
-                const qh = ws.getRow(row);
-                ['Quarter', 'Forecast(L)', 'BU(L)', 'Var(L)', '%'].forEach((h, i) => {
-                    const cell = qh.getCell(i + 1);
-                    cell.value = h;
-                    cell.font = { bold: true, color: { argb: c.white } };
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.hBlue } };
-                    cell.alignment = { horizontal: 'center' };
-                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                });
-                row++;
-
-                q.quarters.forEach((qtr: any, idx: number) => {
-                    const qr = ws.getRow(row);
-                    const variance = (qtr.forecast || 0) - (qtr.bu || 0);
-                    [qtr.quarter, fmtL(qtr.forecast), fmtL(qtr.bu), fmtL(variance), `${(qtr.devPercent || 0).toFixed(0)}%`].forEach((v, i) => {
-                        const cell = qr.getCell(i + 1);
-                        cell.value = v;
-                        cell.alignment = { horizontal: 'center' };
-                        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                        if (idx % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lPurple } };
-                        if (i === 4 && (qtr.devPercent || 0) < 0) cell.font = { color: { argb: c.red }, bold: true };
-                        if (i === 4 && (qtr.devPercent || 0) > 0) cell.font = { color: { argb: c.green }, bold: true };
-                    });
-                    row++;
-                });
-                row += 3;
-            }
-
-            // === PRODUCT TYPE BY ZONE ===
-            const ps = report.data.productTypeSummary;
-            if (ps?.zones) {
-                ws.mergeCells(`A${row}:H${row}`);
-                ws.getCell(`A${row}`).value = `Product Type by Zone & Person`;
-                ws.getCell(`A${row}`).font = { bold: true, size: 12, color: { argb: c.hDark } };
-                row += 2;
-
-                for (const zone of ps.zones) {
-                    if (!zone.users || zone.users.length === 0) continue;
-                    const nc = (zone.users.length || 0) + 2;
-
-                    ws.mergeCells(row, 1, row, nc);
-                    const zh = ws.getCell(row, 1);
-                    zh.value = `${zone.zoneName} - ₹${fmtL(zone.totals?.zoneTotal || 0)}L`;
-                    zh.font = { bold: true, color: { argb: c.white } };
-                    zh.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.hDark } };
-                    zh.alignment = { horizontal: 'center' };
-                    row++;
-
-                    const phr = ws.getRow(row);
-                    phr.getCell(1).value = 'Product';
-                    zone.users.forEach((u: any, i: number) => { phr.getCell(i + 2).value = u.name; });
-                    phr.getCell(nc).value = 'Total';
-                    for (let i = 1; i <= nc; i++) {
-                        const cell = phr.getCell(i);
-                        cell.font = { bold: true, size: 8 };
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lGreen } };
-                        cell.alignment = { horizontal: 'center' };
-                        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                    }
-                    row++;
-
-                    zone.productTypes?.forEach((pt: any, idx: number) => {
-                        const pr = ws.getRow(row);
-                        pr.getCell(1).value = pt.name;
-                        zone.users.forEach((u: any, i: number) => {
-                            pr.getCell(i + 2).value = fmtL(zone.matrix?.[pt.code]?.[u.id] || 0);
-                        });
-                        pr.getCell(nc).value = fmtL(zone.totals?.byProductType?.[pt.code] || 0);
-                        pr.getCell(nc).font = { bold: true };
-                        for (let i = 1; i <= nc; i++) {
-                            const cell = pr.getCell(i);
-                            cell.alignment = { horizontal: i === 1 ? 'left' : 'center' };
-                            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                            if (idx % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lBlue } };
-                        }
-                        row++;
-                    });
-
-                    const ttr = ws.getRow(row);
-                    ttr.getCell(1).value = 'Total';
-                    zone.users.forEach((u: any, i: number) => {
-                        ttr.getCell(i + 2).value = fmtL(zone.totals?.byUser?.[u.id] || 0);
-                    });
-                    ttr.getCell(nc).value = fmtL(zone.totals?.zoneTotal || 0);
-                    for (let i = 1; i <= nc; i++) {
-                        const cell = ttr.getCell(i);
-                        cell.font = { bold: true };
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lYellow } };
-                        cell.border = { top: { style: 'medium' }, left: { style: 'thin' }, bottom: { style: 'medium' }, right: { style: 'thin' } };
-                    }
-                    row += 3;
-                }
-            }
-
-            // === PERSON-WISE FORECAST ===
-            const pw = report.data.personWise;
-            if (pw?.persons && pw.persons.length > 0) {
-                ws.mergeCells(`A${row}:N${row}`);
-                ws.getCell(`A${row}`).value = `Person-wise Monthly Forecast`;
-                ws.getCell(`A${row}`).font = { bold: true, size: 12, color: { argb: c.hDark } };
-                row += 2;
-
-                for (const p of pw.persons.slice(0, 10)) {
-                    ws.mergeCells(row, 1, row, 14);
-                    const ph = ws.getCell(row, 1);
-                    ph.value = `${p.userName} (${p.zoneName}) - ₹${fmtL(p.grandTotal || 0)}L`;
-                    ph.font = { bold: true, color: { argb: c.white }, size: 9 };
-                    ph.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.hDark } };
-                    ph.alignment = { horizontal: 'center' };
-                    row++;
-
-                    const pmh = ws.getRow(row);
-                    pmh.getCell(1).value = 'Product';
-                    (pw.months || monthNames).forEach((m: string, i: number) => { pmh.getCell(i + 2).value = m; });
-                    pmh.getCell(14).value = 'Total';
-                    for (let i = 1; i <= 14; i++) {
-                        const cell = pmh.getCell(i);
-                        cell.font = { bold: true, size: 7 };
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lGreen } };
-                        cell.alignment = { horizontal: 'center' };
-                        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                    }
-                    row++;
-
-                    pw.productTypes?.forEach((pt: any, idx: number) => {
-                        const pmr = ws.getRow(row);
-                        pmr.getCell(1).value = pt.name;
-                        for (let m = 1; m <= 12; m++) {
-                            const val = p.monthly?.[m]?.[pt.code] || 0;
-                            pmr.getCell(m + 1).value = val > 0 ? fmtL(val) : 0;
-                        }
-                        pmr.getCell(14).value = fmtL(p.totals?.[pt.code] || 0);
-                        pmr.getCell(14).font = { bold: true };
-                        for (let i = 1; i <= 14; i++) {
-                            const cell = pmr.getCell(i);
-                            cell.font = { size: 7, ...(i === 14 ? { bold: true } : {}) };
-                            cell.alignment = { horizontal: i === 1 ? 'left' : 'center' };
-                            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                            if (idx % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.lBlue } };
-                        }
-                        row++;
-                    });
-                    row += 2;
-                }
-            }
-
-            // Footer
-            row += 2;
-            ws.getCell(`A${row}`).value = `Generated: ${new Date().toLocaleString()} | KardexCare FORST`;
-            ws.getCell(`A${row}`).font = { italic: true, size: 8, color: { argb: 'FF666666' } };
-
-            // Response
-            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.setHeader('Content-Disposition', `attachment; filename=FORST_Report_${year}.xlsx`);
-            await workbook.xlsx.write(res);
-            res.end();
-        } catch (error) {
-            logger.error('FORST export Excel error:', error);
-            res.status(500).json({ error: 'Failed to export Excel' });
-        }
+    private static async getPipelineAnalysisData(year: number) {
+        return { year };
     }
 }
+
+export default ForstController;

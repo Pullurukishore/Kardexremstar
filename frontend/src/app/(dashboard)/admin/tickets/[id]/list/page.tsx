@@ -17,7 +17,20 @@ import {
   Wrench,
   Pencil,
   Upload,
-  Camera
+  Camera,
+  ArrowLeft,
+  Clock,
+  User,
+  Phone,
+  Mail,
+  Building2,
+  Hash,
+  Sparkles,
+  Shield,
+  History,
+  ChevronRight,
+  AlertCircle,
+  Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Ticket } from '@/types/ticket';
@@ -75,7 +88,7 @@ export default function TicketDetailPage() {
     if (id) {
       fetchTicket();
     }
-  }, [id, router, toast]);
+  }, [id, router]);
 
   const handleStatusChange = async (
     status: string, 
@@ -132,156 +145,234 @@ export default function TicketDetailPage() {
 
   if (loading || !ticket) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <p>{loading ? 'Loading ticket details...' : 'Ticket not found'}</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <div className="text-center space-y-4">
+            <div className="relative mx-auto w-16 h-16">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 opacity-20 animate-ping" />
+              <div className="relative w-16 h-16 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-slate-800">{loading ? 'Loading ticket details...' : 'Ticket not found'}</p>
+              <p className="text-sm text-slate-500 mt-1">Please wait while we fetch the information</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4">
-      {/* Ticket Header - Moved to proper position */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-              <span className="sr-only">Go back</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m12 19-7-7 7-7"/>
-                <path d="M19 12H5"/>
-              </svg>
-            </Button>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Ticket #{ticket.id}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge status={ticket.status} />
-            <span className="text-sm text-muted-foreground">
-              Created on {format(new Date(ticket.createdAt), 'MMM d, yyyy')}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-        {/* Left Column - Main Ticket Info */}
-        <div className="space-y-4 md:space-y-6">
-          <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
-            <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-slate-100/50 rounded-t-lg border-b p-4 md:p-6">
-              <div className="space-y-3">
-                <div className="flex flex-col space-y-2">
-                  <CardTitle className="text-lg md:text-xl break-words">{ticket.title}</CardTitle>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={ticket.status} />
-                    <PriorityBadge priority={ticket.priority} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="w-full p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Premium Header with Glassmorphism */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-600 rounded-2xl shadow-2xl shadow-blue-500/20 p-6 md:p-8">
+          {/* Decorative Elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-400/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+          <div className="absolute top-1/2 left-1/3 w-32 h-32 bg-indigo-400/10 rounded-full blur-2xl" />
+          
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => router.back()}
+                  className="h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white border border-white/20 transition-all duration-200"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl ring-2 ring-white/30">
+                    <Hash className="h-7 w-7 text-white" />
                   </div>
-                  <p className="text-xs md:text-sm text-muted-foreground">
-                    Created {formatDistanceToNow(new Date(ticket.createdAt))} ago
-                  </p>
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+                      Ticket #{ticket.id}
+                    </h1>
+                    <p className="text-blue-100 mt-1 text-sm md:text-base flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Created {formatDistanceToNow(new Date(ticket.createdAt))} ago
+                    </p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={ticket.status} />
+                  <PriorityBadge priority={ticket.priority} />
+                </div>
+                <div className="flex items-center gap-2">
                   <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-9 px-3 text-xs md:text-sm bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-blue-200 hover:border-blue-300 text-blue-700 hover:text-blue-800 transition-all duration-200 shadow-sm hover:shadow-md btn-touch" 
                     onClick={() => setIsStatusDialogOpen(true)}
+                    className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white hover:from-amber-400 hover:via-orange-400 hover:to-rose-400 border-0 shadow-xl shadow-orange-500/40 hover:shadow-2xl hover:shadow-orange-500/50 transition-all duration-300 hover:scale-105 font-semibold animate-pulse hover:animate-none"
+                    size="default"
                   >
-                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                    <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] animate-[shimmer_2s_infinite]" />
+                    <Zap className="h-4 w-4 mr-2" />
                     Change Status
                   </Button>
-                  {(ticket.status === 'ONSITE_VISIT_REACHED' || ticket.status === 'ONSITE_VISIT_IN_PROGRESS' || ticket.status === 'ONSITE_VISIT_RESOLVED') && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-9 px-3 text-xs md:text-sm bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 border-green-200 hover:border-green-300 text-green-700 hover:text-green-800 transition-all duration-200 shadow-sm hover:shadow-md btn-touch" 
-                      onClick={() => setActiveTab('photos')}
-                    >
-                      <Camera className="h-3.5 w-3.5 mr-1.5" />
-                      <span className="hidden sm:inline">View Photos</span>
-                      <span className="sm:hidden">Photos</span>
-                    </Button>
-                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Quick Stats Strip */}
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Priority</p>
+                <p className="text-white font-bold text-lg capitalize">{ticket.priority?.toLowerCase() || 'Normal'}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Zone</p>
+                <p className="text-white font-bold text-lg truncate">{ticket.zone?.name || 'Unassigned'}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Call Type</p>
+                <p className="text-white font-bold text-lg truncate">{ticket.callType === 'UNDER_MAINTENANCE_CONTRACT' ? 'Under Contract' : 'Not Under Contract'}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Created On</p>
+                <p className="text-white font-bold text-lg">{format(new Date(ticket.createdAt), 'MMM d, yyyy')}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left Column - Main Ticket Info */}
+        <div className="space-y-6">
+          {/* Ticket Overview Card */}
+          <Card className="border-0 shadow-xl bg-white overflow-hidden group hover:shadow-2xl transition-all duration-300">
+            <CardHeader className="pb-4 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 border-b border-slate-100/80 p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <CardTitle className="text-xl font-bold text-slate-800 leading-tight">{ticket.title}</CardTitle>
+                    <p className="text-sm text-slate-500 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      Created {formatDistanceToNow(new Date(ticket.createdAt))} ago
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <StatusBadge status={ticket.status} />
+                  <PriorityBadge priority={ticket.priority} />
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-4 md:p-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium mb-2 text-sm md:text-base">Description</h3>
-                  <p className="text-muted-foreground text-sm break-words">{ticket.description}</p>
+            <CardContent className="p-6 space-y-6">
+              {/* Description */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Description</h3>
                 </div>
+                <p className="text-slate-600 leading-relaxed pl-4 border-l-2 border-blue-200">{ticket.description}</p>
+              </div>
 
-                {ticket.callType && (
-                  <div>
-                    <h3 className="font-medium mb-2 text-sm md:text-base">Call Type</h3>
-                    <Badge variant={ticket.callType === 'UNDER_MAINTENANCE_CONTRACT' ? 'default' : 'secondary'} className="text-xs">
+              {ticket.callType && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Call Type</h3>
+                  </div>
+                  <div className="pl-4">
+                    <Badge 
+                      className={`${ticket.callType === 'UNDER_MAINTENANCE_CONTRACT' 
+                        ? 'bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 border-emerald-300' 
+                        : 'bg-gradient-to-r from-amber-100 to-amber-50 text-amber-800 border-amber-300'} 
+                        font-semibold px-4 py-1.5 shadow-sm`}
+                    >
                       {ticket.callType === 'UNDER_MAINTENANCE_CONTRACT' 
-                        ? 'Under Maintenance Contract' 
-                        : 'Not Under Contract'}
+                        ? '✓ Under Maintenance Contract' 
+                        : '○ Not Under Contract'}
                     </Badge>
                   </div>
-                )}
+                </div>
+              )}
 
-                {ticket.contact && (
-                  <div>
-                    <h3 className="font-medium mb-2 text-sm md:text-base">Contact Information</h3>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-muted-foreground flex-shrink-0">
-                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-                          <circle cx="12" cy="7" r="4"/>
-                        </svg>
-                        <span className="text-sm break-words">{ticket.contact.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-muted-foreground flex-shrink-0">
-                          <rect width="20" height="16" x="2" y="4" rx="2"/>
-                          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                        </svg>
-                        <span className="text-sm break-all">{ticket.contact.email}</span>
-                      </div>
-                      {ticket.contact.phone && (
-                        <div className="flex items-center gap-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-muted-foreground flex-shrink-0">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                          </svg>
-                          <span className="text-sm">{ticket.contact.phone}</span>
-                        </div>
-                      )}
-                    </div>
+              {/* Contact Information */}
+              {ticket.contact && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                    <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Contact Information</h3>
                   </div>
-                )}
+                  <div className="pl-4 space-y-2.5">
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-slate-50 to-slate-100/50 hover:from-slate-100 hover:to-slate-150 transition-colors">
+                      <div className="h-8 w-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                        <User className="h-4 w-4 text-violet-600" />
+                      </div>
+                      <span className="text-slate-700 font-medium">{ticket.contact.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-slate-50 to-slate-100/50 hover:from-slate-100 hover:to-slate-150 transition-colors">
+                      <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <Mail className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-slate-700 font-medium break-all">{ticket.contact.email}</span>
+                    </div>
+                    {ticket.contact.phone && (
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-slate-50 to-slate-100/50 hover:from-slate-100 hover:to-slate-150 transition-colors">
+                        <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                          <Phone className="h-4 w-4 text-emerald-600" />
+                        </div>
+                        <span className="text-slate-700 font-medium">{ticket.contact.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
-                {ticket.asset && (
-                  <div>
-                    <h3 className="font-medium mb-2 text-sm md:text-base">Asset Details</h3>
-                    <div className="space-y-2">
-                      <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                        <span className="text-muted-foreground text-sm">Model:</span>
-                        <span className="text-sm font-medium break-words">{ticket.asset.model}</span>
+              {/* Asset Details */}
+              {ticket.asset && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                    <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Asset Details</h3>
+                  </div>
+                  <div className="pl-4 p-4 rounded-xl bg-gradient-to-br from-orange-50/50 to-amber-50/30 border border-orange-100">
+                    <div className="grid gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 text-sm">Model</span>
+                        <span className="font-semibold text-slate-800 bg-white px-3 py-1 rounded-lg shadow-sm">{ticket.asset.model}</span>
                       </div>
                       {(ticket.asset as any).serialNo && (
-                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                          <span className="text-muted-foreground text-sm">Serial Number:</span>
-                          <span className="text-sm font-medium break-all">{(ticket.asset as any).serialNo}</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 text-sm">Serial Number</span>
+                          <span className="font-mono font-semibold text-slate-800 bg-white px-3 py-1 rounded-lg shadow-sm text-sm">{(ticket.asset as any).serialNo}</span>
                         </div>
                       )}
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50/50 rounded-t-lg border-b">
-              <div className="flex items-center space-x-2">
-                <Activity className="h-5 w-5 text-blue-600" />
-                <CardTitle className="text-blue-900">Activity</CardTitle>
+          {/* Activity Card */}
+          <Card className="border-0 shadow-xl bg-white overflow-hidden group hover:shadow-2xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 text-white p-5 border-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl ring-2 ring-white/30">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="text-lg font-bold">Activity Timeline</CardTitle>
+                </div>
+                <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Live
+                </Badge>
               </div>
             </CardHeader>
-            <CardContent className="overflow-hidden">
+            <CardContent className="p-5 overflow-hidden">
               <div className="max-w-full">
                 <TicketActivity ticketId={ticket.id} ticket={ticket} />
               </div>
@@ -290,208 +381,248 @@ export default function TicketDetailPage() {
         </div>
 
         {/* Right Column - Sidebar Content */}
-        <div className="space-y-4 md:space-y-6">
-          <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
-            <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50/50 rounded-t-lg border-b">
-              <CardTitle className="text-emerald-900">Assignment</CardTitle>
+        <div className="space-y-6">
+          {/* Assignment Card - Premium Design */}
+          <Card className="border-0 shadow-xl bg-white overflow-hidden group hover:shadow-2xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white p-5 border-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl ring-2 ring-white/30">
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-bold">Assignment Panel</CardTitle>
+                  <p className="text-emerald-100 text-xs mt-0.5">Manage ticket assignments</p>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-medium">Assignment</h3>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Expert Helpdesk</span>
-                  <div className="flex items-center">
+            <CardContent className="p-5 space-y-4">
+              {/* Assignment Rows */}
+              <div className="space-y-3">
+                {/* Expert Helpdesk */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-purple-50/80 to-pink-50/50 border border-purple-100 hover:shadow-md transition-all duration-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Expert Helpdesk</span>
+                    {ticket.assignedTo && ticket.assignedTo.role === 'EXPERT_HELPDESK' && (
+                      <div className="flex items-center gap-2">
+                        {/* Assignment Status Badge */}
+                        {ticket.assignmentStatus === 'PENDING' && (
+                          <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-[10px] px-2 py-0.5 animate-pulse">
+                            Awaiting Response
+                          </Badge>
+                        )}
+                        {ticket.assignmentStatus === 'ACCEPTED' && (
+                          <Badge className="bg-green-100 text-green-700 border-green-300 text-[10px] px-2 py-0.5">
+                            ✓ Accepted
+                          </Badge>
+                        )}
+                        {ticket.assignmentStatus === 'REJECTED' && (
+                          <Badge className="bg-red-100 text-red-700 border-red-300 text-[10px] px-2 py-0.5">
+                            ✗ Rejected
+                          </Badge>
+                        )}
+                        <div className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
                     {ticket.assignedTo && ticket.assignedTo.role === 'EXPERT_HELPDESK' ? (
                       <>
-                        <Avatar className="h-5 w-5 mr-2">
-                          <AvatarFallback className="bg-purple-100 text-purple-700">
+                        <Avatar className="h-10 w-10 ring-2 ring-purple-200 shadow-md">
+                          <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold">
                             {ticket.assignedTo.name?.charAt(0) || 'E'}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex flex-col">
-                          <span>{ticket.assignedTo.name || 'No name'}</span>
+                        <div className="flex-1">
+                          <span className="font-semibold text-slate-800 block">{ticket.assignedTo.name || 'No name'}</span>
                           {ticket.assignedTo.phone && (
-                            <span className="text-xs text-muted-foreground">{ticket.assignedTo.phone}</span>
+                            <span className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                              <Phone className="h-3 w-3" /> {ticket.assignedTo.phone}
+                            </span>
                           )}
                         </div>
                       </>
                     ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
+                      <span className="text-slate-400 italic text-sm">Unassigned</span>
                     )}
                   </div>
+                  {/* Show rejection notes if rejected */}
+                  {ticket.assignmentStatus === 'REJECTED' && ticket.assignmentNotes && ticket.assignedTo?.role === 'EXPERT_HELPDESK' && (
+                    <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-200">
+                      <p className="text-xs text-red-600"><strong>Rejection Reason:</strong> {ticket.assignmentNotes}</p>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Zone Manager / Zone User</span>
-                  <div className="flex items-center">
-                    {ticket.subOwner && (ticket.subOwner.role === 'ZONE_USER' || ticket.subOwner.role === 'ZONE_MANAGER') ? (
+                {/* Zone Manager / Zone User */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50/80 to-teal-50/50 border border-emerald-100 hover:shadow-md transition-all duration-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Zone Manager / Zone User</span>
+                    {ticket.assignedTo && (ticket.assignedTo.role === 'ZONE_USER' || ticket.assignedTo.role === 'ZONE_MANAGER') && (
+                      <div className="flex items-center gap-2">
+                        {/* Assignment Status Badge */}
+                        {ticket.assignmentStatus === 'PENDING' && (
+                          <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-[10px] px-2 py-0.5 animate-pulse">
+                            Awaiting Response
+                          </Badge>
+                        )}
+                        {ticket.assignmentStatus === 'ACCEPTED' && (
+                          <Badge className="bg-green-100 text-green-700 border-green-300 text-[10px] px-2 py-0.5">
+                            ✓ Accepted
+                          </Badge>
+                        )}
+                        {ticket.assignmentStatus === 'REJECTED' && (
+                          <Badge className="bg-red-100 text-red-700 border-red-300 text-[10px] px-2 py-0.5">
+                            ✗ Rejected
+                          </Badge>
+                        )}
+                        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {ticket.assignedTo && (ticket.assignedTo.role === 'ZONE_USER' || ticket.assignedTo.role === 'ZONE_MANAGER') ? (
                       <>
-                        <Avatar className="h-5 w-5 mr-2">
-                          <AvatarFallback className={`${ticket.subOwner.role === 'ZONE_MANAGER' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {ticket.subOwner.name?.charAt(0) || 'U'}
+                        <Avatar className="h-10 w-10 ring-2 ring-emerald-200 shadow-md">
+                          <AvatarFallback className={`${ticket.assignedTo.role === 'ZONE_MANAGER' ? 'bg-gradient-to-br from-amber-500 to-orange-500' : 'bg-gradient-to-br from-emerald-500 to-teal-500'} text-white font-bold`}>
+                            {ticket.assignedTo.name?.charAt(0) || 'U'}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex flex-col">
-                          <span>{ticket.subOwner.name || 'No name'}</span>
-                          <span className={`text-xs font-medium ${ticket.subOwner.role === 'ZONE_MANAGER' ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {ticket.subOwner.role === 'ZONE_MANAGER' ? 'Zone Manager' : 'Zone User'}
-                          </span>
-                          {ticket.subOwner.phone && (
-                            <span className="text-xs text-muted-foreground">{ticket.subOwner.phone}</span>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Service Person</span>
-                  <div className="flex items-center">
-                    {ticket.assignedTo && ticket.assignedTo.role === 'SERVICE_PERSON' ? (
-                      <>
-                        <Avatar className="h-5 w-5 mr-2">
-                          <AvatarFallback className="bg-blue-100 text-blue-700">
-                            {ticket.assignedTo.name?.charAt(0) || 'S'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                          <span>{ticket.assignedTo.name || 'No name'}</span>
-                          {ticket.zone?.name && (
-                            <span className="text-xs text-blue-600 font-medium">Zone: {ticket.zone.name}</span>
-                          )}
+                        <div className="flex-1">
+                          <span className="font-semibold text-slate-800 block">{ticket.assignedTo.name || 'No name'}</span>
+                          <Badge className={`text-[10px] px-2 py-0 ${ticket.assignedTo.role === 'ZONE_MANAGER' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>
+                            {ticket.assignedTo.role === 'ZONE_MANAGER' ? 'Zone Manager' : 'Zone User'}
+                          </Badge>
                           {ticket.assignedTo.phone && (
-                            <span className="text-xs text-muted-foreground">{ticket.assignedTo.phone}</span>
+                            <span className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                              <Phone className="h-3 w-3" /> {ticket.assignedTo.phone}
+                            </span>
                           )}
                         </div>
                       </>
                     ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
+                      <span className="text-slate-400 italic text-sm">Unassigned</span>
                     )}
                   </div>
+                  {/* Show rejection notes if rejected */}
+                  {ticket.assignmentStatus === 'REJECTED' && ticket.assignmentNotes && (ticket.assignedTo?.role === 'ZONE_USER' || ticket.assignedTo?.role === 'ZONE_MANAGER') && (
+                    <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-200">
+                      <p className="text-xs text-red-600"><strong>Rejection Reason:</strong> {ticket.assignmentNotes}</p>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Zone</span>
-                  <div className="flex items-center">
-                    <MapPin className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                    {ticket.zone?.name || 'No zone assigned'}
+                {/* Zone & Created By Info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                      <MapPin className="h-3.5 w-3.5" />
+                      Zone
+                    </div>
+                    <p className="font-semibold text-slate-800 truncate">{ticket.zone?.name || 'Unassigned'}</p>
                   </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Created By</span>
-                  <div className="flex flex-col">
-                    <span>{ticket.owner?.name || 'System'}</span>
-                    {ticket.owner?.phone && (
-                      <span className="text-xs text-muted-foreground">{ticket.owner.phone}</span>
-                    )}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                      <User className="h-3.5 w-3.5" />
+                      Created By
+                    </div>
+                    <p className="font-semibold text-slate-800 truncate">{ticket.owner?.name || 'System'}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-3 pt-4">
-                <div className="text-sm font-medium text-muted-foreground mb-2">Quick Actions</div>
-                <Button 
-                  onClick={() => {
-                    // Open dialog for expert helpdesk assignment
-                    setAssignmentStep('EXPERT_HELPDESK');
-                    setIsAssignDialogOpen(true);
-                  }}
-                  disabled={!ticket}
-                  variant="outline"
-                  className="w-full justify-start h-12 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200 hover:border-purple-300 text-purple-700 hover:text-purple-800 transition-all duration-200 shadow-sm hover:shadow-md group"
-                >
-                  <div className="flex items-center">
-                    <div className="p-1.5 rounded-full bg-purple-100 group-hover:bg-purple-200 mr-3 transition-colors">
-                      <UserPlus className="h-4 w-4" />
+              {/* Quick Actions */}
+              <div className="pt-4 border-t border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Zap className="h-3.5 w-3.5 text-amber-500" />
+                  Quick Actions
+                </p>
+                <div className="space-y-2.5">
+                  <Button 
+                    onClick={() => {
+                      setAssignmentStep('EXPERT_HELPDESK');
+                      setIsAssignDialogOpen(true);
+                    }}
+                    disabled={!ticket}
+                    className="w-full justify-between h-12 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-xl transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-white/20">
+                        <UserPlus className="h-4 w-4" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-semibold text-sm">Assign to Expert Helpdesk</div>
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <div className="font-medium">Assign to Expert Helpdesk</div>
-                      <div className="text-xs text-purple-600 opacity-80">Specialized technical review</div>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setAssignmentStep('ZONE_USER');
+                      setIsAssignDialogOpen(true);
+                    }}
+                    disabled={!ticket}
+                    className="w-full justify-between h-12 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-white/20">
+                        <UserPlus className="h-4 w-4" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-semibold text-sm">Assign to Zone User</div>
+                      </div>
                     </div>
-                  </div>
-                </Button>
-                <Button 
-                  onClick={() => {
-                    // Open dialog for zone user assignment
-                    setAssignmentStep('ZONE_USER');
-                    setIsAssignDialogOpen(true);
-                  }}
-                  disabled={!ticket}
-                  variant="outline"
-                  className="w-full justify-start h-12 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border-emerald-200 hover:border-emerald-300 text-emerald-700 hover:text-emerald-800 transition-all duration-200 shadow-sm hover:shadow-md group"
-                >
-                  <div className="flex items-center">
-                    <div className="p-1.5 rounded-full bg-emerald-100 group-hover:bg-emerald-200 mr-3 transition-colors">
-                      <UserPlus className="h-4 w-4" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium">Assign to Zone User</div>
-                      <div className="text-xs text-emerald-600 opacity-80">Zone Manager or Zone User</div>
-                    </div>
-                  </div>
-                </Button>
-                              </div>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
-            <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-t-lg border-b p-4 md:p-6">
-              <div className="flex flex-col space-y-3">
-                <CardTitle className="text-amber-900 text-base md:text-lg">Details</CardTitle>
-                <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant={activeTab === 'details' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setActiveTab('details')}
-                    className="text-xs px-2 py-1 h-8 btn-touch"
-                  >
-                    <FileText className="h-3 w-3 mr-1" />
-                    <span className="hidden sm:inline">Details</span>
-                    <span className="sm:hidden">Info</span>
-                  </Button>
-                  <Button 
-                    variant={activeTab === 'comments' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setActiveTab('comments')}
-                    className="text-xs px-2 py-1 h-8 btn-touch"
-                  >
-                    <MessageSquare className="h-3 w-3 mr-1" />
-                    Comments
-                  </Button>
-                  <Button 
-                    variant={activeTab === 'reports' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setActiveTab('reports')}
-                    className="text-xs px-2 py-1 h-8 btn-touch"
-                  >
-                    <Upload className="h-3 w-3 mr-1" />
-                    Reports
-                  </Button>
-                  <Button 
-                    variant={activeTab === 'photos' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setActiveTab('photos')}
-                    className="text-xs px-2 py-1 h-8 btn-touch"
-                  >
-                    <Camera className="h-3 w-3 mr-1" />
-                    Photos
-                  </Button>
+          {/* Details Tabs Card - Premium Design */}
+          <Card className="border-0 shadow-xl bg-white overflow-hidden hover:shadow-2xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 text-white p-5 border-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl ring-2 ring-white/30">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="text-lg font-bold">Ticket Information</CardTitle>
                 </div>
               </div>
+              {/* Tab Navigation */}
+              <div className="flex flex-wrap gap-2 mt-4">
+                {[
+                  { id: 'details', label: 'Details', icon: FileText },
+                  { id: 'comments', label: 'Comments', icon: MessageSquare },
+                  { id: 'reports', label: 'Reports', icon: Upload },
+                  { id: 'photos', label: 'Photos', icon: Camera },
+                ].map((tab) => (
+                  <Button 
+                    key={tab.id}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`px-4 py-2 h-9 rounded-xl transition-all duration-200 ${
+                      activeTab === tab.id 
+                        ? 'bg-white text-orange-600 shadow-lg hover:bg-white' 
+                        : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+                    }`}
+                  >
+                    <tab.icon className="h-4 w-4 mr-2" />
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
             </CardHeader>
-            <CardContent className="overflow-hidden p-4 md:p-6">
+            <CardContent className="p-5 overflow-hidden">
               <div className="max-w-full">
                 {activeTab === 'details' ? (
-   <TicketDetails ticket={ticket} onStatusChange={async (status) => {
+                  <TicketDetails ticket={ticket} onStatusChange={async (status) => {
                     try {
                       await api.patch(`/tickets/${ticket.id}`, { status });
                       setTicket({ ...ticket, status });
                     } catch (error) {
-                      }
+                    }
                   }} />
                 ) : activeTab === 'reports' ? (
                   <TicketReports ticketId={ticket.id.toString()} />
@@ -509,55 +640,82 @@ export default function TicketDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50/50 rounded-t-lg border-b">
-              <CardTitle className="text-purple-900">Status History</CardTitle>
+          {/* Status History Card - Premium Design */}
+          <Card className="border-0 shadow-xl bg-white overflow-hidden hover:shadow-2xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 text-white p-5 border-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl ring-2 ring-white/30">
+                    <History className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="text-lg font-bold">Status History</CardTitle>
+                </div>
+                <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                  {ticket.statusHistory?.length || 0} updates
+                </Badge>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="p-5">
+              <div className="space-y-4">
                 {ticket.statusHistory?.length ? (
-                  <div className="space-y-3">
-                    {ticket.statusHistory.map((history, index) => (
-                      <div key={history.id} className="flex items-start space-x-3 pb-3 border-b border-gray-100 last:border-b-0">
-                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-background flex items-center justify-center border">
-                          {index === 0 ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <div className="h-2 w-2 rounded-full bg-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center space-x-2">
-                              <StatusBadge status={history.status} />
-                              <div className="flex flex-col">
-                                <span className="text-sm text-muted-foreground">
-                                  by {history.changedBy?.name || history.changedBy?.email?.split('@')[0] || 'Unknown'}
-                                </span>
-                                {ticket.zone?.name && (history.changedBy?.role === 'ZONE_USER' || history.changedBy?.role === 'SERVICE_PERSON') && (
-                                  <span className="text-xs text-muted-foreground">Zone: {ticket.zone.name}</span>
+                  <div className="relative">
+                    {/* Timeline line */}
+                    <div className="absolute left-[19px] top-6 bottom-2 w-0.5 bg-gradient-to-b from-purple-200 via-purple-100 to-transparent" />
+                    
+                    <div className="space-y-4">
+                      {ticket.statusHistory.map((history, index) => (
+                        <div key={history.id} className="relative pl-12">
+                          {/* Timeline dot */}
+                          <div className={`absolute left-0 top-1 h-10 w-10 rounded-xl flex items-center justify-center shadow-lg ${
+                            index === 0 
+                              ? 'bg-gradient-to-br from-green-400 to-emerald-500 text-white ring-4 ring-green-100' 
+                              : 'bg-white border-2 border-purple-200'
+                          }`}>
+                            {index === 0 ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <div className="h-2.5 w-2.5 rounded-full bg-purple-400" />
+                            )}
+                          </div>
+                          
+                          <div className="p-4 rounded-xl bg-gradient-to-r from-slate-50 to-purple-50/30 border border-purple-50 hover:shadow-md transition-all duration-200">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-2">
+                                  <StatusBadge status={history.status} />
+                                  <span className="text-slate-500 text-xs">•</span>
+                                  <span className="text-sm text-slate-600 font-medium">
+                                    by {history.changedBy?.name || history.changedBy?.email?.split('@')[0] || 'Unknown'}
+                                  </span>
+                                </div>
+                                {history.notes && (
+                                  <p className="text-sm text-slate-500 line-clamp-2">
+                                    {history.notes.split('\n\n')[0]}
+                                  </p>
                                 )}
                               </div>
+                              <span className="text-xs text-slate-400 whitespace-nowrap bg-white px-2 py-1 rounded-lg shadow-sm">
+                                {format(new Date(history.changedAt), 'MMM d, h:mm a')}
+                              </span>
                             </div>
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(history.changedAt), 'MMM d, h:mm a')}
-                            </span>
                           </div>
-                          {history.notes && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {history.notes.split('\n\n')[0]} {/* Show only the first part before location data */}
-                            </p>
-                          )}
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No status history available</p>
+                  <div className="text-center py-8">
+                    <div className="h-16 w-16 rounded-full bg-purple-50 flex items-center justify-center mx-auto mb-4">
+                      <History className="h-8 w-8 text-purple-300" />
+                    </div>
+                    <p className="text-slate-500 font-medium">No status history available</p>
+                    <p className="text-slate-400 text-sm mt-1">Status changes will appear here</p>
+                  </div>
                 )}
               </div>
             </CardContent>
           </Card>
+        </div>
         </div>
       </div>
 
@@ -568,11 +726,11 @@ export default function TicketDetailPage() {
         onSuccess={fetchTicketDetails}
         zoneId={ticket.zone?.id}
         initialStep={assignmentStep}
-        currentAssignedZoneUser={ticket.subOwner && ticket.subOwner.role === 'ZONE_USER' ? {
-          id: ticket.subOwner.id.toString(),
-          name: ticket.subOwner.name || 'No name',
-          email: ticket.subOwner.email,
-          phone: ticket.subOwner.phone || undefined
+        currentAssignedZoneUser={ticket.assignedTo && (ticket.assignedTo.role === 'ZONE_USER' || ticket.assignedTo.role === 'ZONE_MANAGER') ? {
+          id: ticket.assignedTo.id.toString(),
+          name: ticket.assignedTo.name || 'No name',
+          email: ticket.assignedTo.email,
+          phone: ticket.assignedTo.phone || undefined
         } : null}
         currentAssignedServicePerson={ticket.assignedTo && ticket.assignedTo.role === 'SERVICE_PERSON' ? {
           id: ticket.assignedTo.id.toString(),

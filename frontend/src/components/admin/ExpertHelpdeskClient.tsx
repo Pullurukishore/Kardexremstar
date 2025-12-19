@@ -6,7 +6,7 @@ import { ExpertHelpdesk } from '@/lib/server/expert-helpdesk';
 import { apiClient } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { Users, UserCheck, UserX, Zap, Edit2, Lock, Trash2, Search } from 'lucide-react';
+import { Users, UserCheck, UserX, Zap, Pencil as Edit2, Lock, Trash2, Search } from 'lucide-react';
 
 interface ExpertHelpdeskStats {
   total: number;

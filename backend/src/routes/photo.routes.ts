@@ -1,16 +1,20 @@
 import { Router } from 'express';
-import { EnhancedPhotoStorageService } from '../services/enhanced-photo-storage.service';
+// ⚠️ IMPORTANT: Using PhotoStorageService for LOCAL storage
+// DO NOT switch to EnhancedPhotoStorageService - that uploads to Cloudinary (external)
+// Company policy: All images must stay within the network
+import { PhotoStorageService } from '../services/photo-storage.service';
 import { authenticate } from '../middleware/auth.middleware';
 import prisma from '../config/db';
 
 const router = Router();
 
+
 // Get photos for a ticket
 router.get('/tickets/:ticketId/photos', authenticate, async (req, res) => {
   try {
     const { ticketId } = req.params;
-    const photos = await EnhancedPhotoStorageService.getTicketPhotos(Number(ticketId));
-    
+    const photos = await PhotoStorageService.getTicketPhotos(Number(ticketId));
+
     res.json({
       success: true,
       photos
@@ -37,7 +41,7 @@ router.post('/tickets/:ticketId/photos', authenticate, async (req, res) => {
       });
     }
 
-    const storedPhotos = await EnhancedPhotoStorageService.storePhotos(
+    const storedPhotos = await PhotoStorageService.storePhotos(
       photos,
       {
         ticketId: Number(ticketId),
@@ -62,7 +66,7 @@ router.post('/tickets/:ticketId/photos', authenticate, async (req, res) => {
 router.get('/activities/:activityId/photos', authenticate, async (req, res) => {
   try {
     const { activityId } = req.params;
-    
+
     // For activities, photos are stored in local storage and referenced in ActivityStage notes
     // We need to extract photo URLs from the activity stages
     const activity = await prisma.dailyActivityLog.findUnique({
@@ -151,7 +155,7 @@ router.post('/activities/:activityId/photos', authenticate, async (req, res) => 
       });
     }
 
-    const storedPhotos = await EnhancedPhotoStorageService.storePhotos(
+    const storedPhotos = await PhotoStorageService.storePhotos(
       photos,
       {
         activityId: Number(activityId),

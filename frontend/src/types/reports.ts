@@ -179,37 +179,37 @@ export interface Customer {
 }
 
 export const REPORT_TYPES: ReportType[] = [
-  { 
-    value: 'ticket-summary', 
-    label: 'Ticket Analytics Report', 
+  {
+    value: 'ticket-summary',
+    label: 'Ticket Analytics Report',
     description: 'Comprehensive ticket analytics with status, priority trends, and resolution metrics',
     icon: 'BarChart3',
     color: 'from-blue-500 to-blue-600'
   },
-  { 
-    value: 'customer-satisfaction', 
-    label: 'Customer Experience Report', 
+  {
+    value: 'customer-satisfaction',
+    label: 'Customer Experience Report',
     description: 'Customer satisfaction ratings, feedback analysis, and experience metrics',
     icon: 'Star',
     color: 'from-amber-500 to-amber-600'
   },
-  { 
-    value: 'industrial-data', 
-    label: 'Machine Reports', 
+  {
+    value: 'industrial-data',
+    label: 'Machine Reports',
     description: 'Machine downtime analysis, equipment performance tracking, and maintenance efficiency metrics',
     icon: 'Settings',
     color: 'from-green-500 to-green-600'
   },
-  { 
-    value: 'zone-performance', 
-    label: 'Zone Performance Report', 
+  {
+    value: 'zone-performance',
+    label: 'Zone Performance Report',
     description: 'Service zone efficiency, resource utilization, and performance benchmarks',
     icon: 'Target',
     color: 'from-purple-500 to-purple-600'
   },
-  { 
-    value: 'agent-productivity', 
-    label: 'Service Person Performance Report', 
+  {
+    value: 'agent-productivity',
+    label: 'Service Person Performance Report',
     description: 'Comprehensive performance analytics for all service persons including productivity, resolution rates, and efficiency metrics',
     icon: 'Users',
     color: 'from-indigo-500 to-indigo-600'
@@ -369,9 +369,7 @@ export const STAGE_COLORS: Record<string, string> = {
   INITIAL: '#3B82F6',
   PROPOSAL_SENT: '#8B5CF6',
   NEGOTIATION: '#F59E0B',
-  FINAL_APPROVAL: '#F97316',
   PO_RECEIVED: '#06B6D4',
-  ORDER_BOOKED: '#14B8A6',
   WON: '#10B981',
   LOST: '#EF4444',
 };

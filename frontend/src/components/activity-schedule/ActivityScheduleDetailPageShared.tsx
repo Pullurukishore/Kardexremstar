@@ -14,7 +14,7 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Edit3,
+  Pencil as Edit3,
   ExternalLink,
   Phone,
   Mail,
@@ -251,6 +251,81 @@ export default function ActivityScheduleDetailPageShared() {
       return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
     }
     return `${minutes}m`;
+  };
+
+  // Helper to get readable stage label for ticket status stages
+  const getStageLabel = (stage: string, isTicketStatus?: boolean): string => {
+    // Ticket work status progression labels
+    const ticketStatusLabels: Record<string, string> = {
+      'OPEN': 'Ticket Opened',
+      'ASSIGNED': 'Assigned to Technician',
+      'IN_PROGRESS': 'Work In Progress',
+      'ONSITE_VISIT_STARTED': 'Traveling to Site',
+      'ONSITE_VISIT_REACHED': 'Arrived at Site',
+      'ONSITE_VISIT_IN_PROGRESS': 'Onsite Work In Progress',
+      'ONSITE_VISIT_RESOLVED': 'Issue Resolved',
+      'ONSITE_VISIT_COMPLETED': 'Onsite Visit Completed',
+      'REMOTE_RESOLUTION_STARTED': 'Remote Support Started',
+      'REMOTE_RESOLUTION_IN_PROGRESS': 'Remote Support In Progress',
+      'REMOTE_RESOLUTION_RESOLVED': 'Remote Issue Resolved',
+      'PARTS_ORDERED': 'Parts Ordered',
+      'PARTS_RECEIVED': 'Parts Received',
+      'AWAITING_PARTS': 'Awaiting Parts',
+      'AWAITING_CUSTOMER': 'Awaiting Customer',
+      'ESCALATED': 'Escalated',
+      'ON_HOLD': 'On Hold',
+      'RESOLVED': 'Resolved',
+      'CLOSED': 'Closed',
+      'CLOSED_PENDING': 'Closure Pending',
+      'CANCELLED': 'Cancelled',
+    };
+
+    // Activity stage labels
+    const activityStageLabels: Record<string, string> = {
+      'STARTED': 'Started',
+      'TRAVELING': 'Traveling',
+      'ARRIVED': 'Arrived',
+      'WORK_IN_PROGRESS': 'Work in Progress',
+      'COMPLETED': 'Completed',
+      'ASSESSMENT': 'Assessment',
+      'PLANNING': 'Planning',
+      'EXECUTION': 'Execution',
+      'TESTING': 'Testing',
+      'DOCUMENTATION': 'Documentation',
+      'CUSTOMER_HANDOVER': 'Customer Handover',
+      'PREPARATION': 'Preparation',
+      'CLEANUP': 'Cleanup',
+    };
+
+    if (isTicketStatus) {
+      return ticketStatusLabels[stage] || stage?.replace(/_/g, ' ') || 'Unknown';
+    }
+    return activityStageLabels[stage] || stage?.replace(/_/g, ' ') || 'Unknown';
+  };
+
+  // Helper to get stage styling based on type
+  const getStageStyle = (stage: string, isTicketStatus?: boolean) => {
+    // Ticket status styles with icons
+    const ticketStatusStyles: Record<string, { bg: string; text: string; icon: string }> = {
+      'ONSITE_VISIT_STARTED': { bg: 'from-blue-100 to-sky-100', text: 'text-blue-700', icon: '🚗' },
+      'ONSITE_VISIT_REACHED': { bg: 'from-green-100 to-emerald-100', text: 'text-green-700', icon: '📍' },
+      'ONSITE_VISIT_IN_PROGRESS': { bg: 'from-orange-100 to-amber-100', text: 'text-orange-700', icon: '🔧' },
+      'ONSITE_VISIT_RESOLVED': { bg: 'from-emerald-100 to-teal-100', text: 'text-emerald-700', icon: '✅' },
+      'ONSITE_VISIT_COMPLETED': { bg: 'from-purple-100 to-violet-100', text: 'text-purple-700', icon: '🎉' },
+      'IN_PROGRESS': { bg: 'from-yellow-100 to-amber-100', text: 'text-yellow-700', icon: '⚡' },
+      'PARTS_ORDERED': { bg: 'from-cyan-100 to-blue-100', text: 'text-cyan-700', icon: '📦' },
+      'PARTS_RECEIVED': { bg: 'from-teal-100 to-cyan-100', text: 'text-teal-700', icon: '✔️' },
+      'RESOLVED': { bg: 'from-green-100 to-emerald-100', text: 'text-green-700', icon: '🎯' },
+      'CLOSED': { bg: 'from-slate-100 to-gray-100', text: 'text-slate-700', icon: '🔒' },
+    };
+
+    // Default style
+    const defaultStyle = { bg: 'from-gray-100 to-slate-100', text: 'text-gray-700', icon: '📋' };
+
+    if (isTicketStatus) {
+      return ticketStatusStyles[stage] || defaultStyle;
+    }
+    return defaultStyle;
   };
 
   const handleComplete = async () => {
@@ -777,27 +852,46 @@ export default function ActivityScheduleDetailPageShared() {
                         <div className="mt-5 pl-5 border-l-2 border-emerald-300 space-y-4">
                           {activity.ActivityStage.map((stage: any, stageIndex: number) => {
                             const meta = stage.metadata || {};
+                            const isTicketStatus = meta.isTicketStatus === true;
                             const locationSource = meta.locationSource as string | undefined;
                             const accuracyRaw = (meta.accuracy as any) ?? undefined;
                             const accuracy = typeof accuracyRaw === 'number' ? accuracyRaw : accuracyRaw ? parseFloat(accuracyRaw) : undefined;
                             const photos = Array.isArray(meta.photos) ? meta.photos : [];
+                            const stageStyle = getStageStyle(stage.stage, isTicketStatus);
+                            const changedBy = meta.changedBy;
 
                             return (
                               <div key={stage.id} className="relative">
-                                <div className="absolute -left-[29px] top-2 w-4 h-4 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full border-4 border-white shadow-md" />
+                                <div className={`absolute -left-[29px] top-2 w-4 h-4 rounded-full border-4 border-white shadow-md ${
+                                  isTicketStatus 
+                                    ? 'bg-gradient-to-br from-blue-500 to-indigo-500' 
+                                    : 'bg-gradient-to-br from-emerald-400 to-teal-500'
+                                }`} />
                                 
-                                <div className="bg-white rounded-xl p-5 shadow-sm border border-emerald-100 ml-2">
+                                <div className={`rounded-xl p-5 shadow-sm ml-2 ${
+                                  isTicketStatus 
+                                    ? `bg-gradient-to-br ${stageStyle.bg} border border-blue-200` 
+                                    : 'bg-white border border-emerald-100'
+                                }`}>
                                   <div className="flex flex-wrap items-center gap-3 mb-3">
-                                    <span className="font-semibold text-gray-900 text-lg">
-                                      {stage.stage?.replace(/_/g, ' ')}
+                                    {isTicketStatus && (
+                                      <span className="text-xl">{stageStyle.icon}</span>
+                                    )}
+                                    <span className={`font-semibold text-lg ${isTicketStatus ? stageStyle.text : 'text-gray-900'}`}>
+                                      {getStageLabel(stage.stage, isTicketStatus)}
                                     </span>
-                                    {locationSource === 'gps' && typeof accuracy === 'number' && (
+                                    {isTicketStatus && (
+                                      <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200 border text-xs">
+                                        Ticket Status
+                                      </Badge>
+                                    )}
+                                    {!isTicketStatus && locationSource === 'gps' && typeof accuracy === 'number' && (
                                       <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200 border">
                                         <Navigation className="h-3 w-3 mr-1" />
                                         GPS ±{Math.round(accuracy)}m
                                       </Badge>
                                     )}
-                                    {locationSource === 'manual' && (
+                                    {!isTicketStatus && locationSource === 'manual' && (
                                       <Badge className="bg-gradient-to-r from-blue-100 to-sky-100 text-blue-700 border-blue-200 border">
                                         Manual Location
                                       </Badge>
@@ -814,6 +908,12 @@ export default function ActivityScheduleDetailPageShared() {
                                       <span className="flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded">
                                         <Timer className="h-3 w-3" />
                                         {formatDurationFromTimes(stage.startTime, stage.endTime)}
+                                      </span>
+                                    )}
+                                    {isTicketStatus && changedBy?.name && (
+                                      <span className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded text-blue-700">
+                                        <User className="h-3 w-3" />
+                                        by {changedBy.name}
                                       </span>
                                     )}
                                   </div>

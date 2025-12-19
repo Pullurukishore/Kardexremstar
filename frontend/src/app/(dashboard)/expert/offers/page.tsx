@@ -36,7 +36,7 @@ import {
 import { 
   Search, 
   MoreHorizontal, 
-  Edit, 
+  Pencil as Edit, 
   Trash2, 
   Plus,
   RefreshCw,
@@ -65,7 +65,8 @@ import {
 import { apiService } from '@/services/api'
 import { toast } from 'sonner'
 
-const stages = ['All Stage', 'INITIAL', 'PROPOSAL_SENT', 'NEGOTIATION', 'FINAL_APPROVAL', 'PO_RECEIVED', 'ORDER_BOOKED', 'WON', 'LOST']
+// Note: PO_RECEIVED leads directly to WON (ORDER_BOOKED stage removed)
+const stages = ['All Stage', 'INITIAL', 'PROPOSAL_SENT', 'NEGOTIATION', 'PO_RECEIVED', 'WON', 'LOST']
 const productTypes = ['All Product Types', 'RELOCATION', 'CONTRACT', 'SPP', 'UPGRADE_KIT', 'SOFTWARE', 'BD_CHARGES', 'BD_SPARE', 'MIDLIFE_UPGRADE', 'RETROFIT_KIT']
 
 export default function OfferManagement() {
@@ -441,85 +442,87 @@ export default function OfferManagement() {
           </CardContent>
         </Card>
 
-        {/* Offers Table */}
-        <Card className="border-0 shadow-2xl overflow-hidden">
+        {/* Offers Table - Premium Design */}
+        <Card className="border-0 shadow-2xl overflow-hidden bg-white">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-slate-100 via-blue-50 to-purple-50/50 border-b-2 border-slate-200 sticky top-0 z-10">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSort('offerReferenceNumber')}>
-                    <div className="flex items-center gap-2">
-                      Offer #
+              <thead>
+                <tr className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 text-white">
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-slate-600/50 transition-colors" onClick={() => handleSort('offerReferenceNumber')}>
+                    <div className="flex items-center gap-1.5">
+                      Offer Ref
                       {sortField === 'offerReferenceNumber' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-emerald-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSort('customer')}>
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-slate-600/50 transition-colors" onClick={() => handleSort('customer')}>
+                    <div className="flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-emerald-400" />
                       Customer
                       {sortField === 'customer' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-emerald-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSort('productType')}>
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4" />
-                      Product Type
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-slate-600/50 transition-colors" onClick={() => handleSort('productType')}>
+                    <div className="flex items-center gap-1.5">
+                      <Package className="h-3.5 w-3.5 text-orange-400" />
+                      Type
                       {sortField === 'productType' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-emerald-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSort('zone')}>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-slate-600/50 transition-colors" onClick={() => handleSort('zone')}>
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-blue-400" />
                       Zone
                       {sortField === 'zone' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-emerald-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSort('offerValue')}>
-                    <div className="flex items-center gap-2">
-                      <IndianRupee className="h-4 w-4" />
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-slate-600/50 transition-colors" onClick={() => handleSort('offerValue')}>
+                    <div className="flex items-center gap-1.5">
+                      <IndianRupee className="h-3.5 w-3.5 text-green-400" />
                       Value
                       {sortField === 'offerValue' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-emerald-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSort('stage')}>
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-slate-600/50 transition-colors" onClick={() => handleSort('stage')}>
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-purple-400" />
                       Stage
                       {sortField === 'stage' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-emerald-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSort('createdBy')}>
-                    <div className="flex items-center gap-2">
-                      Added By
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-slate-600/50 transition-colors" onClick={() => handleSort('createdBy')}>
+                    <div className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-cyan-400" />
+                      Owner
                       {sortField === 'createdBy' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-emerald-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSort('createdAt')}>
-                    <div className="flex items-center gap-2">
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-slate-600/50 transition-colors" onClick={() => handleSort('createdAt')}>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-pink-400" />
                       Date
                       {sortField === 'createdAt' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        <span className="text-emerald-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   <tr>
                     <td colSpan={9} className="px-6 py-16 text-center">
@@ -666,17 +669,11 @@ export default function OfferManagement() {
                             View Details
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => {
-                              if (offer.stage === 'INITIAL') {
-                                router.push(`/expert/offers/${offer.id}/edit`);
-                              } else {
-                                handleEditOffer(offer);
-                              }
-                            }}
+                            onClick={() => router.push(`/expert/offers/${offer.id}/edit`)}
                             className="cursor-pointer rounded-lg hover:bg-purple-50"
                           >
                             <Edit className="h-4 w-4 mr-2 text-purple-600" />
-                            {offer.stage === 'INITIAL' ? 'Complete Offer' : 'Edit'}
+                            Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDeleteOffer(offer.id)}

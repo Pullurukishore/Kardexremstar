@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { query, param, body } from 'express-validator';
 import { upload } from '../config/multer';
-import { 
-  getTickets, 
-  getTicket, 
-  createTicket, 
+import {
+  getTickets,
+  getTicket,
+  createTicket,
   updateStatus,
   assignTicket,
   assignToZoneUser,
@@ -31,18 +31,19 @@ import {
   updatePOReached,
   getOnsiteVisitTracking,
   updateStatusWithLifecycle,
-  getTicketPhotos
+  getTicketPhotos,
+  respondToAssignment
 } from '../controllers/ticket.controller';
 import { authenticate, requireRole } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validate-request';
 // Custom type definitions to replace problematic Prisma imports
-type TicketStatus = 
-  | 'OPEN' | 'ASSIGNED' | 'IN_PROCESS' | 'WAITING_CUSTOMER' | 'ONSITE_VISIT' 
-  | 'ONSITE_VISIT_PLANNED' | 'ONSITE_VISIT_STARTED' | 'ONSITE_VISIT_REACHED' 
-  | 'ONSITE_VISIT_IN_PROGRESS' | 'ONSITE_VISIT_RESOLVED' | 'ONSITE_VISIT_PENDING' 
-  | 'ONSITE_VISIT_COMPLETED' | 'PO_NEEDED' | 'PO_REACHED' | 'PO_RECEIVED' 
-  | 'SPARE_PARTS_NEEDED' | 'SPARE_PARTS_BOOKED' | 'SPARE_PARTS_DELIVERED' 
-  | 'CLOSED_PENDING' | 'CLOSED' | 'CANCELLED' | 'REOPENED' | 'IN_PROGRESS' 
+type TicketStatus =
+  | 'OPEN' | 'ASSIGNED' | 'IN_PROCESS' | 'WAITING_CUSTOMER' | 'ONSITE_VISIT'
+  | 'ONSITE_VISIT_PLANNED' | 'ONSITE_VISIT_STARTED' | 'ONSITE_VISIT_REACHED'
+  | 'ONSITE_VISIT_IN_PROGRESS' | 'ONSITE_VISIT_RESOLVED' | 'ONSITE_VISIT_PENDING'
+  | 'ONSITE_VISIT_COMPLETED' | 'PO_NEEDED' | 'PO_REACHED' | 'PO_RECEIVED'
+  | 'SPARE_PARTS_NEEDED' | 'SPARE_PARTS_BOOKED' | 'SPARE_PARTS_DELIVERED'
+  | 'CLOSED_PENDING' | 'CLOSED' | 'CANCELLED' | 'REOPENED' | 'IN_PROGRESS'
   | 'ON_HOLD' | 'ESCALATED' | 'RESOLVED' | 'PENDING';
 
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -57,9 +58,9 @@ const statusValues = [
   'OPEN', 'ASSIGNED', 'IN_PROCESS', 'WAITING_CUSTOMER', 'ONSITE_VISIT',
   'ONSITE_VISIT_PLANNED', 'ONSITE_VISIT_STARTED', 'ONSITE_VISIT_REACHED',
   'ONSITE_VISIT_IN_PROGRESS', 'ONSITE_VISIT_RESOLVED', 'ONSITE_VISIT_PENDING',
-  'ONSITE_VISIT_COMPLETED', 'PO_NEEDED', 'PO_REACHED', 'PO_RECEIVED', 
-  'SPARE_PARTS_NEEDED', 'SPARE_PARTS_BOOKED', 'SPARE_PARTS_DELIVERED', 
-  'CLOSED_PENDING', 'CLOSED', 'CANCELLED', 'REOPENED', 'IN_PROGRESS', 
+  'ONSITE_VISIT_COMPLETED', 'PO_NEEDED', 'PO_REACHED', 'PO_RECEIVED',
+  'SPARE_PARTS_NEEDED', 'SPARE_PARTS_BOOKED', 'SPARE_PARTS_DELIVERED',
+  'CLOSED_PENDING', 'CLOSED', 'CANCELLED', 'REOPENED', 'IN_PROGRESS',
   'ON_HOLD', 'ESCALATED', 'RESOLVED', 'PENDING'
 ];
 const priorityValues = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -485,6 +486,21 @@ router.get(
   ],
   requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER', 'EXPERT_HELPDESK']),
   getTicketPhotos
+);
+
+// Respond to ticket assignment (accept/reject)
+router.post(
+  '/:id/respond-assignment',
+  [
+    param('id').isInt().toInt().withMessage('Invalid ticket ID'),
+    body('action')
+      .isIn(['ACCEPT', 'REJECT'])
+      .withMessage('Action must be ACCEPT or REJECT'),
+    body('notes').optional().trim(),
+    validateRequest
+  ],
+  requireRole(['ZONE_USER', 'ZONE_MANAGER', 'EXPERT_HELPDESK']),
+  respondToAssignment
 );
 
 export default router;

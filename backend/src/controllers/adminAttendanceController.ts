@@ -10,25 +10,25 @@ export const adminAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'EXPERT_HELPDESK', 'ZONE_USER', 'ZONE_MANAGER'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
-      const { 
-        startDate, 
-        endDate, 
-        zoneId, 
+      const {
+        startDate,
+        endDate,
+        zoneId,
         status,
         userId: filterUserId,
         activityType,
         search,
-        page = 1, 
-        limit = 20 
+        page = 1,
+        limit = 20
       } = req.query;
 
       const skip = (Number(page) - 1) * Number(limit);
@@ -195,13 +195,13 @@ export const adminAttendanceController = {
 
       // Group attendance records by user and date
       const consolidatedRecords = new Map();
-      
+
       // First, process actual attendance records
       allAttendanceRecords.forEach(record => {
         const userId = record.userId;
         const dateKey = new Date(record.checkInAt).toDateString(); // Group by date
         const key = `${userId}-${dateKey}`;
-        
+
         if (!consolidatedRecords.has(key)) {
           // First record for this user-date combination
           consolidatedRecords.set(key, {
@@ -216,7 +216,7 @@ export const adminAttendanceController = {
           const existing = consolidatedRecords.get(key);
           existing.sessions.push(record);
           existing.totalHours += Number(record.totalHours || 0);
-          
+
           // Update earliest check-in
           if (new Date(record.checkInAt) < new Date(existing.earliestCheckIn)) {
             existing.earliestCheckIn = record.checkInAt;
@@ -225,7 +225,7 @@ export const adminAttendanceController = {
             existing.checkInLongitude = record.checkInLongitude;
             existing.checkInAddress = record.checkInAddress;
           }
-          
+
           // Update latest check-out
           if (record.checkOutAt && (!existing.latestCheckOut || new Date(record.checkOutAt) > new Date(existing.latestCheckOut))) {
             existing.latestCheckOut = record.checkOutAt;
@@ -234,7 +234,7 @@ export const adminAttendanceController = {
             existing.checkOutLongitude = record.checkOutLongitude;
             existing.checkOutAddress = record.checkOutAddress;
           }
-          
+
           // Update status - prioritize certain statuses
           const statusPriority: Record<string, number> = {
             'CHECKED_IN': 5,
@@ -243,11 +243,11 @@ export const adminAttendanceController = {
             'CHECKED_OUT': 2,
             'ABSENT': 1
           };
-          
+
           if ((statusPriority[record.status] || 0) > (statusPriority[existing.status] || 0)) {
             existing.status = record.status;
           }
-          
+
           // Combine notes
           if (record.notes && !existing.notes?.includes(record.notes)) {
             existing.notes = existing.notes ? `${existing.notes}; ${record.notes}` : record.notes;
@@ -258,10 +258,10 @@ export const adminAttendanceController = {
       // Now add absent service persons (those without attendance records)
       const filterStartDate = startDate ? new Date(startDate as string) : new Date();
       const targetDate = filterStartDate.toDateString();
-      
+
       allServicePersons.forEach(servicePerson => {
         const key = `${servicePerson.id}-${targetDate}`;
-        
+
         if (!consolidatedRecords.has(key)) {
           // Create absent record for service person with no attendance
           consolidatedRecords.set(key, {
@@ -301,7 +301,7 @@ export const adminAttendanceController = {
         const flags = [];
         const checkInTime = record.checkInAt ? new Date(record.checkInAt) : null;
         const checkOutTime = record.checkOutAt ? new Date(record.checkOutAt) : null;
-        
+
         // Skip flagging for absent users
         if (record.status === 'ABSENT') {
           flags.push({ type: 'ABSENT', message: 'No attendance record', severity: 'error' });
@@ -311,23 +311,23 @@ export const adminAttendanceController = {
             flags.push({ type: 'LATE', message: 'Late check-in', severity: 'warning' });
           }
         }
-        
+
         if (record.status !== 'ABSENT') {
           // Flag: Early checkout (before 4 PM)
           if (checkOutTime && checkOutTime.getHours() < 16) {
             flags.push({ type: 'EARLY_CHECKOUT', message: 'Early checkout', severity: 'warning' });
           }
-          
+
           // Flag: Long day (>12 hours)
           if (record.totalHours && Number(record.totalHours) > 12) {
             flags.push({ type: 'LONG_DAY', message: 'Unusually long day', severity: 'warning' });
           }
-          
+
           // Flag: Auto checkout
           if (record.status === 'CHECKED_OUT' && record.notes?.includes('Auto-checkout')) {
             flags.push({ type: 'AUTO_CHECKOUT', message: 'Auto checked out', severity: 'info' });
           }
-          
+
           // Flag: No activity logged but checked in
           const activityCount = record.user._count?.activityLogs || 0;
           if (activityCount === 0) {
@@ -337,7 +337,7 @@ export const adminAttendanceController = {
               flags.push({ type: 'NO_ACTIVITY', message: 'No activity after check-in', severity: 'warning' });
             }
           }
-          
+
           // Flag: Missing checkout (still checked in from previous day)
           if (record.status === 'CHECKED_IN' && checkInTime) {
             const now = new Date();
@@ -347,13 +347,13 @@ export const adminAttendanceController = {
             }
           }
         }
-        
+
         // Add flag for multiple sessions
         if (record.sessions && record.sessions.length > 1) {
-          flags.push({ 
-            type: 'MULTIPLE_SESSIONS', 
-            message: `${record.sessions.length} check-in sessions`, 
-            severity: 'info' 
+          flags.push({
+            type: 'MULTIPLE_SESSIONS',
+            message: `${record.sessions.length} check-in sessions`,
+            severity: 'info'
           });
         }
 
@@ -388,12 +388,12 @@ export const adminAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'EXPERT_HELPDESK', 'ZONE_USER', 'ZONE_MANAGER'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -442,11 +442,11 @@ export const adminAttendanceController = {
         prisma.attendance.count({ where: { ...whereClause, status: 'ABSENT' } }),
         prisma.attendance.count({ where: { ...whereClause, status: 'LATE' } }),
         prisma.attendance.count({ where: { ...whereClause, status: 'EARLY_CHECKOUT' } }),
-        prisma.attendance.count({ 
-          where: { 
-            ...whereClause, 
-            notes: { contains: 'Auto-checkout' } 
-          } 
+        prisma.attendance.count({
+          where: {
+            ...whereClause,
+            notes: { contains: 'Auto-checkout' }
+          }
         }),
         prisma.attendance.aggregate({
           where: { ...whereClause, totalHours: { not: null } },
@@ -482,12 +482,12 @@ export const adminAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'EXPERT_HELPDESK', 'ZONE_USER', 'ZONE_MANAGER'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -500,7 +500,7 @@ export const adminAttendanceController = {
         if (parts.length >= 3) {
           const userId = parseInt(parts[1]);
           const timestamp = parts[2];
-          
+
           // Get user details for absent record
           const user = await prisma.user.findUnique({
             where: { id: userId },
@@ -836,12 +836,12 @@ export const adminAttendanceController = {
       // Calculate gaps between activities
       const activities = activityLogs;
       const gaps = [];
-      
+
       for (let i = 1; i < activities.length; i++) {
         const prevEnd = activities[i - 1].endTime ? new Date(activities[i - 1].endTime!) : new Date(activities[i - 1].startTime);
         const currentStart = new Date(activities[i].startTime);
         const gapMinutes = (currentStart.getTime() - prevEnd.getTime()) / (1000 * 60);
-        
+
         if (gapMinutes > 30) { // 30+ minute gap
           gaps.push({
             start: prevEnd,
@@ -940,7 +940,7 @@ export const adminAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
@@ -950,18 +950,18 @@ export const adminAttendanceController = {
       }
 
       const { id } = req.params;
-      const { 
-        checkInAt, 
-        checkOutAt, 
-        checkInLatitude, 
-        checkInLongitude, 
+      const {
+        checkInAt,
+        checkOutAt,
+        checkInLatitude,
+        checkInLongitude,
         checkInAddress,
-        checkOutLatitude, 
-        checkOutLongitude, 
+        checkOutLatitude,
+        checkOutLongitude,
         checkOutAddress,
-        status, 
+        status,
         notes,
-        adminNotes 
+        adminNotes
       } = req.body;
 
       const attendance = await prisma.attendance.findUnique({
@@ -1035,7 +1035,7 @@ export const adminAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
@@ -1045,16 +1045,16 @@ export const adminAttendanceController = {
       }
 
       const { attendanceId } = req.params;
-      const { 
-        activityType, 
-        title, 
-        description, 
-        startTime, 
-        endTime, 
-        location, 
-        latitude, 
+      const {
+        activityType,
+        title,
+        description,
+        startTime,
+        endTime,
+        location,
+        latitude,
         longitude,
-        ticketId 
+        ticketId
       } = req.body;
 
       const attendance = await prisma.attendance.findUnique({
@@ -1138,12 +1138,12 @@ export const adminAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'EXPERT_HELPDESK', 'ZONE_USER', 'ZONE_MANAGER'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -1253,12 +1253,12 @@ export const adminAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'EXPERT_HELPDESK', 'ZONE_USER', 'ZONE_MANAGER'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -1316,12 +1316,12 @@ export const adminAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ADMIN', 'ZONE_USER'].includes(userRole)) {
+      if (!userRole || !['ADMIN', 'EXPERT_HELPDESK', 'ZONE_USER', 'ZONE_MANAGER'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 

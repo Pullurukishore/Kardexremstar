@@ -426,7 +426,7 @@ export function TicketStatusDialogWithLocation({
                 </label>
                 <PhotoCapture
                   onPhotoCapture={handlePhotoCapture}
-                  maxPhotos={3}
+                  maxPhotos={1}
                   required={true}
                   label="Onsite Verification Photos"
                   description="Take photos to verify your presence at the customer location"

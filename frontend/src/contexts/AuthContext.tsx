@@ -201,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         path: '/',
         secure: process.env.NODE_ENV === 'production' ? true : false,
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7, // 7 days
+        maxAge: 60 * 60 * 24 * 30, // 30 days (matches refresh token)
       });
 
       // Role-based access is now handled by server-side layout and middleware
@@ -602,8 +602,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       // Set cookies with different expiration times based on rememberMe
-      const tokenMaxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24; // 30 days if remember me, 24 hours otherwise
-      const roleMaxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7; // 30 days if remember me, 7 days otherwise
+      const tokenMaxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7; // 30 days if remember me, 7 days otherwise (matches backend)
+      const roleMaxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 30; // 30 days always for role/refresh token
       
       const tokenOptions = { 
         ...cookieOptions, 
@@ -634,12 +634,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Verify cookies were set immediately
-      // Store token in localStorage as primary storage for development reliability
-      if (process.env.NODE_ENV === 'development') {
-        localStorage.setItem('dev_accessToken', response.accessToken);
-        localStorage.setItem('dev_userRole', safeUser.role);
-        localStorage.setItem('dev_rememberMe', rememberMe.toString());
-        localStorage.setItem('dev_tokenExpiry', (Date.now() + tokenMaxAge * 1000).toString());
+      // Store tokens in localStorage for reliability across all environments
+      if (typeof window !== 'undefined') {
+        // Always store tokens in localStorage as backup
+        localStorage.setItem('accessToken', response.accessToken);
+        if (response.refreshToken) {
+          localStorage.setItem('refreshToken', response.refreshToken);
+        }
+        localStorage.setItem('userRole', safeUser.role);
+        localStorage.setItem('tokenExpiry', (Date.now() + tokenMaxAge * 1000).toString());
+        
+        // Development-specific keys for debugging
+        if (process.env.NODE_ENV === 'development') {
+          localStorage.setItem('dev_accessToken', response.accessToken);
+          localStorage.setItem('dev_userRole', safeUser.role);
+          localStorage.setItem('dev_rememberMe', rememberMe.toString());
+          localStorage.setItem('dev_tokenExpiry', (Date.now() + tokenMaxAge * 1000).toString());
+        }
       }
       
       setTimeout(() => {

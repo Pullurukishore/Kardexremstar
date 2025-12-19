@@ -34,7 +34,7 @@ import {
   Search, 
   Filter,
   MoreHorizontal, 
-  Edit, 
+  Pencil as Edit, 
   Trash2, 
   Plus,
   RefreshCw,

@@ -44,6 +44,7 @@ import sparePartRoutes from './routes/sparePart.routes';
 import forecastRoutes from './routes/forecast.routes';
 import offerDashboardRoutes from './routes/offerDashboard.routes';
 import forstRoutes from './routes/forst.routes';
+import imageManagementRoutes from './routes/image-management.routes';
 
 const app = express();
 const server = http.createServer(app);
@@ -228,6 +229,7 @@ app.use('/api/spare-parts', sparePartRoutes);
 app.use('/api/forecast', forecastRoutes);
 app.use('/api/offer-dashboard', offerDashboardRoutes);
 app.use('/api/forst', forstRoutes);
+app.use('/api/image-management', imageManagementRoutes);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

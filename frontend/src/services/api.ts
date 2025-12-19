@@ -170,7 +170,104 @@ class ApiService {
     return response.data;
   }
 
-  // FORST (Field Operations Report Summary Tracking) methods
+  // ============================================================================
+  // FORST (Field Operations Report Summary Tracking) - NEW REDESIGNED API
+  // ============================================================================
+
+  // New Dashboard API - Main KPI overview
+  async getForstDashboard(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/dashboard`, { params });
+    return response.data;
+  }
+
+  // Zone Performance API
+  async getForstZonePerformance(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/zones`, { params });
+    return response.data;
+  }
+
+  // Quarterly Analysis API
+  async getForstQuarterly(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/quarterly`, { params });
+    return response.data;
+  }
+
+  // Product Type Analysis API
+  async getForstProducts(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/products`, { params });
+    return response.data;
+  }
+
+  // Team Performance API
+  async getForstTeam(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/team`, { params });
+    return response.data;
+  }
+
+  // Pipeline Analysis API
+  async getForstPipeline(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/pipeline`, { params });
+    return response.data;
+  }
+
+  // Complete Report API
+  async getForstReport(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/report`, { params });
+    return response.data;
+  }
+
+  // Export Excel
+  async exportForstExcel(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/export`, {
+      params,
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  // ============================================================================
+  // COMPREHENSIVE FORECAST API - Zone, User, Product, Funnel, Hit Rate
+  // ============================================================================
+
+  // Forecast Summary - Executive KPIs
+  async getForstForecastSummary(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/forecast/summary`, { params });
+    return response.data;
+  }
+
+  // Zone-wise Forecast - Monthly breakdown with targets
+  async getForstZoneForecast(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/forecast/zones`, { params });
+    return response.data;
+  }
+
+  // User-wise Forecast - Individual performance with ranking
+  async getForstUserForecast(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/forecast/users`, { params });
+    return response.data;
+  }
+
+  // Product-wise Forecast - By product type
+  async getForstProductForecastDetail(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/forecast/products`, { params });
+    return response.data;
+  }
+
+  // Funnel Analysis - Pipeline stages with conversion
+  async getForstFunnelAnalysis(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/forecast/funnel`, { params });
+    return response.data;
+  }
+
+  // Hit Rate Analysis - By zone, user, product
+  async getForstHitRateAnalysis(params?: any) {
+    const response = await api.get(`${this.baseURL}/forst/forecast/hitrate`, { params });
+    return response.data;
+  }
+
+  // ----- LEGACY FORST METHODS (Backward Compatibility) -----
+
+
   async getForstCompleteReport(params?: any) {
     const response = await api.get(`${this.baseURL}/forst/complete-report`, { params });
     return response.data;
@@ -206,13 +303,6 @@ class ApiService {
     return response.data;
   }
 
-  async exportForstExcel(params?: any) {
-    const response = await api.get(`${this.baseURL}/forst/export`, {
-      params,
-      responseType: 'blob'
-    });
-    return response.data;
-  }
 
   // Target methods
   async getZoneTargets(params?: any) {

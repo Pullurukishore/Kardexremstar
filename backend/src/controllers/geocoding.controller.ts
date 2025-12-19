@@ -30,7 +30,7 @@ export const reverseGeocode = async (req: Request, res: Response) => {
 
     // Validate location using enhanced validation service
     const validation = LocationValidationService.validateLocation(locationData);
-    
+
     if (!validation.isValid) {
       return res.status(400).json({
         success: false,
@@ -49,12 +49,12 @@ export const reverseGeocode = async (req: Request, res: Response) => {
     // Call the enhanced geocoding service with validation
     const maxDistanceKm = maxDistance ? parseFloat(maxDistance as string) : 5;
     const result = await GeocodingService.reverseGeocodeWithValidation(
-      lat, 
-      lng, 
+      lat,
+      lng,
       expectedCity as string,
       maxDistanceKm
     );
-    
+
     // Get location quality assessment
     const quality = LocationValidationService.getLocationQuality(locationData);
 
@@ -199,3 +199,58 @@ export const validateLocationJump = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * Forward geocode an address to coordinates
+ * Used for manual address entry
+ */
+export const forwardGeocode = async (req: Request, res: Response) => {
+  try {
+    const { address } = req.query;
+
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Address is required'
+      });
+    }
+
+    if (address.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Address must be at least 3 characters'
+      });
+    }
+
+    logger.info(`Forward geocoding request for: ${address}`);
+
+    const result = await GeocodingService.forwardGeocode(address);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        data: {
+          latitude: result.latitude,
+          longitude: result.longitude,
+          displayName: result.displayName,
+          address: address.trim()
+        }
+      });
+    } else {
+      // Return success: false but with 200 status so frontend can handle gracefully
+      res.json({
+        success: false,
+        message: result.error || 'Could not geocode address',
+        data: null
+      });
+    }
+
+  } catch (error) {
+    logger.error('Forward geocoding controller error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to geocode address'
+    });
+  }
+};
+

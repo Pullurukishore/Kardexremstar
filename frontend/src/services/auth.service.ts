@@ -83,7 +83,7 @@ export const authService = {
 
     // Ensure consistent name handling with better validation
     let userName = data.name?.trim();
-    
+
     // Check if name is valid and not a placeholder
     if (!userName || userName === '' || userName === 'null' || userName === 'undefined' || userName === 'User') {
       userName = data.email?.split('@')[0] || 'User';
@@ -111,14 +111,9 @@ export const authService = {
           }
         })
         .catch(error => {
-          if (typeof window !== 'undefined') {
-            // Clear cookies
-            document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-            document.cookie = 'refreshToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-            if (window.location.pathname !== '/auth/login') {
-              window.location.href = '/auth/login';
-            }
-          }
+          // Don't automatically redirect here - let the axios interceptor handle it
+          // The interceptor has better logic for handling refresh failures
+          // and will only redirect after exhausting all retry attempts
           reject(error);
         });
     });

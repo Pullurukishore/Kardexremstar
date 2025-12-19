@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select'
 import { 
   ArrowLeft, 
-  Edit, 
+  Pencil as Edit, 
   CheckCircle, 
   Clock, 
   FileText, 
@@ -42,19 +42,18 @@ import {
   Loader2,
   Wrench,
   IndianRupee,
-  ImageIcon
+  Image as ImageIcon
 } from 'lucide-react'
 import { apiService } from '@/services/api'
 import { toast } from 'sonner'
 
 // Main progression stages (excludes LOST as it's a separate outcome)
+// Note: PO_RECEIVED leads directly to WON (ORDER_BOOKED stage removed)
 const STAGES = [
   { key: 'INITIAL', label: 'Initial', icon: FileText },
   { key: 'PROPOSAL_SENT', label: 'Proposal Sent', icon: FileText },
   { key: 'NEGOTIATION', label: 'Negotiation', icon: TrendingUp },
-  { key: 'FINAL_APPROVAL', label: 'Final Approval', icon: CheckCircle },
   { key: 'PO_RECEIVED', label: 'PO Received', icon: Package },
-  { key: 'ORDER_BOOKED', label: 'Order Booked', icon: CheckCircle },
   { key: 'WON', label: 'Won', icon: CheckCircle }
 ]
 
@@ -84,22 +83,10 @@ const STAGE_INFO: Record<string, { description: string; color: string; icon: str
     icon: '💬',
     requiresAllFields: true
   },
-  'FINAL_APPROVAL': {
-    description: 'Awaiting final sign-off - Document decision makers, approval timeline, and any final conditions or commitments',
-    color: 'purple',
-    icon: '✅',
-    requiresAllFields: true
-  },
   'PO_RECEIVED': {
-    description: 'Purchase Order received - Capture PO details including PO number, date, and value for order processing',
+    description: 'Purchase Order received - Capture PO details and complete the order. PO received means WON!',
     color: 'green',
     icon: '📄',
-    requiresAllFields: true
-  },
-  'ORDER_BOOKED': {
-    description: 'Order booked in SAP system - Capture booking date and finalize order processing',
-    color: 'teal',
-    icon: '📦',
     requiresAllFields: true
   },
   'WON': {
@@ -220,8 +207,8 @@ export default function OfferDetailPage() {
         }
       }
 
-      // PO_RECEIVED stage specific validations (skip for LOST)
-      if ((updateData.stage === 'PO_RECEIVED' || updateData.stage === 'ORDER_BOOKED' || updateData.stage === 'WON')) {
+      // PO_RECEIVED stage specific validations (PO_RECEIVED = deal won!)
+      if ((updateData.stage === 'PO_RECEIVED' || updateData.stage === 'WON')) {
         if (!updateData.poNumber || !updateData.poNumber.trim()) {
           toast.error('PO Number is required for this stage')
           return
@@ -236,14 +223,6 @@ export default function OfferDetailPage() {
         }
         if (parseFloat(updateData.poValue) <= 0) {
           toast.error('PO Value must be greater than zero')
-          return
-        }
-      }
-
-      // ORDER_BOOKED stage specific validations (skip for LOST)
-      if ((updateData.stage === 'ORDER_BOOKED' || updateData.stage === 'WON')) {
-        if (!updateData.bookingDateInSap) {
-          toast.error('Booking Date in SAP is required for this stage')
           return
         }
       }
@@ -366,7 +345,7 @@ export default function OfferDetailPage() {
             <div>
               <CardTitle className="text-2xl font-bold text-white mb-2">Offer Progress Journey</CardTitle>
               <CardDescription className="text-blue-100">
-                Track your offer through each milestone - WON or LOST outcomes after Final Approval
+                Track your offer through each milestone - WON or LOST outcomes after Negotiation
               </CardDescription>
             </div>
             <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full border border-white/30">
@@ -795,7 +774,14 @@ export default function OfferDetailPage() {
                     </div>
                     <dt className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Machine Serial Number</dt>
                   </div>
-                  <dd className="text-base font-bold text-gray-900">{offer.machineSerialNumber || '-'}</dd>
+                  <dd className="text-base font-bold text-gray-900">
+                    {offer.machineSerialNumber || 
+                      (offer.offerAssets && offer.offerAssets.length > 0 
+                        ? offer.offerAssets.map((oa: any) => oa.asset?.serialNo || oa.asset?.machineId).filter(Boolean).join(', ')
+                        : '-'
+                      )
+                    }
+                  </dd>
                 </div>
                 {offer.title && (
                   <div className="md:col-span-2 bg-white rounded-xl p-5 shadow-md border border-purple-100 hover:shadow-lg transition-shadow">
@@ -982,7 +968,16 @@ export default function OfferDetailPage() {
           )}
 
           {/* Stage-wise Remarks History - Timeline Design */}
-          {offer.stageRemarks && offer.stageRemarks.length > 0 && (
+          {offer.stageRemarks && offer.stageRemarks.filter((r: any) => {
+            // Filter out JSON quoteData entries - only show human-readable remarks
+            try {
+              const parsed = JSON.parse(r.remarks);
+              if (parsed.quoteData) return false; // Skip quoteData JSON
+            } catch (e) {
+              // Not JSON, include it
+            }
+            return true;
+          }).length > 0 && (
             <Card className="shadow-lg overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border-b border-indigo-100">
                 <CardTitle className="flex items-center gap-2">
@@ -999,7 +994,16 @@ export default function OfferDetailPage() {
                   <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 via-purple-200 to-pink-200"></div>
                   
                   <div className="space-y-6">
-                    {offer.stageRemarks.map((remark: any, index: number) => {
+                    {offer.stageRemarks.filter((r: any) => {
+                      // Filter out JSON quoteData entries
+                      try {
+                        const parsed = JSON.parse(r.remarks);
+                        if (parsed.quoteData) return false;
+                      } catch (e) {
+                        // Not JSON, include it
+                      }
+                      return true;
+                    }).map((remark: any, index: number) => {
                       const stageInfo = STAGE_INFO[remark.stage] || {};
                       const stageName = ALL_STAGES.find(s => s.key === remark.stage)?.label || remark.stage;
                       
@@ -1283,235 +1287,291 @@ export default function OfferDetailPage() {
         </div>
       </div>
 
-      {/* Update Dialog */}
+      {/* Update Dialog - Premium Design */}
       <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Update Offer Details</DialogTitle>
-            <DialogDescription>
-              Update offer information for {offer?.offerReferenceNumber}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-2xl border-0 shadow-2xl">
+          {/* Gradient Header */}
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 rounded-t-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-white text-xl font-bold flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <Edit className="h-5 w-5 text-white" />
+                </div>
+                Update Offer Details
+              </DialogTitle>
+              <DialogDescription className="text-blue-100 mt-1">
+                Update offer information for <span className="font-semibold text-white">{offer?.offerReferenceNumber}</span>
+              </DialogDescription>
+            </DialogHeader>
+          </div>
           
-          {/* Stage-specific context banner */}
-          {updateData.stage && STAGE_INFO[updateData.stage] && (
-            <div className={`
-              p-4 rounded-lg border-l-4 mb-4
-              ${STAGE_INFO[updateData.stage].color === 'blue' ? 'bg-blue-50 border-blue-500' : ''}
-              ${STAGE_INFO[updateData.stage].color === 'indigo' ? 'bg-indigo-50 border-indigo-500' : ''}
-              ${STAGE_INFO[updateData.stage].color === 'amber' ? 'bg-amber-50 border-amber-500' : ''}
-              ${STAGE_INFO[updateData.stage].color === 'purple' ? 'bg-purple-50 border-purple-500' : ''}
-              ${STAGE_INFO[updateData.stage].color === 'green' ? 'bg-green-50 border-green-500' : ''}
-              ${STAGE_INFO[updateData.stage].color === 'teal' ? 'bg-teal-50 border-teal-500' : ''}
-              ${STAGE_INFO[updateData.stage].color === 'red' ? 'bg-red-50 border-red-500' : ''}
-            `}>
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">{STAGE_INFO[updateData.stage].icon}</span>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 mb-1">
-                    {STAGES.find(s => s.key === updateData.stage)?.label} Stage
-                  </h4>
-                  <p className="text-sm text-gray-700">
-                    {STAGE_INFO[updateData.stage].description}
-                  </p>
-                  {STAGE_INFO[updateData.stage].requiresAllFields && (
-                    <p className="text-xs text-red-600 mt-2 font-medium">
-                      ⚠️ All fields marked with * are required for this stage
+          <div className="p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white">
+            {/* Stage-specific context banner */}
+            {updateData.stage && STAGE_INFO[updateData.stage] && (
+              <div className={`
+                p-4 rounded-xl border-l-4 shadow-sm
+                ${STAGE_INFO[updateData.stage].color === 'blue' ? 'bg-gradient-to-r from-blue-50 to-blue-100/50 border-blue-500' : ''}
+                ${STAGE_INFO[updateData.stage].color === 'indigo' ? 'bg-gradient-to-r from-indigo-50 to-indigo-100/50 border-indigo-500' : ''}
+                ${STAGE_INFO[updateData.stage].color === 'amber' ? 'bg-gradient-to-r from-amber-50 to-amber-100/50 border-amber-500' : ''}
+                ${STAGE_INFO[updateData.stage].color === 'purple' ? 'bg-gradient-to-r from-purple-50 to-purple-100/50 border-purple-500' : ''}
+                ${STAGE_INFO[updateData.stage].color === 'green' ? 'bg-gradient-to-r from-green-50 to-green-100/50 border-green-500' : ''}
+                ${STAGE_INFO[updateData.stage].color === 'teal' ? 'bg-gradient-to-r from-teal-50 to-teal-100/50 border-teal-500' : ''}
+                ${STAGE_INFO[updateData.stage].color === 'red' ? 'bg-gradient-to-r from-red-50 to-red-100/50 border-red-500' : ''}
+              `}>
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-white rounded-xl shadow-sm">
+                    <span className="text-3xl">{STAGE_INFO[updateData.stage].icon}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-gray-900 text-lg">
+                      {STAGES.find(s => s.key === updateData.stage)?.label || updateData.stage} Stage
+                    </h4>
+                    <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                      {STAGE_INFO[updateData.stage].description}
                     </p>
-                  )}
+                    {STAGE_INFO[updateData.stage].requiresAllFields && (
+                      <div className="flex items-center gap-2 mt-2 text-xs text-red-600 font-medium bg-red-50 px-3 py-1.5 rounded-lg w-fit">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        All fields marked with * are required
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          <div className="space-y-4">
-            {/* Stage */}
-            <div className="space-y-2">
-              <Label className="text-red-600">Stage *</Label>
+            )}
+            
+            {/* Stage Selection Card */}
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-indigo-100 rounded-lg">
+                  <TrendingUp className="h-4 w-4 text-indigo-600" />
+                </div>
+                <Label className="text-gray-900 font-semibold">Stage <span className="text-red-500">*</span></Label>
+              </div>
               <Select 
                 value={updateData.stage} 
                 onValueChange={(value) => setUpdateData(prev => ({ ...prev, stage: value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-12 text-base font-medium border-2 border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-colors rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {ALL_STAGES.map(stage => (
-                    <SelectItem key={stage.key} value={stage.key}>
-                      {stage.label}
+                    <SelectItem key={stage.key} value={stage.key} className="py-3">
+                      <div className="flex items-center gap-2">
+                        <span>{STAGE_INFO[stage.key]?.icon || '📄'}</span>
+                        <span className="font-medium">{stage.label}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Offer Title */}
-            <div className="space-y-2">
-              <Label className="text-red-600">Offer Title *</Label>
+            {/* Offer Title Card */}
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                </div>
+                <Label className="text-gray-900 font-semibold">Offer Title <span className="text-red-500">*</span></Label>
+              </div>
               <Input 
                 value={updateData.title}
                 onChange={(e) => setUpdateData(prev => ({ ...prev, title: e.target.value }))}
                 placeholder="Enter offer title"
+                className="h-12 text-base border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 transition-colors rounded-xl"
               />
             </div>
 
             {/* Offer Reference Date */}
-            <div className="space-y-2">
-              <Label className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields ? 'text-red-600' : ''}>
-                Offer Reference Date {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && '*'}
-              </Label>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Calendar className="h-4 w-4 text-purple-600" />
+                </div>
+                <Label className={`text-gray-900 font-semibold ${updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields ? '' : ''}`}>
+                  Offer Reference Date {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && <span className="text-red-500">*</span>}
+                </Label>
+              </div>
               <Input 
                 type="date"
                 value={updateData.offerReferenceDate}
                 onChange={(e) => setUpdateData(prev => ({ ...prev, offerReferenceDate: e.target.value }))}
-                className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.offerReferenceDate ? 'border-red-300' : ''}
+                className={`h-12 text-base border-2 transition-colors rounded-xl ${
+                  updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.offerReferenceDate 
+                    ? 'border-red-300 hover:border-red-400' 
+                    : 'border-gray-200 hover:border-purple-300 focus:border-purple-500'
+                }`}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Offer Value */}
-              <div className="space-y-2">
-                <Label className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields ? 'text-red-600' : ''}>
-                  Offer Value (₹) {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && '*'}
-                </Label>
-                <Input 
-                  type="number"
-                  value={updateData.offerValue}
-                  onChange={(e) => setUpdateData(prev => ({ ...prev, offerValue: e.target.value }))}
-                  placeholder="Enter amount"
-                  className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.offerValue ? 'border-red-300' : ''}
-                />
+            {/* Financial Details Grid */}
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <IndianRupee className="h-4 w-4 text-green-600" />
+                </div>
+                <Label className="text-gray-900 font-semibold">Financial Details</Label>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Offer Value */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-gray-600">
+                    Offer Value (₹) {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && <span className="text-red-500">*</span>}
+                  </Label>
+                  <Input 
+                    type="number"
+                    value={updateData.offerValue}
+                    onChange={(e) => setUpdateData(prev => ({ ...prev, offerValue: e.target.value }))}
+                    placeholder="Enter amount"
+                    className={`h-11 border-2 transition-colors rounded-lg ${
+                      updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.offerValue 
+                        ? 'border-red-300' 
+                        : 'border-gray-200 hover:border-green-300 focus:border-green-500'
+                    }`}
+                  />
+                </div>
 
-              {/* Win Probability */}
-              <div className="space-y-2">
-                <Label className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields ? 'text-red-600' : ''}>
-                  Win Probability (%) {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && '*'}
-                </Label>
-                <Input 
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={updateData.probabilityPercentage}
-                  onChange={(e) => setUpdateData(prev => ({ ...prev, probabilityPercentage: e.target.value }))}
-                  placeholder="1-100"
-                  className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.probabilityPercentage ? 'border-red-300' : ''}
-                />
+                {/* Win Probability */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-gray-600">
+                    Win Probability (%) {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && <span className="text-red-500">*</span>}
+                  </Label>
+                  <Input 
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={updateData.probabilityPercentage}
+                    onChange={(e) => setUpdateData(prev => ({ ...prev, probabilityPercentage: e.target.value }))}
+                    placeholder="1-100"
+                    className={`h-11 border-2 transition-colors rounded-lg ${
+                      updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.probabilityPercentage 
+                        ? 'border-red-300' 
+                        : 'border-gray-200 hover:border-green-300 focus:border-green-500'
+                    }`}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Offer Month */}
-              <div className="space-y-2">
-                <Label className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields ? 'text-red-600' : ''}>
-                  Offer Month {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && '*'}
-                </Label>
-                <Input 
-                  type="month"
-                  value={updateData.offerMonth}
-                  onChange={(e) => setUpdateData(prev => ({ ...prev, offerMonth: e.target.value }))}
-                  className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.offerMonth ? 'border-red-300' : ''}
-                />
+            {/* Timeline Details Grid */}
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                </div>
+                <Label className="text-gray-900 font-semibold">Timeline</Label>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Offer Month */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-gray-600">
+                    Offer Month {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && <span className="text-red-500">*</span>}
+                  </Label>
+                  <Input 
+                    type="month"
+                    value={updateData.offerMonth}
+                    onChange={(e) => setUpdateData(prev => ({ ...prev, offerMonth: e.target.value }))}
+                    className={`h-11 border-2 transition-colors rounded-lg ${
+                      updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.offerMonth 
+                        ? 'border-red-300' 
+                        : 'border-gray-200 hover:border-amber-300 focus:border-amber-500'
+                    }`}
+                  />
+                </div>
 
-              {/* PO Expected Month */}
-              <div className="space-y-2">
-                <Label className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields ? 'text-red-600' : ''}>
-                  PO Expected Month {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && '*'}
-                </Label>
-                <Input 
-                  type="month"
-                  value={updateData.poExpectedMonth}
-                  onChange={(e) => setUpdateData(prev => ({ ...prev, poExpectedMonth: e.target.value }))}
-                  className={updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.poExpectedMonth ? 'border-red-300' : ''}
-                />
+                {/* PO Expected Month */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-gray-600">
+                    PO Expected Month {updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && <span className="text-red-500">*</span>}
+                  </Label>
+                  <Input 
+                    type="month"
+                    value={updateData.poExpectedMonth}
+                    onChange={(e) => setUpdateData(prev => ({ ...prev, poExpectedMonth: e.target.value }))}
+                    className={`h-11 border-2 transition-colors rounded-lg ${
+                      updateData.stage && STAGE_INFO[updateData.stage]?.requiresAllFields && !updateData.poExpectedMonth 
+                        ? 'border-red-300' 
+                        : 'border-gray-200 hover:border-amber-300 focus:border-amber-500'
+                    }`}
+                  />
+                </div>
               </div>
             </div>
             
-            {/* PO Details Section - For PO_RECEIVED, ORDER_BOOKED, WON stages */}
-            {(updateData.stage === 'PO_RECEIVED' || updateData.stage === 'ORDER_BOOKED' || updateData.stage === 'WON') && (
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center gap-2 mb-2">
-                  <Package className="h-5 w-5 text-green-600" />
-                  <h3 className="font-semibold text-gray-900">Purchase Order Details</h3>
+            {/* PO Details Section - For PO_RECEIVED and WON stages */}
+            {(updateData.stage === 'PO_RECEIVED' || updateData.stage === 'WON') && (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 border-2 border-green-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2.5 bg-green-500 rounded-lg shadow-sm">
+                    <Package className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-green-900 text-lg">Purchase Order Details</h3>
+                    <p className="text-xs text-green-700">Complete PO information to close this deal</p>
+                  </div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   {/* PO Number */}
                   <div className="space-y-2">
-                    <Label className="text-red-600">PO Number *</Label>
+                    <Label className="text-sm font-medium text-green-800">PO Number <span className="text-red-500">*</span></Label>
                     <Input 
                       value={updateData.poNumber}
                       onChange={(e) => setUpdateData(prev => ({ ...prev, poNumber: e.target.value }))}
                       placeholder="Enter PO number"
-                      className={!updateData.poNumber ? 'border-red-300' : ''}
+                      className={`h-11 bg-white border-2 transition-colors rounded-lg ${
+                        !updateData.poNumber ? 'border-red-300' : 'border-green-200 hover:border-green-400 focus:border-green-500'
+                      }`}
                     />
                   </div>
 
                   {/* PO Date */}
                   <div className="space-y-2">
-                    <Label className="text-red-600">PO Date *</Label>
+                    <Label className="text-sm font-medium text-green-800">PO Date <span className="text-red-500">*</span></Label>
                     <Input 
                       type="date"
                       value={updateData.poDate}
                       onChange={(e) => setUpdateData(prev => ({ ...prev, poDate: e.target.value }))}
-                      className={!updateData.poDate ? 'border-red-300' : ''}
+                      className={`h-11 bg-white border-2 transition-colors rounded-lg ${
+                        !updateData.poDate ? 'border-red-300' : 'border-green-200 hover:border-green-400 focus:border-green-500'
+                      }`}
                     />
                   </div>
                 </div>
 
                 {/* PO Value */}
                 <div className="space-y-2">
-                  <Label className="text-red-600">PO Value (₹) *</Label>
+                  <Label className="text-sm font-medium text-green-800">PO Value (₹) <span className="text-red-500">*</span></Label>
                   <Input 
                     type="number"
                     value={updateData.poValue}
                     onChange={(e) => setUpdateData(prev => ({ ...prev, poValue: e.target.value }))}
                     placeholder="Enter PO value"
-                    className={!updateData.poValue ? 'border-red-300' : ''}
+                    className={`h-11 bg-white border-2 transition-colors rounded-lg ${
+                      !updateData.poValue ? 'border-red-300' : 'border-green-200 hover:border-green-400 focus:border-green-500'
+                    }`}
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-green-700 flex items-center gap-1.5 mt-1">
+                    <CheckCircle className="h-3.5 w-3.5" />
                     Actual purchase order value received from customer
                   </p>
                 </div>
               </div>
             )}
-            
-            {/* Order Booking Details Section - For ORDER_BOOKED and WON stages */}
-            {(updateData.stage === 'ORDER_BOOKED' || updateData.stage === 'WON') && (
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-5 w-5 text-teal-600" />
-                  <h3 className="font-semibold text-gray-900">Order Booking Details</h3>
-                </div>
-                
-                {/* Booking Date in SAP */}
-                <div className="space-y-2">
-                  <Label className="text-red-600">Booking Date in SAP *</Label>
-                  <Input 
-                    type="date"
-                    value={updateData.bookingDateInSap}
-                    onChange={(e) => setUpdateData(prev => ({ ...prev, bookingDateInSap: e.target.value }))}
-                    className={!updateData.bookingDateInSap ? 'border-red-300' : ''}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Date when the order was booked in SAP system
-                  </p>
-                </div>
-              </div>
-            )}
-            
+
             {/* Loss Reason Section - For LOST stage */}
             {updateData.stage === 'LOST' && (
-              <div className="space-y-3 pt-4 border-t-4 border-red-300 bg-red-50 p-4 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+              <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-xl p-5 border-2 border-red-200 shadow-sm">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="p-2.5 bg-red-500 rounded-lg shadow-sm">
+                    <AlertCircle className="h-5 w-5 text-white" />
+                  </div>
                   <div className="flex-1">
-                    <Label className="text-red-700 font-semibold text-base">
-                      ❌ Reason for Loss *
-                    </Label>
+                    <h3 className="font-bold text-red-900 text-lg">Reason for Loss <span className="text-red-500">*</span></h3>
                     <p className="text-xs text-red-600 mt-1">
-                      This deal can be marked as LOST from any stage (Proposal Sent, Negotiation, Final Approval) if PO is not received
+                      Document why this deal was lost to improve future proposals
                     </p>
                   </div>
                 </div>
@@ -1520,30 +1580,49 @@ export default function OfferDetailPage() {
                   onChange={(e) => setUpdateData(prev => ({ ...prev, remarks: e.target.value }))}
                   placeholder="Document why the deal was lost: competitor won, pricing issues, customer delayed, requirements changed, budget constraints, etc."
                   rows={5}
-                  className="resize-none border-red-300 focus:border-red-500"
+                  className="resize-none bg-white border-2 border-red-200 hover:border-red-300 focus:border-red-400 rounded-xl"
                 />
-                <p className="text-xs text-red-700 font-medium bg-red-100 p-2 rounded">
-                  ⚠️ Important: Documenting loss reasons helps improve future proposals and understand customer objections
-                </p>
+                <div className="flex items-start gap-2 mt-3 p-3 bg-red-100 rounded-lg">
+                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-red-700 font-medium leading-relaxed">
+                    Documenting loss reasons helps improve future proposals and understand customer objections
+                  </p>
+                </div>
               </div>
             )}
             
-            {/* Remarks/Notes Section - Especially for Negotiation and Final Approval */}
+            {/* Remarks/Notes Section - For Negotiation */}
             {(updateData.stage === 'NEGOTIATION' || updateData.stage === 'FINAL_APPROVAL' || updateData.stage === 'PROPOSAL_SENT') && (
-              <div className="space-y-3 pt-4 border-t-2 border-indigo-100">
+              <div className="space-y-4">
                 {/* Show previous stage remarks if any */}
-                {offer.stageRemarks && offer.stageRemarks.filter((r: any) => r.stage === updateData.stage).length > 0 && (
-                  <div className="mb-4 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl shadow-sm">
+                {offer.stageRemarks && offer.stageRemarks.filter((r: any) => {
+                  if (r.stage !== updateData.stage) return false;
+                  try {
+                    const parsed = JSON.parse(r.remarks);
+                    if (parsed.quoteData) return false;
+                  } catch (e) {}
+                  return true;
+                }).length > 0 && (
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-4 border-2 border-indigo-200 rounded-xl shadow-sm">
                     <div className="flex items-center gap-2 mb-3">
-                      <Clock className="h-4 w-4 text-indigo-600" />
+                      <div className="p-1.5 bg-indigo-500 rounded-lg">
+                        <Clock className="h-4 w-4 text-white" />
+                      </div>
                       <p className="text-sm font-bold text-indigo-900">Previous Activity for {ALL_STAGES.find(s => s.key === updateData.stage)?.label}</p>
                     </div>
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
                       {offer.stageRemarks
-                        .filter((r: any) => r.stage === updateData.stage)
-                        .slice(0, 5)
+                        .filter((r: any) => {
+                          if (r.stage !== updateData.stage) return false;
+                          try {
+                            const parsed = JSON.parse(r.remarks);
+                            if (parsed.quoteData) return false;
+                          } catch (e) {}
+                          return true;
+                        })
+                        .slice(0, 3)
                         .map((r: any) => (
-                          <div key={r.id} className="bg-white p-3 rounded-lg border border-indigo-100 shadow-sm hover:shadow-md transition-shadow">
+                          <div key={r.id} className="bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-3 w-3 text-indigo-500" />
@@ -1551,7 +1630,6 @@ export default function OfferDetailPage() {
                                   {new Date(r.createdAt).toLocaleDateString('en-IN', { 
                                     day: 'numeric', 
                                     month: 'short',
-                                    year: 'numeric',
                                     hour: '2-digit', 
                                     minute: '2-digit' 
                                   })}
@@ -1564,34 +1642,26 @@ export default function OfferDetailPage() {
                                 </div>
                               )}
                             </div>
-                            <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{r.remarks}</p>
+                            <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">{r.remarks}</p>
                           </div>
                         ))}
                     </div>
                   </div>
                 )}
                 
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border-2 border-blue-200">
-                  <Label className="text-blue-700 font-bold text-base flex items-center gap-2 mb-2">
-                    {updateData.stage === 'NEGOTIATION' && (
-                      <>
-                        <span className="text-xl">💬</span>
-                        Add New Negotiation Notes
-                      </>
-                    )}
-                    {updateData.stage === 'FINAL_APPROVAL' && (
-                      <>
-                        <span className="text-xl">✅</span>
-                        Add New Approval Notes & Conditions
-                      </>
-                    )}
-                    {updateData.stage === 'PROPOSAL_SENT' && (
-                      <>
-                        <span className="text-xl">📋</span>
-                        Add Proposal Notes
-                      </>
-                    )}
-                  </Label>
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-xl border-2 border-blue-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-blue-500 rounded-lg shadow-sm">
+                      {updateData.stage === 'NEGOTIATION' && <span className="text-lg">💬</span>}
+                      {updateData.stage === 'FINAL_APPROVAL' && <span className="text-lg">✅</span>}
+                      {updateData.stage === 'PROPOSAL_SENT' && <span className="text-lg">📋</span>}
+                    </div>
+                    <Label className="text-blue-900 font-bold text-base">
+                      {updateData.stage === 'NEGOTIATION' && 'Add Negotiation Notes'}
+                      {updateData.stage === 'FINAL_APPROVAL' && 'Add Approval Notes'}
+                      {updateData.stage === 'PROPOSAL_SENT' && 'Add Proposal Notes'}
+                    </Label>
+                  </div>
                   <Textarea
                     value={updateData.remarks}
                     onChange={(e) => setUpdateData(prev => ({ ...prev, remarks: e.target.value }))}
@@ -1602,15 +1672,13 @@ export default function OfferDetailPage() {
                         ? 'Document decision makers, approval timeline, final terms, conditions, commitments, etc.'
                         : 'Add any notes about this stage...'
                     }
-                    rows={5}
-                    className="resize-none bg-white border-blue-300 focus:border-blue-500 focus:ring-blue-500 shadow-sm"
+                    rows={4}
+                    className="resize-none bg-white border-2 border-blue-200 hover:border-blue-300 focus:border-blue-400 rounded-xl shadow-sm"
                   />
-                  <div className="flex items-start gap-2 mt-2 p-2 bg-blue-100 rounded-lg">
+                  <div className="flex items-start gap-2 mt-3 p-2.5 bg-blue-100 rounded-lg">
                     <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-blue-700 leading-relaxed">
-                      {updateData.stage === 'NEGOTIATION' && 'Each update creates a new timeline entry. All previous negotiation notes are preserved in the activity history.'}
-                      {updateData.stage === 'FINAL_APPROVAL' && 'Each update creates a new timeline entry. All previous approval notes are preserved in the activity history.'}
-                      {updateData.stage === 'PROPOSAL_SENT' && 'Optional notes about the proposal. These will be saved in the activity timeline.'}
+                      Each update creates a new timeline entry. All notes are preserved in the activity history.
                     </p>
                   </div>
                 </div>
@@ -1618,21 +1686,36 @@ export default function OfferDetailPage() {
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUpdateDialog(false)} disabled={updating}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateOffer} disabled={updating}>
-              {updating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                'Update Offer'
-              )}
-            </Button>
-          </DialogFooter>
+          {/* Footer */}
+          <div className="p-6 bg-gray-50 border-t border-gray-200 rounded-b-2xl">
+            <DialogFooter className="gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowUpdateDialog(false)} 
+                disabled={updating}
+                className="px-6 h-11 text-base font-medium border-2 hover:bg-gray-100 rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleUpdateOffer} 
+                disabled={updating}
+                className="px-8 h-11 text-base font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all rounded-xl"
+              >
+                {updating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Update Offer
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

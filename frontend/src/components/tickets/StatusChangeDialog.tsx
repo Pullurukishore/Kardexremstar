@@ -25,7 +25,8 @@ import {
   Navigation,
   X,
   Upload,
-  File
+  File,
+  Camera
 } from 'lucide-react';
 import { UserRole } from '@/types/user.types';
 import PhotoCapture, { CapturedPhoto } from '@/components/photo/PhotoCapture';
@@ -52,6 +53,7 @@ export const TicketStatus = {
   WORK_IN_PROGRESS: 'WORK_IN_PROGRESS', // Alternative underscore format
   WAITING_CUSTOMER: 'WAITING_CUSTOMER',
   ONSITE_VISIT: 'ONSITE_VISIT',
+  ONSITE_VISIT_PLANNED: 'ONSITE_VISIT_PLANNED',
   ONSITE_VISIT_STARTED: 'ONSITE_VISIT_STARTED',
   ONSITE_VISIT_REACHED: 'ONSITE_VISIT_REACHED',
   ONSITE_VISIT_IN_PROGRESS: 'ONSITE_VISIT_IN_PROGRESS',
@@ -83,6 +85,7 @@ export type TicketStatusType =
   | 'WORK_IN_PROGRESS'
   | 'WAITING_CUSTOMER'
   | 'ONSITE_VISIT'
+  | 'ONSITE_VISIT_PLANNED'
   | 'ONSITE_VISIT_STARTED'
   | 'ONSITE_VISIT_REACHED'
   | 'ONSITE_VISIT_IN_PROGRESS'
@@ -176,9 +179,17 @@ const validTransitions: Record<TicketStatusType, TicketStatusType[]> = {
   
   // Onsite visit flow - comprehensive lifecycle
   [TicketStatus.ONSITE_VISIT]: [
+    TicketStatus.ONSITE_VISIT_PLANNED,
     TicketStatus.ONSITE_VISIT_STARTED, 
     TicketStatus.IN_PROGRESS, 
     TicketStatus.CANCELLED
+  ],
+
+  [TicketStatus.ONSITE_VISIT_PLANNED]: [
+    TicketStatus.ONSITE_VISIT_STARTED,
+    TicketStatus.ONSITE_VISIT_REACHED,
+    TicketStatus.CANCELLED,
+    TicketStatus.IN_PROGRESS
   ],
   
   [TicketStatus.ONSITE_VISIT_STARTED]: [
@@ -537,8 +548,9 @@ export function StatusChangeDialog({
       [TicketStatus.RESOLVED]: { label: 'Resolved', shortLabel: 'Resolved', category: 'Completion', description: 'Issue has been resolved' },
       [TicketStatus.CLOSED]: { label: 'Closed', shortLabel: 'Closed', category: 'Completion', description: 'Ticket is closed and complete' },
       [TicketStatus.CLOSED_PENDING]: { label: 'Pending Closure', shortLabel: 'Pending Close', category: 'Completion', description: 'Awaiting admin approval to close' },
-      [TicketStatus.ONSITE_VISIT]: { label: 'Onsite Visit', shortLabel: 'Onsite', category: 'Onsite', description: 'Requires onsite visit' },
-      [TicketStatus.ONSITE_VISIT_STARTED]: { label: 'Visit Started', shortLabel: 'Visit Started', category: 'Onsite', description: 'Technician started journey' },
+  [TicketStatus.ONSITE_VISIT]: { label: 'Onsite Visit', shortLabel: 'Onsite', category: 'Onsite', description: 'Requires onsite visit' },
+  [TicketStatus.ONSITE_VISIT_PLANNED]: { label: 'Visit Planned', shortLabel: 'Visit Planned', category: 'Onsite', description: 'Onsite visit is scheduled' },
+  [TicketStatus.ONSITE_VISIT_STARTED]: { label: 'Visit Started', shortLabel: 'Visit Started', category: 'Onsite', description: 'Technician started journey' },
       [TicketStatus.ONSITE_VISIT_REACHED]: { label: 'Visit Reached', shortLabel: 'Reached Site', category: 'Onsite', description: 'Technician reached location (auto-transitions to In Progress)' },
       [TicketStatus.ONSITE_VISIT_IN_PROGRESS]: { label: 'Visit In Progress', shortLabel: 'Work Onsite', category: 'Onsite', description: 'Work in progress at site' },
       [TicketStatus.ONSITE_VISIT_RESOLVED]: { label: 'Visit Resolved', shortLabel: 'Site Resolved', category: 'Onsite', description: 'Onsite work completed' },
@@ -594,6 +606,12 @@ export function StatusChangeDialog({
     // Check if photo is required but not captured
     if (requiresPhoto(selectedStatus) && capturedPhotos.length === 0) {
       alert('Photo verification is required when reaching onsite location. Please take at least one photo.');
+      return;
+    }
+
+    // Check if photo is required for CLOSED_PENDING
+    if (selectedStatus === TicketStatus.CLOSED_PENDING && capturedPhotos.length === 0) {
+      alert('Closure report photos are required. Please take at least one photo.');
       return;
     }
     
@@ -658,12 +676,12 @@ export function StatusChangeDialog({
           // Wait a moment for the first status change to be processed
           await new Promise(resolve => setTimeout(resolve, 500));
           
-          // Automatically transition to in progress (reuse same location and photos)
+          // Automatically transition to in progress (reuse same location, but NOT photos - they were already saved)
           await onStatusChange(
             TicketStatus.ONSITE_VISIT_IN_PROGRESS, 
             'Automatically transitioned to in progress after reaching site',
             locationData,
-            photoData
+            undefined // Don't pass photos again - they were already saved with REACHED status
           );
         } catch (error) {
           // Don't show error to user as the main status change was successful
@@ -1004,7 +1022,7 @@ export function StatusChangeDialog({
           {selectedStatus && requiresPhoto(selectedStatus) && (
             <PhotoCapture
               onPhotoCapture={handlePhotoCapture}
-              maxPhotos={3}
+              maxPhotos={1}
               required={true}
               label="Onsite Verification Photos"
               description="Take photos to verify your presence at the customer location"
@@ -1057,46 +1075,21 @@ export function StatusChangeDialog({
             </div>
           )}
 
-          {/* Report Upload for CLOSED_PENDING */}
+          {/* Closure Report Photo Capture for CLOSED_PENDING */}
           {selectedStatus === TicketStatus.CLOSED_PENDING && (
             <div className="space-y-2 mt-4">
-              <Label htmlFor="report-file" className="text-sm font-medium flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Closure Report
-                <Badge variant="secondary" className="text-xs">Optional</Badge>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Camera className="h-4 w-4" />
+                Closure Report Photos
+                <Badge variant="destructive" className="text-xs">Required</Badge>
               </Label>
-              <div className="space-y-2">
-                <input
-                  id="report-file"
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      setReportFile(e.target.files[0]);
-                    }
-                  }}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-                {reportFile && (
-                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
-                    <File className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm text-gray-700 flex-1 truncate">{reportFile.name}</span>
-                    <span className="text-xs text-gray-500">({(reportFile.size / 1024).toFixed(1)} KB)</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setReportFile(null)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Upload completion report (optional). Accepted formats: PDF, Word, Excel, Images
-                </p>
-              </div>
+              <PhotoCapture
+                onPhotoCapture={handlePhotoCapture}
+                maxPhotos={3}
+                required={true}
+                label="Completion Photos"
+                description="Take photos of the completed work"
+              />
             </div>
           )}
         </div>
@@ -1115,7 +1108,8 @@ export function StatusChangeDialog({
             disabled={!selectedStatus || isSubmitting || (showComments && !comments.trim()) || 
               ((selectedStatus === TicketStatus.CLOSED || selectedStatus === TicketStatus.CLOSED_PENDING || selectedStatus === TicketStatus.RESOLVED) && !comments.trim()) ||
               (requiresLocation(selectedStatus) && !currentLocation) ||
-              (requiresPhoto(selectedStatus) && capturedPhotos.length === 0)}
+              (requiresPhoto(selectedStatus) && capturedPhotos.length === 0) ||
+              (selectedStatus === TicketStatus.CLOSED_PENDING && capturedPhotos.length === 0)}
             variant={selectedOption?.isDestructive ? 'destructive' : 'default'}
             className="px-6 font-medium"
           >

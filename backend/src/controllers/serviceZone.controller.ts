@@ -84,16 +84,34 @@ export const listServiceZones = async (req: ServiceZoneRequest, res: Response) =
     const skip = (pageNum - 1) * limitNum;
 
     const where: Prisma.ServiceZoneWhereInput = {};
-    
+
     // For ZONE_USER and ZONE_MANAGER, only show their assigned zones
     if (req.user?.role === 'ZONE_USER' || req.user?.role === 'ZONE_MANAGER') {
-      where.servicePersons = {
-        some: {
-          userId: req.user.id
-        }
-      };
+      // First, get the zones that this user belongs to
+      const userZones = await prisma.servicePersonZone.findMany({
+        where: { userId: req.user.id },
+        select: { serviceZoneId: true }
+      });
+
+      const zoneIds = userZones.map(z => z.serviceZoneId);
+
+      if (zoneIds.length > 0) {
+        where.id = { in: zoneIds };
+      } else {
+        // User has no zones, return empty result
+        return res.json({
+          success: true,
+          data: [],
+          pagination: {
+            total: 0,
+            page: pageNum,
+            limit: limitNum,
+            totalPages: 0,
+          },
+        });
+      }
     }
-    
+
     if (search) {
       where.OR = [
         { name: { contains: search as string, mode: 'insensitive' } },
@@ -127,7 +145,7 @@ export const listServiceZones = async (req: ServiceZoneRequest, res: Response) =
       zones.map(async (zone) => {
         const [servicePersonsCount, zoneUsersCount, customersCount, ticketsCount] = await Promise.all([
           prisma.servicePersonZone.count({
-            where: { 
+            where: {
               serviceZoneId: zone.id,
               user: { role: 'SERVICE_PERSON' }
             },
@@ -166,6 +184,7 @@ export const listServiceZones = async (req: ServiceZoneRequest, res: Response) =
     );
 
     res.json({
+      success: true,
       data: zonesWithCounts,
       pagination: {
         total,
@@ -248,7 +267,7 @@ export const createServiceZone = async (req: Request, res: Response) => {
 
     // Validate required fields
     if (!name) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Name is a required field'
       });
     }
@@ -297,7 +316,7 @@ export const updateServiceZone = async (req: ServiceZoneRequest, res: Response) 
     }
 
     const serviceZoneId = parseInt(id, 10);
-    
+
     if (isNaN(serviceZoneId)) {
       return res.status(400).json({ error: 'Invalid service zone ID' });
     }
@@ -326,14 +345,14 @@ export const updateServiceZone = async (req: ServiceZoneRequest, res: Response) 
     // Check for duplicate name if name is being updated
     if (name && name !== existingZone.name) {
       const duplicateZone = await prisma.serviceZone.findFirst({
-        where: { 
+        where: {
           name,
           id: { not: serviceZoneId },
         },
       });
 
       if (duplicateZone) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Service zone with this name already exists',
         });
       }
@@ -342,14 +361,14 @@ export const updateServiceZone = async (req: ServiceZoneRequest, res: Response) 
     // Validate service persons if provided
     if (servicePersonIds && servicePersonIds.length > 0) {
       const servicePersons = await prisma.user.findMany({
-        where: { 
+        where: {
           id: { in: servicePersonIds },
           role: 'SERVICE_PERSON'
         },
       });
-      
+
       if (servicePersons.length !== servicePersonIds.length) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'One or more service person IDs are invalid',
         });
       }
@@ -432,12 +451,12 @@ export const deleteServiceZone = async (req: Request, res: Response) => {
       Promise.all([
         prisma.servicePersonZone.count({ where: { serviceZoneId: parseInt(id) } }),
         prisma.customer.count({ where: { serviceZoneId: parseInt(id) } }),
-        prisma.ticket.count({ 
-          where: { 
-            customer: { 
-              serviceZoneId: parseInt(id) 
-            } 
-          } 
+        prisma.ticket.count({
+          where: {
+            customer: {
+              serviceZoneId: parseInt(id)
+            }
+          }
         })
       ])
     ]);
@@ -473,24 +492,24 @@ export const deleteServiceZone = async (req: Request, res: Response) => {
 export const getServiceZoneStats = async (req: ServiceZoneRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id) {
       return res.status(400).json({ error: 'Service zone ID is required' });
     }
 
     const serviceZoneId = parseInt(id, 10);
-    
+
     if (isNaN(serviceZoneId)) {
       return res.status(400).json({ error: 'Invalid service zone ID' });
     }
 
     // Get all data in parallel
     const [
-      serviceZone, 
-      servicePersonsCount, 
-      customersCount, 
-      ticketsCount, 
-      activeTicketsCount, 
+      serviceZone,
+      servicePersonsCount,
+      customersCount,
+      ticketsCount,
+      activeTicketsCount,
       recentTickets
     ] = await Promise.all([
       prisma.serviceZone.findUnique({
@@ -503,7 +522,7 @@ export const getServiceZoneStats = async (req: ServiceZoneRequest, res: Response
         where: { serviceZoneId },
       }),
       prisma.ticket.count({
-        where: { 
+        where: {
           customer: {
             serviceZoneId: serviceZoneId
           }
@@ -520,7 +539,7 @@ export const getServiceZoneStats = async (req: ServiceZoneRequest, res: Response
         },
       }),
       prisma.ticket.findMany({
-        where: { 
+        where: {
           customer: {
             serviceZoneId: serviceZoneId
           }
@@ -555,7 +574,7 @@ export const getServiceZoneStats = async (req: ServiceZoneRequest, res: Response
       recentTickets: (recentTickets as Array<any>).map((ticket) => {
         // Ensure we have a valid ticket and customer
         if (!ticket) return null;
-        
+
         const customerInfo = ticket.customer ? {
           id: ticket.customer.id || null,
           companyName: ticket.customer?.companyName || null,

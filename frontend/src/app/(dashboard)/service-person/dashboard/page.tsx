@@ -10,63 +10,89 @@ import DashboardErrorFallback from '@/components/dashboard/DashboardErrorFallbac
 export const metadata: Metadata = {
   title: 'Dashboard | Service Person | KardexCare',
   description: 'Service person dashboard for managing attendance, activities, and tickets',
-  robots: 'noindex, nofollow', // Prevent indexing of authenticated pages
+  robots: 'noindex, nofollow',
 };
 
-// Force dynamic rendering for this page (always server‑side render)
+// Force dynamic rendering
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * Premium loading skeleton – mirrors the admin dashboard loading UI.
+ * Premium loading skeleton with matching design
  */
 function DashboardLoading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6 lg:p-8">
-      {/* Animated background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
-      </div>
-
-      {/* Header skeleton */}
-      <div className="mb-6 sm:mb-8">
-        <div className="h-32 sm:h-40 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl sm:rounded-3xl animate-pulse" />
-        <div className="mt-4 sm:mt-5 h-12 bg-blue-100/50 rounded-xl sm:rounded-2xl animate-pulse" />
-      </div>
-
-      {/* Content skeleton – a few placeholder cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {[1, 2, 3, 4].map(i => (
-          <div
-            key={i}
-            className="bg-white/60 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-white/50 shadow-lg animate-pulse"
-            style={{ animationDelay: `${i * 100}ms` }}
-          >
-            <div className="h-6 bg-slate-200/60 rounded w-3/4 mb-2" />
-            <div className="h-8 bg-slate-200/80 rounded w-1/2" />
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.06),_transparent_50%)]"></div>
+      
+      {/* Floating orbs */}
+      <div className="fixed top-20 left-10 w-64 h-64 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full blur-3xl animate-pulse pointer-events-none"></div>
+      <div className="fixed bottom-32 right-10 w-80 h-80 bg-gradient-to-br from-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-pulse pointer-events-none" style={{ animationDelay: '1s' }}></div>
+      
+      {/* Header Skeleton */}
+      <div className="relative bg-gradient-to-r from-[#3d5a78] via-[#507295] to-[#6889ab] px-4 py-6 sm:px-6 sm:py-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/20 rounded-xl sm:rounded-2xl animate-pulse"></div>
+            <div className="space-y-2">
+              <div className="h-6 sm:h-8 w-48 sm:w-64 bg-white/20 rounded-lg animate-pulse"></div>
+              <div className="h-4 w-32 sm:w-40 bg-white/20 rounded-lg animate-pulse"></div>
+            </div>
           </div>
-        ))}
+        </div>
+      </div>
+
+      {/* Stats Bar Skeleton */}
+      <div className="relative z-10 px-4 sm:px-6 lg:px-8 -mt-4 sm:-mt-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <div 
+                key={i}
+                className="bg-white/90 backdrop-blur-xl rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-white/50 shadow-lg animate-pulse"
+                style={{ animationDelay: `${i * 100}ms` }}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl"></div>
+                  <div className="space-y-2">
+                    <div className="h-3 w-12 bg-gray-200 rounded"></div>
+                    <div className="h-6 w-8 bg-gray-300 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content Skeleton */}
+      <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+          {[1, 2, 3].map(i => (
+            <div 
+              key={i}
+              className="bg-white/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/50 shadow-lg animate-pulse"
+              style={{ animationDelay: `${i * 150}ms` }}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl sm:rounded-2xl"></div>
+                <div className="space-y-2 flex-1">
+                  <div className="h-5 w-40 bg-gray-200 rounded-lg"></div>
+                  <div className="h-3 w-28 bg-gray-100 rounded"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
 /**
- * Checks if a JWT token is expired by decoding its payload.
- */
-function isTokenExpired(token: string): boolean {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const now = Math.floor(Date.now() / 1000);
-    return payload.exp ? payload.exp < now + 60 : true;
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Fetches the service‑person attendance data.
+ * Fetches the service-person attendance data
  */
 async function getServicePersonDashboardData(token: string, retryCount = 0): Promise<any> {
   const MAX_RETRIES = 2;
@@ -109,25 +135,25 @@ async function getServicePersonDashboardData(token: string, retryCount = 0): Pro
  * Service Person Dashboard – Server Component
  */
 export default async function ServicePersonDashboardPage() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
   const accessToken = cookieStore.get('accessToken')?.value;
   const userRole = cookieStore.get('userRole')?.value;
   const authToken = accessToken || token;
 
+  // Only redirect if NO token at all - let client-side handle expired tokens
   if (!authToken) redirect('/auth/login');
-  if (userRole !== 'SERVICE_PERSON') redirect('/auth/login');
-  if (isTokenExpired(authToken)) redirect('/auth/login');
+  
+  // Role check - redirect to login if wrong role
+  if (userRole && userRole !== 'SERVICE_PERSON') redirect('/auth/login');
 
   const dashboardData = await getServicePersonDashboardData(authToken);
 
   return (
     <DashboardErrorBoundary fallback={DashboardErrorFallback}> 
       <Suspense fallback={<DashboardLoading />}> 
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 overflow-x-hidden relative">
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-            <ServicePersonDashboardClientFixed initialAttendanceData={dashboardData?.attendance ?? null} />
-          </main>
+        <div className="min-h-screen overflow-x-hidden relative">
+          <ServicePersonDashboardClientFixed initialAttendanceData={dashboardData?.attendance ?? null} />
         </div>
       </Suspense>
     </DashboardErrorBoundary>

@@ -762,7 +762,7 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Offers Value - Orders Received (pending opportunities)">
                         Open Funnel
                       </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Count of ORDER_BOOKED stage offers in current year">
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Count of WON/PO_RECEIVED stage offers in current year">
                         Order Booking
                       </th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Target BU</th>
@@ -859,7 +859,7 @@ const ReportsClient: React.FC<ReportsClientProps> = ({
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Offers Value - Orders Received (pending opportunities)">
                         Open Funnel
                       </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Count of ORDER_BOOKED stage offers in current year">
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 cursor-help" title="Count of WON/PO_RECEIVED stage offers in current year">
                         Order Booking
                       </th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Target BU</th>

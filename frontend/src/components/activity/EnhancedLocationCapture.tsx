@@ -37,6 +37,10 @@ const EnhancedLocationCapture: React.FC<EnhancedLocationCaptureProps> = ({
 }) => {
   const { toast } = useToast();
   
+  // Elapsed time counter for GPS capture
+  const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
+  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+  
   const {
     isLoading,
     isManualAddressOpen,
@@ -55,13 +59,35 @@ const EnhancedLocationCapture: React.FC<EnhancedLocationCaptureProps> = ({
     isManualLocation,
     locationQuality
   } = useEnhancedLocation({
-    maxAccuracy: 100, // Reduced to 100m for better coordinate validation
-    maxRetries: 3, // 3 GPS attempts before manual entry
+    maxAccuracy: 2000, // 2km accuracy threshold (very lenient)
+    maxRetries: 1, // Single attempt - no retries
     timeout: 15000,
     autoCapture,
     enableJumpDetection,
     previousLocation
   });
+
+  // Timer for elapsed seconds during GPS capture
+  React.useEffect(() => {
+    if (isLoading) {
+      setElapsedSeconds(0);
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setElapsedSeconds(0);
+    }
+    
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isLoading]);
 
   // Debug logging for GPS capture attempts
   React.useEffect(() => {
@@ -117,9 +143,9 @@ const EnhancedLocationCapture: React.FC<EnhancedLocationCaptureProps> = ({
 
   const getStatusText = () => {
     if (isLoading) {
-      return gpsRetryCount > 0
-        ? `Attempting GPS capture (${gpsRetryCount}/5)...`
-        : 'Capturing location...';
+      // Show elapsed time so user knows app is working
+      const mode = elapsedSeconds < 10 ? 'GPS' : 'Network';
+      return `Capturing ${mode} location... ${elapsedSeconds}s`;
     }
     
     if (hasValidLocation) {
@@ -238,7 +264,7 @@ const EnhancedLocationCapture: React.FC<EnhancedLocationCaptureProps> = ({
             <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
               <div className="font-medium text-yellow-800">GPS Available but Inaccurate</div>
               <div className="text-yellow-700">
-                Best GPS: ±{Math.round(lastAttempt.location.accuracy)}m (requires ≤100m)
+                Best GPS: ±{Math.round(lastAttempt.location.accuracy)}m (requires ≤2000m)
               </div>
             </div>
           )}
@@ -266,7 +292,7 @@ const EnhancedLocationCapture: React.FC<EnhancedLocationCaptureProps> = ({
         onClose={closeManualAddress}
         onLocationSelect={handleManualAddressSelect}
         title="📍 Enter Your Location"
-        description="GPS signal is weak after multiple attempts. Please type your current address."
+        description="GPS is not available. Please type your current address."
         gpsRetryCount={gpsRetryCount}
       />
     </div>

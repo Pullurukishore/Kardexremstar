@@ -41,6 +41,8 @@ import {
   Square,
   CheckCircle,
   Navigation,
+  RefreshCw,
+  XCircle,
 } from "lucide-react";
 import { apiClient } from "@/lib/api/api-client";
 import { cn } from "@/lib/utils";
@@ -99,6 +101,9 @@ const ACTIVITY_TYPES = [
   { value: "WORK_FROM_HOME", label: "Work From Home", icon: "🏠" },
   { value: "OTHER", label: "Other", icon: "📋" },
 ];
+
+// Activity types that don't require scheduling (ad-hoc activities)
+const AD_HOC_ACTIVITY_TYPES = ['WORK_FROM_HOME', 'OTHER', 'BREAK', 'DOCUMENTATION'];
 
 // Stage templates for different activity types (dual-flow system)
 const ACTIVITY_STAGE_TEMPLATES: Record<string, Array<{
@@ -336,17 +341,11 @@ function ActivityLoggerComponent({
       const { latitude, longitude } = position.coords;
       const accuracy = position.coords.accuracy || 999999;
       
-      // Provide accuracy feedback only for clearly problematic cases
-      if (accuracy > 1000) {
+      // Provide accuracy feedback only for extreme cases (> 2000m threshold)
+      if (accuracy > 2000) {
         toast({
           title: "Very Poor GPS Signal",
           description: `GPS accuracy is very poor (±${Math.round(accuracy)}m). Please move outdoors with clear sky view for better accuracy.`,
-          variant: "destructive",
-        });
-      } else if (accuracy > 100) {
-        toast({
-          title: "Poor GPS Accuracy",
-          description: `GPS accuracy is poor (±${Math.round(accuracy)}m). Location may be less precise. Try moving to an open area.`,
           variant: "destructive",
         });
       }
@@ -535,7 +534,8 @@ function ActivityLoggerComponent({
       return;
     }
 
-    if (!formData.activityScheduleId) {
+    // Only require scheduled activity for non-ad-hoc activity types
+    if (!formData.activityScheduleId && !AD_HOC_ACTIVITY_TYPES.includes(formData.activityType)) {
       toast({
         title: "Error",
         description: "Please select a Scheduled Activity",
@@ -924,26 +924,31 @@ function ActivityLoggerComponent({
   // Memoize the component's JSX to prevent unnecessary re-renders
   const activityLoggerContent = useMemo(
     () => (
-      <Card className="w-full">
-        <CardHeader className={isMobile ? "p-4" : "p-6"}>
-          <div className={`flex items-center justify-between ${isMobile ? 'flex-col gap-3' : 'flex-row'}`}>
-            <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
-              <Activity className={isMobile ? "h-4 w-4" : "h-5 w-5"} />
-              Activity Log
+      <Card className="w-full border border-gray-200 shadow-sm rounded-xl overflow-hidden">
+        {/* Header */}
+        <CardHeader className={`${isMobile ? 'p-4' : 'p-5'} bg-gray-50 border-b border-gray-100`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'flex-col gap-4' : 'flex-row'}`}>
+            <CardTitle className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-purple-100">
+                <Activity className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <span className={`font-bold text-gray-900 ${isMobile ? 'text-lg' : 'text-lg'}`}>Activity Log</span>
+              </div>
             </CardTitle>
-            <div className={`flex gap-2 ${isMobile ? 'w-full flex-col' : 'flex-row'}`}>
+            <div className={`flex gap-2 ${isMobile ? 'w-full' : ''}`}>
               {activeActivity && (
                 <Button
                   onClick={handleEndActivity}
                   disabled={submitting}
                   variant="destructive"
                   size={isMobile ? "default" : "sm"}
-                  className={`${isMobile ? 'w-full h-12 text-base touch-manipulation' : ''}`}
+                  className={`${isMobile ? 'flex-1 h-11' : 'h-9'} font-medium rounded-lg`}
                 >
                   {submitting ? (
-                    <Loader2 className={`${isMobile ? 'h-5 w-5' : 'h-4 w-4'} mr-2 animate-spin`} />
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <Square className={`${isMobile ? 'h-5 w-5' : 'h-4 w-4'} mr-2`} />
+                    <Square className="h-4 w-4 mr-2" />
                   )}
                   End Activity
                 </Button>
@@ -953,11 +958,9 @@ function ActivityLoggerComponent({
                 onOpenChange={(open) => {
                   setDialogOpen(open);
                   if (open) {
-                    // Fetch workable tickets and accepted schedules when dialog opens
                     fetchWorkableTickets();
                     fetchAcceptedSchedules();
                   } else {
-                    // Reset location state when dialog closes
                     setActivityLocation(null);
                     setLocationError(null);
                   }
@@ -967,52 +970,88 @@ function ActivityLoggerComponent({
                   <Button 
                     size={isMobile ? "default" : "sm"} 
                     disabled={!!activeActivity}
-                    className={`${isMobile ? 'w-full h-12 text-base touch-manipulation' : ''}`}
+                    className={`${isMobile ? 'flex-1 h-11' : 'h-9'} bg-gray-900 hover:bg-gray-800 font-medium rounded-lg`}
                   >
-                    <Plus className={`${isMobile ? 'h-5 w-5' : 'h-4 w-4'} mr-2`} />
+                    <Plus className="h-4 w-4 mr-2" />
                     Log Activity
                   </Button>
                 </DialogTrigger>
-                <DialogContent className={isMobile ? "w-[95vw] max-w-[95vw] max-h-[90vh] p-3 overflow-y-auto" : "sm:max-w-[500px] max-h-[90vh] overflow-y-auto"}>
-                  <DialogHeader className={isMobile ? "pb-3 sticky top-0 bg-white z-10" : "pb-4"}>
-                    <DialogTitle className={isMobile ? "text-base font-bold" : "text-xl"}>Log New Activity</DialogTitle>
-                  </DialogHeader>
-                  <div className={`space-y-3 pb-4 ${isMobile ? 'space-y-3' : 'space-y-4'}`}>
-                    <div className="space-y-2">
-                      <Label htmlFor="activityType" className={isMobile ? "text-sm font-medium" : ""}>Activity Type *</Label>
-                      <Select
-                        value={formData.activityType}
-                        onValueChange={(value) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            activityType: value,
-                            ticketId: "",
-                            activityScheduleId: "",
-                          }))
-                        }
-                      >
-                        <SelectTrigger className={isMobile ? "h-12 text-base" : "h-10"}>
-                          <SelectValue placeholder="Select activity type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ACTIVITY_TYPES.map((type) => (
-                            <SelectItem key={type.value} value={type.value}>
-                              <div className="flex items-center gap-2">
-                                <span>{type.icon}</span>
-                                <span>{type.label}</span>
+                <DialogContent className={isMobile ? "w-[95vw] max-w-[95vw] max-h-[90vh] p-0 overflow-hidden" : "sm:max-w-[500px] max-h-[90vh] p-0 overflow-hidden"}>
+                  {/* Premium Dialog Header */}
+                  <div className="relative bg-gradient-to-r from-[#3d5a78] via-[#507295] to-[#6889ab] p-4 sm:p-5 overflow-hidden">
+                    {/* Background decorations */}
+                    <div className="absolute inset-0 overflow-hidden">
+                      <div className="absolute -top-10 -right-10 w-28 h-28 bg-white/10 rounded-full blur-2xl"></div>
+                      <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-white/10 rounded-full blur-2xl"></div>
+                    </div>
+                    <DialogHeader className="relative z-10 p-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30 shadow-lg">
+                          <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                        </div>
+                        <div>
+                          <DialogTitle className="text-lg sm:text-xl font-bold text-white">Log New Activity</DialogTitle>
+                          <p className="text-white/70 text-xs sm:text-sm mt-0.5">Start a new work activity</p>
+                        </div>
+                      </div>
+                    </DialogHeader>
+                  </div>
+
+                  {/* Dialog Content */}
+                  <div className={`p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[60vh]`}>
+                    {/* Activity Type Cards Grid */}
+                    <div className="space-y-3">
+                      <Label htmlFor="activityType" className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <span className="w-5 h-5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-md flex items-center justify-center text-white text-xs">1</span>
+                        Activity Type
+                      </Label>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {ACTIVITY_TYPES.map((type) => (
+                          <button
+                            key={type.value}
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                activityType: type.value,
+                                ticketId: "",
+                                activityScheduleId: "",
+                              }))
+                            }
+                            className={cn(
+                              "relative flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-xl border-2 transition-all duration-200 touch-manipulation",
+                              formData.activityType === type.value
+                                ? "border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md scale-[1.02]"
+                                : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                            )}
+                          >
+                            <span className="text-xl sm:text-2xl mb-1">{type.icon}</span>
+                            <span className={cn(
+                              "text-[10px] sm:text-xs font-medium text-center leading-tight",
+                              formData.activityType === type.value
+                                ? "text-blue-700"
+                                : "text-gray-600"
+                            )}>
+                              {type.label}
+                            </span>
+                            {formData.activityType === type.value && (
+                              <div className="absolute top-1 right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                                <CheckCircle className="w-3 h-3 text-white" />
                               </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-
-
-                    {/* Show scheduled activity dropdown - filtered by activity type */}
-                    {formData.activityType && (
+                    {/* Show scheduled activity dropdown - only for activity types that require scheduling */}
+                    {formData.activityType && !AD_HOC_ACTIVITY_TYPES.includes(formData.activityType) && (
                       <div className="space-y-2">
-                        <Label htmlFor="activityScheduleId" className={isMobile ? "text-sm font-medium" : ""}>Scheduled Activity *</Label>
+                        <Label htmlFor="activityScheduleId" className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                          <span className="w-5 h-5 bg-gradient-to-br from-purple-500 to-pink-600 rounded-md flex items-center justify-center text-white text-xs">2</span>
+                          Scheduled Activity
+                          <span className="text-xs font-medium text-red-500 bg-red-50 px-1.5 py-0.5 rounded">Required</span>
+                        </Label>
                         <Select
                           value={formData.activityScheduleId}
                           onValueChange={(value) =>
@@ -1022,7 +1061,7 @@ function ActivityLoggerComponent({
                             }))
                           }
                         >
-                          <SelectTrigger className={isMobile ? "h-12 text-base" : "h-10"}>
+                          <SelectTrigger className={`${isMobile ? 'h-14 text-base' : 'h-12'} rounded-xl border-2 border-gray-200 focus:border-purple-400 bg-gray-50/50`}>
                             <SelectValue placeholder="Select scheduled activity" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1030,7 +1069,7 @@ function ActivityLoggerComponent({
                               (schedule) => schedule.activityType === formData.activityType
                             ).length === 0 ? (
                               <SelectItem value="" disabled>
-                                No schedules available for this activity type
+                                <span className="text-gray-400">No schedules available for this activity type</span>
                               </SelectItem>
                             ) : (
                               acceptedSchedules
@@ -1041,12 +1080,13 @@ function ActivityLoggerComponent({
                                   <SelectItem
                                     key={schedule.id}
                                     value={schedule.id.toString()}
+                                    className="py-3"
                                   >
                                     <div className="flex flex-col">
-                                      <span>
+                                      <span className="font-medium">
                                         {schedule.description || `${schedule.activityType} - ${new Date(schedule.scheduledDate).toLocaleDateString()}`}
                                       </span>
-                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                                         <Badge variant="secondary" className="text-xs">
                                           {schedule.activityType}
                                         </Badge>
@@ -1078,20 +1118,43 @@ function ActivityLoggerComponent({
                       </div>
                     )}
 
-                    {/* Location Section - Same as Check-in/Checkout with Manual Entry */}
+                    {/* Show info message for ad-hoc activity types */}
+                    {formData.activityType && AD_HOC_ACTIVITY_TYPES.includes(formData.activityType) && (
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-md flex items-center justify-center text-white text-xs">✓</span>
+                          <span className="text-sm text-blue-800 font-medium">
+                            No scheduling required for {ACTIVITY_TYPES.find(t => t.value === formData.activityType)?.label}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Location Section */}
                     <div className="space-y-2">
-                      <Label className={isMobile ? "text-sm font-medium" : ""}>Location *</Label>
+                      <Label className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <span className="w-5 h-5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-md flex items-center justify-center text-white text-xs">3</span>
+                        Location
+                      </Label>
                       
                       {/* Show location capture dialog when needed */}
                       {showLocationCapture ? (
-                        <div className={`space-y-3 border border-blue-200 rounded-xl bg-blue-50 ${isMobile ? 'p-3' : 'p-4'}`}>
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-4 space-y-4">
                           <div className="flex items-center justify-between">
-                            <h3 className={`font-bold text-blue-900 ${isMobile ? 'text-xs' : 'text-sm'}`}>📍 Capture Location</h3>
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md">
+                                <MapPin className="h-4 w-4 text-white" />
+                              </div>
+                              <div>
+                                <h3 className="font-bold text-gray-900 text-sm">Capture Location</h3>
+                                <p className="text-xs text-gray-500">GPS or manual selection</p>
+                              </div>
+                            </div>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setShowLocationCapture(false)}
-                              className={`p-0 text-blue-600 hover:text-blue-800 ${isMobile ? 'h-8 w-8' : 'h-6 w-6'}`}
+                              className="h-8 w-8 p-0 rounded-full hover:bg-gray-200"
                             >
                               ✕
                             </Button>
@@ -1124,58 +1187,89 @@ function ActivityLoggerComponent({
                         <div className="space-y-2">
                           {(activityLocation || enhancedLocation) ? (
                             /* Location captured - show details */
-                            <div className={`bg-green-50 border border-green-200 rounded-xl ${isMobile ? 'p-2.5' : 'p-3'}`}>
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <CheckCircle className={`text-green-600 flex-shrink-0 ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
-                                  <span className={`font-bold text-green-800 truncate ${isMobile ? 'text-xs' : 'text-sm'}`}>✅ Location Ready</span>
-                                </div>
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+                              <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                                    <CheckCircle className="h-4 w-4 text-white" />
+                                  </div>
+                                  <span className="font-bold text-green-800 text-sm">Location Ready</span>
+                                </div>
+                                <div className="flex items-center gap-1">
                                   {enhancedLocation?.source === 'manual' ? (
-                                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 px-2 py-1">
                                       <MapPin className="h-3 w-3 mr-1" />
                                       Manual
                                     </Badge>
                                   ) : (
-                                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 px-2 py-1">
                                       <Navigation className="h-3 w-3 mr-1" />
                                       GPS
                                     </Badge>
                                   )}
+                                  {/* Recapture button */}
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => setShowLocationCapture(true)}
-                                    className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                                    className="h-7 w-7 p-0 rounded-full hover:bg-blue-100"
+                                    title="Recapture location"
                                   >
-                                    <MapPin className="h-3 w-3" />
+                                    <RefreshCw className="h-3.5 w-3.5 text-blue-600" />
+                                  </Button>
+                                  {/* Clear button */}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setActivityLocation(null);
+                                      setEnhancedLocation(null);
+                                      toast({
+                                        title: "Location Cleared",
+                                        description: "Please capture location again to continue.",
+                                      });
+                                    }}
+                                    className="h-7 w-7 p-0 rounded-full hover:bg-red-100"
+                                    title="Clear location"
+                                  >
+                                    <XCircle className="h-3.5 w-3.5 text-red-500" />
                                   </Button>
                                 </div>
                               </div>
-                              <div className="text-xs sm:text-sm text-green-700 break-words leading-relaxed">
-                                {(enhancedLocation?.address || activityLocation?.address) || 
-                                 `${(enhancedLocation?.latitude || activityLocation?.lat)?.toFixed(6)}, ${(enhancedLocation?.longitude || activityLocation?.lng)?.toFixed(6)}`}
-                              </div>
-                              <div className="text-xs text-green-600 mt-1">
-                                🕒 {enhancedLocation ? new Date(enhancedLocation.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}
+                              <div className="bg-white/60 rounded-lg p-3 space-y-1">
+                                <p className="text-sm text-gray-700 break-words">
+                                  📍 {(enhancedLocation?.address || activityLocation?.address) || 
+                                   `${(enhancedLocation?.latitude || activityLocation?.lat)?.toFixed(6)}, ${(enhancedLocation?.longitude || activityLocation?.lng)?.toFixed(6)}`}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  🕒 {enhancedLocation ? new Date(enhancedLocation.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}
+                                </p>
                               </div>
                             </div>
                           ) : (
                             /* No location - show capture button */
-                            <Button
-                              variant="outline"
+                            <button
+                              type="button"
                               onClick={() => setShowLocationCapture(true)}
-                              className={`w-full border-dashed border-2 border-blue-300 text-blue-600 hover:bg-blue-50 ${isMobile ? 'h-12 text-base font-semibold touch-manipulation' : ''}`}
+                              className={`w-full border-2 border-dashed border-blue-300 rounded-xl bg-gradient-to-r from-blue-50/50 to-indigo-50/50 hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ${isMobile ? 'py-5' : 'py-4'}`}
                             >
-                              <MapPin className={`mr-2 ${isMobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
-                              📍 Capture Location
-                            </Button>
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                                  <MapPin className="h-5 w-5 text-white" />
+                                </div>
+                                <span className="text-blue-600 font-semibold text-sm">Capture Location</span>
+                                <span className="text-gray-400 text-xs">GPS or manual selection</span>
+                              </div>
+                            </button>
                           )}
                         </div>
                       )}
                     </div>
+                  </div>
 
-                    <div className={`flex gap-2 pt-4 ${isMobile ? 'flex-col' : 'justify-end flex-row'}`}>
+                  {/* Dialog Footer */}
+                  <div className="border-t border-gray-100 bg-gray-50/50 p-4 sm:p-5">
+                    <div className={`flex gap-3 ${isMobile ? 'flex-col' : 'justify-end flex-row'}`}>
                       <Button
                         variant="outline"
                         onClick={() => {
@@ -1184,26 +1278,36 @@ function ActivityLoggerComponent({
                           setEnhancedLocation(null);
                         }}
                         disabled={submitting}
-                        className={`${isMobile ? 'w-full h-12 text-base order-2 touch-manipulation' : ''}`}
+                        className={`${isMobile ? 'w-full h-12 order-2' : ''} rounded-xl border-2`}
                       >
                         Cancel
                       </Button>
-                      <Button
-                        onClick={handleStartActivity}
-                        disabled={
-                          submitting || 
-                          !formData.activityType || 
-                          (!activityLocation && !enhancedLocation)
-                        }
-                        className={`${isMobile ? 'w-full h-12 text-base order-1 touch-manipulation' : ''}`}
-                      >
-                        {submitting ? (
-                          <Loader2 className={`${isMobile ? 'h-5 w-5' : 'h-4 w-4'} mr-2 animate-spin`} />
-                        ) : (
-                          <Play className={`${isMobile ? 'h-5 w-5' : 'h-4 w-4'} mr-2`} />
-                        )}
-                        Start Activity
-                      </Button>
+                      
+                      {/* Show message if location not captured */}
+                      {!activityLocation && !enhancedLocation ? (
+                        <div className={`${isMobile ? 'w-full order-1' : ''} flex items-center justify-center gap-2 px-4 py-3 bg-amber-50 border-2 border-amber-200 rounded-xl text-amber-700`}>
+                          <MapPin className="h-5 w-5 animate-pulse" />
+                          <span className="font-medium text-sm">Capture location to start activity</span>
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={handleStartActivity}
+                          disabled={
+                            submitting || 
+                            !formData.activityType || 
+                            // Only require schedule for non-ad-hoc activity types
+                            (!AD_HOC_ACTIVITY_TYPES.includes(formData.activityType) && !formData.activityScheduleId)
+                          }
+                          className={`${isMobile ? 'w-full h-12 order-1' : ''} bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl font-bold shadow-lg shadow-green-500/30`}
+                        >
+                          {submitting ? (
+                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          ) : (
+                            <Play className="h-5 w-5 mr-2" />
+                          )}
+                          Start Activity
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </DialogContent>
@@ -1211,45 +1315,56 @@ function ActivityLoggerComponent({
             </div>
           </div>
         </CardHeader>
-        <CardContent className={`space-y-4 ${isMobile ? 'p-4' : 'p-6'}`}>
+        <CardContent className={`space-y-4 ${isMobile ? 'p-4' : 'p-5'}`}>
           {/* Active Activity */}
           {activeActivity && (
-            <div className={`${isMobile ? 'p-3' : 'p-4'} bg-green-50 border border-green-200 rounded-lg`}>
-              <div className={`flex items-center justify-between mb-2 ${isMobile ? 'flex-col gap-2' : 'flex-row'}`}>
-                <div className={`flex items-center gap-2 ${isMobile ? 'flex-wrap' : ''}`}>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <Badge
-                    variant="outline"
-                    className="bg-green-100 text-green-800"
-                  >
+            <div className="bg-white border border-green-200 rounded-xl overflow-hidden shadow-sm">
+              {/* Active header bar */}
+              <div className="flex items-center justify-between px-4 py-3 bg-green-50 border-b border-green-100">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-sm font-semibold text-green-700">Active Now</span>
+                  </div>
+                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
                     {formatDuration(undefined, true, activeActivity.startTime)}
-                  </Badge>
-                  <span className={`${isMobile ? 'text-base' : 'text-sm'} font-medium`}>
-                    {getActivityTypeInfo(activeActivity.activityType).icon}
-                  </span>
-                  <span className={`${isMobile ? 'text-base' : 'text-sm'} font-medium`}>
-                    {getActivityTypeInfo(activeActivity.activityType).label}
                   </span>
                 </div>
-                <span className={`${isMobile ? 'text-sm' : 'text-sm'} text-muted-foreground ${isMobile ? 'w-full text-center' : ''}`}>
-                  Started{" "}
-                  {new Date(activeActivity.startTime).toLocaleTimeString()}
+                <span className="text-xs text-gray-500">
+                  Started {new Date(activeActivity.startTime).toLocaleTimeString()}
                 </span>
               </div>
-              <h4 className={`font-medium ${isMobile ? 'text-base' : 'text-sm'}`}>{activeActivity.title}</h4>
-              {activeActivity.description && (
-                <p className={`${isMobile ? 'text-sm' : 'text-sm'} text-muted-foreground mt-1`}>
-                  {activeActivity.description}
-                </p>
-              )}
-              {activeActivity.location && (
-                <div className="flex items-start gap-1 mt-2 text-sm text-muted-foreground">
-                  <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                  <span className="break-words leading-relaxed text-xs">
-                    {activeActivity.location}
-                  </span>
+              
+              {/* Activity content */}
+              <div className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-lg">
+                    {getActivityTypeInfo(activeActivity.activityType).icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-gray-500">
+                        {getActivityTypeInfo(activeActivity.activityType).label}
+                      </span>
+                    </div>
+                    <h4 className="font-semibold text-gray-900">{activeActivity.title}</h4>
+                    {activeActivity.description && (
+                      <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                        {activeActivity.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              )}
+                
+                {activeActivity.location && (
+                  <div className="flex items-start gap-2 mt-3 pt-3 border-t border-gray-100">
+                    <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-gray-500 break-words leading-relaxed">
+                      {activeActivity.location}
+                    </span>
+                  </div>
+                )}
+              </div>
               {activeActivity.ticket && (
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-start justify-between mb-2">
@@ -1304,7 +1419,7 @@ function ActivityLoggerComponent({
           )}
 
           {/* Recent Activities */}
-          <div className={`space-y-3 ${isMobile ? 'space-y-2' : 'space-y-3'}`}>
+          <div className="space-y-3">
             {(() => {
               // Filter activities for today and yesterday only
               const now = new Date();
@@ -1322,9 +1437,14 @@ function ActivityLoggerComponent({
 
               return (
                 <>
-                  <h4 className={`${isMobile ? 'text-base' : 'text-sm'} font-medium text-muted-foreground`}>
-                    Recent Activities - Today & Yesterday ({recentActivities.length} activities)
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-gray-700">
+                      Recent Activities
+                    </h4>
+                    <span className="text-xs text-gray-500">
+                      Today & Yesterday ({recentActivities.length})
+                    </span>
+                  </div>
                   {loading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin" />

@@ -11,7 +11,7 @@ import {
   Clock,
   User,
   FileText,
-  Edit as EditIcon,
+  Pencil as EditIcon,
   CheckCircle,
   XCircle,
   AlertTriangle,
@@ -114,13 +114,14 @@ const ACTION_CONFIG: Record<string, {
 }
 
 // Stage colors for visual distinction
+// Note: ORDER_BOOKED kept for backwards compatibility with existing data
 const STAGE_COLORS: Record<string, string> = {
   'INITIAL': 'bg-blue-600 hover:bg-blue-700',
   'PROPOSAL_SENT': 'bg-indigo-600 hover:bg-indigo-700',
   'NEGOTIATION': 'bg-amber-600 hover:bg-amber-700',
   'FINAL_APPROVAL': 'bg-purple-600 hover:bg-purple-700',
   'PO_RECEIVED': 'bg-green-600 hover:bg-green-700',
-  'ORDER_BOOKED': 'bg-teal-600 hover:bg-teal-700',
+  'ORDER_BOOKED': 'bg-teal-600 hover:bg-teal-700', // Kept for backwards compatibility
   'WON': 'bg-emerald-600 hover:bg-emerald-700',
   'LOST': 'bg-red-600 hover:bg-red-700',
 }
@@ -617,107 +618,120 @@ export default function OfferActivityPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      {/* Header */}
-      <div className="mb-8">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push(`/admin/offers/${offerId}`)}
-          className="mb-4 hover:bg-gray-100"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Offer
-        </Button>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Activity className="h-8 w-8 text-blue-600" />
-              Activity Timeline
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Complete activity history for offer <span className="font-mono font-semibold text-gray-900">{offerReferenceNumber}</span>
-            </p>
-          </div>
-
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
+      <div className="container mx-auto py-8 px-4">
+        {/* Premium Header */}
+        <div className="mb-8">
           <Button
-            onClick={handleRefresh}
-            variant="outline"
-            disabled={refreshing}
-            className="hover:bg-gray-50"
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/admin/offers/${offerId}`)}
+            className="mb-4 hover:bg-white/80 backdrop-blur-sm"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Offer
           </Button>
+
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                  <Activity className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                    Activity Timeline
+                  </h1>
+                  <p className="text-blue-100 mt-1">
+                    Complete history for <span className="font-mono font-semibold text-white bg-white/20 px-2 py-0.5 rounded">{offerReferenceNumber}</span>
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleRefresh}
+                variant="outline"
+                disabled={refreshing}
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Activities</p>
-                <p className="text-3xl font-bold text-gray-900">{pagination.total}</p>
+        {/* Stats Cards - Premium Design */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all bg-gradient-to-br from-blue-500 to-blue-600 text-white overflow-hidden">
+            <CardContent className="pt-6 relative">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-sm text-blue-100 mb-1">Total Activities</p>
+                  <p className="text-3xl font-bold">{pagination.total}</p>
+                </div>
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <Activity className="h-6 w-6" />
+                </div>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Activity className="h-8 w-8 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Updates</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {activities.filter(a => a.action === 'OFFER_UPDATED').length}
-                </p>
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all bg-gradient-to-br from-green-500 to-emerald-600 text-white overflow-hidden">
+            <CardContent className="pt-6 relative">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-sm text-green-100 mb-1">Updates</p>
+                  <p className="text-3xl font-bold">
+                    {activities.filter(a => a.action === 'OFFER_UPDATED').length}
+                  </p>
+                </div>
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <EditIcon className="h-6 w-6" />
+                </div>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <EditIcon className="h-8 w-8 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Stage Changes</p>
-                <p className="text-2xl font-bold">
-                  {activities.filter(a => 
-                    (a.action === 'OFFER_UPDATED' && a.details?.changes?.stage) || 
-                    (a.action === 'OFFER_STATUS_UPDATED' && a.details?.fromStage && a.details?.toStage)
-                  ).length}
-                </p>
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all bg-gradient-to-br from-purple-500 to-indigo-600 text-white overflow-hidden">
+            <CardContent className="pt-6 relative">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-sm text-purple-100 mb-1">Stage Changes</p>
+                  <p className="text-3xl font-bold">
+                    {activities.filter(a => 
+                      (a.action === 'OFFER_UPDATED' && a.details?.changes?.stage) || 
+                      (a.action === 'OFFER_STATUS_UPDATED' && a.details?.fromStage && a.details?.toStage)
+                    ).length}
+                  </p>
+                </div>
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <TrendingUp className="h-6 w-6" />
+                </div>
               </div>
-              <TrendingUp className="h-8 w-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Contributors</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {new Set(activities.map(a => a.userId).filter(Boolean)).size}
-                </p>
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all bg-gradient-to-br from-amber-500 to-orange-600 text-white overflow-hidden">
+            <CardContent className="pt-6 relative">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-sm text-amber-100 mb-1">Contributors</p>
+                  <p className="text-3xl font-bold">
+                    {new Set(activities.map(a => a.userId).filter(Boolean)).size}
+                  </p>
+                </div>
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <User className="h-6 w-6" />
+                </div>
               </div>
-              <div className="p-3 bg-amber-100 rounded-lg">
-                <User className="h-8 w-8 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
 
       {/* Activity Timeline */}
       <Card className="shadow-lg">
@@ -784,6 +798,7 @@ export default function OfferActivityPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

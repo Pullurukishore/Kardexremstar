@@ -957,8 +957,8 @@ export default function CleanAttendanceWidget({
 
     if (!attendanceData) {
       return (
-        <Button disabled className="w-full h-12 text-sm font-semibold">
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        <Button disabled className="w-full h-12 rounded-xl text-sm font-semibold bg-gray-100 text-gray-400">
+          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
           Loading...
         </Button>
       );
@@ -974,33 +974,34 @@ export default function CleanAttendanceWidget({
         <Button
           onClick={handleCheckOut}
           disabled={actionLoading}
-          className="w-full h-12 bg-red-600 hover:bg-red-700 text-sm font-bold shadow-lg active:scale-95 transition-transform touch-manipulation"
+          className="w-full h-14 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white text-sm font-bold shadow-lg shadow-red-500/30 active:scale-[0.98] transition-all duration-200 touch-manipulation rounded-xl"
         >
           {actionLoading ? (
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
           ) : (
             <LogOut className="w-5 h-5 mr-2" />
           )}
-          {actionLoading ? 'Checking Out...' : '🚪 Check Out'}
+          {actionLoading ? 'Checking Out...' : 'Check Out'}
         </Button>
       );
     } else if (hasAttendanceToday) {
       return (
-        <div className="space-y-2">
-          <div className="text-xs text-blue-600 font-semibold text-center bg-blue-50 py-2 px-3 rounded-lg border border-blue-200">
-            ✅ Checked out today • Tap to resume work
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-2 text-xs text-blue-700 font-semibold bg-gradient-to-r from-blue-50 to-indigo-50 py-2.5 px-4 rounded-xl border border-blue-200">
+            <CheckCircle className="w-4 h-4" />
+            <span>Checked out today • Tap to resume work</span>
           </div>
           <Button
             onClick={handleReCheckIn}
             disabled={actionLoading}
-            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-sm font-bold shadow-lg active:scale-95 transition-transform touch-manipulation"
+            className="w-full h-14 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-sm font-bold shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all duration-200 touch-manipulation rounded-xl"
           >
             {actionLoading ? (
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             ) : (
               <LogIn className="w-5 h-5 mr-2" />
             )}
-            {actionLoading ? 'Re-Checking In...' : '🔄 Re-Check In'}
+            {actionLoading ? 'Re-Checking In...' : 'Re-Check In'}
           </Button>
         </div>
       );
@@ -1009,14 +1010,14 @@ export default function CleanAttendanceWidget({
         <Button
           onClick={handleCheckIn}
           disabled={actionLoading}
-          className="w-full h-12 bg-green-600 hover:bg-green-700 text-sm font-bold shadow-lg active:scale-95 transition-transform touch-manipulation"
+          className="w-full h-14 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-sm font-bold shadow-lg shadow-green-500/30 active:scale-[0.98] transition-all duration-200 touch-manipulation rounded-xl"
         >
           {actionLoading ? (
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
           ) : (
             <LogIn className="w-5 h-5 mr-2" />
           )}
-          {actionLoading ? 'Checking In...' : '✅ Check In'}
+          {actionLoading ? 'Checking In...' : 'Check In'}
         </Button>
       );
     }
@@ -1024,286 +1025,228 @@ export default function CleanAttendanceWidget({
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span className="ml-2">Loading attendance...</span>
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl">
+        {/* Premium Loading State */}
+        <div className="bg-gradient-to-r from-[#3d5a78] via-[#507295] to-[#6889ab] p-4 sm:p-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-white/20 rounded-xl animate-pulse"></div>
+            <div className="space-y-2 flex-1">
+              <div className="h-5 w-32 bg-white/30 rounded-lg animate-pulse"></div>
+              <div className="h-3 w-24 bg-white/20 rounded animate-pulse"></div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="bg-white p-4 sm:p-6">
+          <div className="space-y-3">
+            <div className="h-12 bg-gray-100 rounded-xl animate-pulse"></div>
+            <div className="h-14 bg-gray-100 rounded-xl animate-pulse"></div>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="relative overflow-hidden">
       {/* Early Checkout Confirmation Modal */}
       {showEarlyCheckoutConfirm && earlyCheckoutData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                  <AlertCircle className="h-5 w-5 text-amber-500 mr-2" />
-                  Early Check-out Confirmation
-                </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-4 sm:p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                    <AlertCircle className="h-5 w-5 text-white" />
+                  </div>
+                  <h2 className="text-lg font-bold text-white">Early Check-out</h2>
+                </div>
                 <button
                   onClick={() => handleEarlyCheckoutConfirm(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
+            </div>
+            
+            <div className="p-4 sm:p-5 space-y-4">
+              <p className="text-gray-600 text-sm sm:text-base">
+                {earlyCheckoutData.confirmationData.message}
+              </p>
               
-              <div className="space-y-4">
-                <p className="text-gray-600">
-                  {earlyCheckoutData.confirmationData.message}
-                </p>
-                
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <div className="flex items-center space-x-2 text-sm">
-                    <Clock className="h-4 w-4 text-amber-600" />
-                    <span className="text-amber-800">
-                      Current time: {new Date(earlyCheckoutData.confirmationData.checkoutTime).toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm mt-1">
-                    <Clock className="h-4 w-4 text-amber-600" />
-                    <span className="text-amber-800">
-                      Scheduled end: {new Date(earlyCheckoutData.confirmationData.scheduledTime).toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
-                      })}
-                    </span>
-                  </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <span className="text-amber-800 font-medium">
+                    Current: {new Date(earlyCheckoutData.confirmationData.checkoutTime).toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
+                  </span>
                 </div>
-                
-                <div className="flex space-x-3">
-                  <Button
-                    onClick={() => handleEarlyCheckoutConfirm(false)}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => handleEarlyCheckoutConfirm(true)}
-                    className="flex-1 bg-amber-600 hover:bg-amber-700"
-                    disabled={actionLoading}
-                  >
-                    {actionLoading ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : null}
-                    Confirm Early Check-out
-                  </Button>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <span className="text-amber-800 font-medium">
+                    Scheduled: {new Date(earlyCheckoutData.confirmationData.scheduledTime).toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
+                  </span>
                 </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => handleEarlyCheckoutConfirm(false)}
+                  variant="outline"
+                  className="flex-1 h-12 rounded-xl border-2"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => handleEarlyCheckoutConfirm(true)}
+                  className="flex-1 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 rounded-xl font-bold"
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  Confirm
+                </Button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main Attendance Card - Mobile Optimized */}
-      <Card className="border-0 shadow-none">
-        <CardHeader className="pb-2 px-3 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-base sm:text-lg font-bold text-gray-900 truncate">Attendance</CardTitle>
-              <CardDescription className="text-xs sm:text-sm text-gray-600 truncate">Track your daily work hours</CardDescription>
+      {/* Premium Attendance Card */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl overflow-hidden">
+        {/* Premium Header */}
+        <div className="relative bg-gradient-to-r from-[#3d5a78] via-[#507295] to-[#6889ab] p-4 sm:p-6 overflow-hidden">
+          {/* Background decorations */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+            <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+          </div>
+          
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
+                <Clock className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-white">Attendance</h2>
+                <p className="text-white/70 text-xs sm:text-sm">Track your daily work hours</p>
+              </div>
             </div>
-            <div className="flex-shrink-0 ml-2">
-              {getStatusBadge()}
+            
+            {/* Status Badge */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-full backdrop-blur-sm border ${
+              attendanceData?.isCheckedIn 
+                ? 'bg-green-500/20 border-green-400/50' 
+                : attendanceData?.attendance?.status === 'EARLY_CHECKOUT'
+                ? 'bg-amber-500/20 border-amber-400/50'
+                : 'bg-white/10 border-white/30'
+            }`}>
+              <div className={`w-2.5 h-2.5 rounded-full ${
+                attendanceData?.isCheckedIn 
+                  ? 'bg-green-400 animate-pulse shadow-lg shadow-green-400/50' 
+                  : attendanceData?.attendance?.status === 'EARLY_CHECKOUT'
+                  ? 'bg-amber-400'
+                  : 'bg-white/50'
+              }`}></div>
+              <span className={`text-xs sm:text-sm font-semibold ${
+                attendanceData?.isCheckedIn 
+                  ? 'text-green-100' 
+                  : attendanceData?.attendance?.status === 'EARLY_CHECKOUT'
+                  ? 'text-amber-100'
+                  : 'text-white/80'
+              }`}>
+                {attendanceData?.isCheckedIn 
+                  ? 'Checked In' 
+                  : attendanceData?.attendance?.status === 'EARLY_CHECKOUT'
+                  ? 'Early Out'
+                  : 'Ready to Check In'}
+              </span>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3 px-3 sm:px-6 pb-4">
-          {/* Current Status - Mobile Optimized */}
+          
+          {/* Time Info for Checked-in State */}
           {attendanceData?.attendance && (
-            <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between text-xs sm:text-sm">
-                <span className="text-gray-600 font-medium">Check-in:</span>
-                <span className="font-bold text-green-700">{formatTime(attendanceData.attendance.checkInAt)}</span>
+            <div className="relative z-10 mt-4 pt-4 border-t border-white/20">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-3">
+                  <p className="text-white/60 text-xs font-medium">Check-in</p>
+                  <p className="text-white font-bold text-sm sm:text-base">
+                    {formatTime(attendanceData.attendance.checkInAt)}
+                  </p>
+                </div>
+                {attendanceData.attendance.checkOutAt && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-3">
+                    <p className="text-white/60 text-xs font-medium">Check-out</p>
+                    <p className="text-white font-bold text-sm sm:text-base">
+                      {formatTime(attendanceData.attendance.checkOutAt)}
+                    </p>
+                  </div>
+                )}
+                {attendanceData.attendance.totalHours && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-3">
+                    <p className="text-white/60 text-xs font-medium">Total Hours</p>
+                    <p className="text-white font-bold text-sm sm:text-base">
+                      {formatHours(attendanceData.attendance.totalHours)}h
+                    </p>
+                  </div>
+                )}
               </div>
-              
-              {attendanceData.attendance.checkOutAt && (
-                <div className="flex items-center justify-between text-xs sm:text-sm">
-                  <span className="text-gray-600 font-medium">Check-out:</span>
-                  <span className="font-bold text-red-700">{formatTime(attendanceData.attendance.checkOutAt)}</span>
-                </div>
-              )}
-              
-              {attendanceData.attendance.totalHours && (
-                <div className="flex items-center justify-between text-xs sm:text-sm border-t border-gray-200 pt-2">
-                  <span className="text-gray-600 font-medium">Total Hours:</span>
-                  <span className="font-bold text-blue-700 text-sm">{formatHours(attendanceData.attendance.totalHours)}h</span>
-                </div>
-              )}
+            </div>
+          )}
+        </div>
 
-              {/* Location Capture Status - Mobile Optimized */}
-              {locationState.isCapturing && (
-                <div className="mt-3">
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                    <div className="flex items-center space-x-2">
-                      <Navigation className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
-                      <span className="text-sm font-semibold text-blue-800">Capturing Location...</span>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1">Taking multiple GPS readings for accuracy</p>
-                    <div className="mt-2 flex items-center space-x-2">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                      </div>
-                      <span className="text-xs text-blue-500">Checking GPS consistency</span>
-                    </div>
-                  </div>
+        {/* Content Area */}
+        <div className="p-4 sm:p-6 space-y-4">
+          {/* Location Capture Status */}
+          {locationState.isCapturing && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                  <Navigation className="h-5 w-5 text-white animate-spin" />
                 </div>
-              )}
-
-              {/* Captured Location Display */}
-              {locationState.capturedLocation && !locationState.isCapturing && (
-                <div className="pt-2 border-t border-gray-100">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium text-green-800">Latest Location Captured</span>
-                      </div>
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs px-2 py-0 h-5 ${
-                          locationState.capturedLocation.accuracy > 100 
-                            ? 'bg-red-100 text-red-700 border-red-300' 
-                            : locationState.capturedLocation.accuracy > 50 
-                            ? 'bg-yellow-100 text-yellow-700 border-yellow-300' 
-                            : 'bg-green-100 text-green-700 border-green-300'
-                        }`}
-                      >
-                        ±{Math.round(locationState.capturedLocation.accuracy)}m
-                      </Badge>
-                    </div>
-                    
-                    {/* Timestamp */}
-                    <div className="mb-2">
-                      <p className="text-xs text-green-700">
-                        🕒 {new Date(locationState.capturedLocation.timestamp).toLocaleString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: true,
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </p>
-                    </div>
-                    
-                    {/* GPS Accuracy Warning */}
-                    {locationState.capturedLocation.accuracy > 50 && (
-                      <div className={`mb-2 p-2 rounded text-xs ${
-                        locationState.capturedLocation.accuracy > 100 
-                          ? 'bg-red-50 border border-red-200 text-red-700' 
-                          : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
-                      }`}>
-                        <div className="flex items-center space-x-1">
-                          <AlertCircle className="h-3 w-3" />
-                          <span className="font-medium">
-                            {locationState.capturedLocation.accuracy > 100 
-                              ? 'Poor GPS Signal' 
-                              : 'Fair GPS Signal'
-                            }
-                          </span>
-                        </div>
-                        <p className="mt-1">
-                          {locationState.capturedLocation.accuracy > 100 
-                            ? 'GPS accuracy is poor (±' + Math.round(locationState.capturedLocation.accuracy) + 'm). Please go outdoors with clear sky view.' 
-                            : 'GPS accuracy is fair (±' + Math.round(locationState.capturedLocation.accuracy) + 'm). Consider moving outdoors for better accuracy.'
-                          }
-                        </p>
-                      </div>
-                    )}
-                    
-                    {/* Coordinates Display */}
-                    <div className="space-y-1">
-                      <div className="bg-white bg-opacity-70 rounded px-2 py-1">
-                        <p className="text-xs font-mono text-gray-700">
-                          📍 {locationState.capturedLocation.latitude.toFixed(6)}, {locationState.capturedLocation.longitude.toFixed(6)}
-                        </p>
-                      </div>
-                      <div className="bg-white bg-opacity-70 rounded px-2 py-1">
-                        <p className="text-xs text-gray-700 break-words">
-                          🏠 {locationState.capturedLocation.address}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900 text-sm">Capturing Location...</p>
+                  <p className="text-xs text-gray-600">Taking multiple GPS readings for accuracy</p>
                 </div>
-              )}
-
-              {/* Location Error */}
-              {locationState.error && !locationState.isCapturing && (
-                <div className="pt-2 border-t border-gray-100">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="h-4 w-4 text-red-600" />
-                      <span className="text-sm font-medium text-red-800">Location Error</span>
-                    </div>
-                    <p className="text-xs text-red-600 mt-1">{locationState.error}</p>
-                  </div>
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                 </div>
-              )}
-
-              {/* Stored Location Info - Only show if no fresh location captured */}
-              {!locationState.isCapturing && !locationState.capturedLocation && (
-                <div className="pt-2 border-t border-gray-100">
-                  <div className="space-y-2">
-                    {/* Check-in Location */}
-                    {attendanceData.attendance.checkInAddress && (
-                      <div className="flex items-start space-x-2">
-                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-600">Check-in Location:</p>
-                          <p className="text-xs text-gray-800 break-words">
-                            {attendanceData.attendance.checkInAddress}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Check-out Location */}
-                    {attendanceData.attendance.checkOutAddress && (
-                      <div className="flex items-start space-x-2">
-                        <MapPin className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-blue-600">Check-out Location:</p>
-                          <p className="text-xs text-gray-800 break-words">
-                            {attendanceData.attendance.checkOutAddress}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           )}
 
-          {/* Enhanced Location Capture Dialog - Mobile Optimized */}
+          {/* Enhanced Location Capture Dialog */}
           {enhancedLocationState.showLocationCapture && (
-            <div className="space-y-3 p-3 border border-blue-200 rounded-xl bg-blue-50">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-blue-900 truncate">📍 Location Required</h3>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <MapPin className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">Location Required</h3>
+                    <p className="text-xs text-gray-500">Capture your current location</p>
+                  </div>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setEnhancedLocationState(prev => ({ ...prev, showLocationCapture: false }))}
-                  className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 flex-shrink-0 rounded-full"
+                  className="h-9 w-9 p-0 rounded-full hover:bg-gray-200"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4 text-gray-500" />
                 </Button>
               </div>
               <EnhancedLocationCapture
@@ -1323,51 +1266,107 @@ export default function CleanAttendanceWidget({
             </div>
           )}
 
-          {/* Enhanced Location Status - Mobile Optimized */}
+          {/* Captured Location Status */}
           {enhancedLocationState.capturedLocation && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <span className="text-sm font-bold text-green-800 truncate">✅ Location Ready</span>
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="font-bold text-green-800 text-sm">Location Ready</span>
                 </div>
-                <div className="flex-shrink-0 ml-2">
+                <Badge 
+                  variant="secondary" 
+                  className={`text-xs px-2 py-1 ${
+                    enhancedLocationState.capturedLocation.source === 'manual' 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : 'bg-green-100 text-green-800'
+                  }`}
+                >
                   {enhancedLocationState.capturedLocation.source === 'manual' ? (
-                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 px-2 py-1">
+                    <>
                       <MapPin className="h-3 w-3 mr-1" />
                       Manual
-                    </Badge>
+                    </>
                   ) : (
-                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 px-2 py-1">
+                    <>
                       <Navigation className="h-3 w-3 mr-1" />
                       ±{Math.round(enhancedLocationState.capturedLocation.accuracy)}m
-                    </Badge>
+                    </>
                   )}
-                </div>
+                </Badge>
               </div>
-              <div className="text-xs sm:text-sm text-green-700 break-words">
-                📍 {enhancedLocationState.capturedLocation.address || 
-                 `${enhancedLocationState.capturedLocation.latitude.toFixed(6)}, ${enhancedLocationState.capturedLocation.longitude.toFixed(6)}`}
-              </div>
-              <div className="text-xs text-green-600 mt-1">
-                🕒 {new Date(enhancedLocationState.capturedLocation.timestamp).toLocaleTimeString()}
+              <div className="bg-white/60 rounded-lg p-3 space-y-1">
+                <p className="text-sm text-gray-700 break-words">
+                  📍 {enhancedLocationState.capturedLocation.address || 
+                   `${enhancedLocationState.capturedLocation.latitude.toFixed(6)}, ${enhancedLocationState.capturedLocation.longitude.toFixed(6)}`}
+                </p>
+                <p className="text-xs text-gray-500">
+                  🕒 {new Date(enhancedLocationState.capturedLocation.timestamp).toLocaleTimeString()}
+                </p>
               </div>
             </div>
           )}
 
-          {/* Action Buttons - Mobile Optimized */}
-          <div className="flex gap-2">
+          {/* Location Error */}
+          {locationState.error && !locationState.isCapturing && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-red-800 text-sm">Location Error</p>
+                  <p className="text-xs text-red-600 mt-0.5">{locationState.error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stored Location Info - when no fresh location */}
+          {attendanceData?.attendance && !locationState.isCapturing && !locationState.capturedLocation && !enhancedLocationState.capturedLocation && (
+            <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+              {attendanceData.attendance.checkInAddress && (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <LogIn className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 font-medium">Check-in Location</p>
+                    <p className="text-sm text-gray-800 break-words mt-0.5">
+                      {attendanceData.attendance.checkInAddress}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {attendanceData.attendance.checkOutAddress && (
+                <div className="flex items-start gap-3 pt-3 border-t border-gray-200">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <LogOut className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 font-medium">Check-out Location</p>
+                    <p className="text-sm text-gray-800 break-words mt-0.5">
+                      {attendanceData.attendance.checkOutAddress}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
             <div className="flex-1">
               {renderActionButton()}
             </div>
-            
             <Button
               variant="outline"
               size="default"
               onClick={() => {
                 fetchAttendanceStatus();
                 fetchAttendanceStats();
-                // Only clear error state on refresh, preserve captured location
                 setLocationState(prev => ({
                   ...prev,
                   isCapturing: false,
@@ -1375,14 +1374,14 @@ export default function CleanAttendanceWidget({
                 }));
               }}
               disabled={actionLoading || locationState.isCapturing}
-              className="px-3 py-2 h-10 min-w-[44px] touch-manipulation active:scale-95 transition-transform"
+              className="w-12 h-12 p-0 rounded-xl border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className={`w-5 h-5 text-gray-600 ${actionLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
-
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
+

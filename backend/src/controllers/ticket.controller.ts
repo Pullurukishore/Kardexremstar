@@ -44,18 +44,18 @@ type TicketRequest = Request & {
 const validTransitions = {
   // Initial state - can be assigned or moved to pending
   [TicketStatus.OPEN]: [TicketStatus.ASSIGNED, TicketStatus.CANCELLED, TicketStatus.PENDING],
-  
+
   // Assigned state - can start working on it or schedule onsite visit
   [TicketStatus.ASSIGNED]: [
-    TicketStatus.IN_PROGRESS, 
-    TicketStatus.ONSITE_VISIT, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.IN_PROGRESS,
+    TicketStatus.ONSITE_VISIT,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   // Main working state - multiple possible next steps (IN_PROGRESS replaces IN_PROCESS)
   [TicketStatus.IN_PROGRESS]: [
-    TicketStatus.WAITING_CUSTOMER, 
+    TicketStatus.WAITING_CUSTOMER,
     TicketStatus.ONSITE_VISIT,
     TicketStatus.PO_NEEDED,
     TicketStatus.SPARE_PARTS_NEEDED,
@@ -66,44 +66,44 @@ const validTransitions = {
     TicketStatus.ESCALATED,
     TicketStatus.PENDING
   ],
-  
+
   // Waiting for customer response
   [TicketStatus.WAITING_CUSTOMER]: [
-    TicketStatus.IN_PROGRESS, 
-    TicketStatus.CLOSED_PENDING, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.IN_PROGRESS,
+    TicketStatus.CLOSED_PENDING,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   // Onsite visit flow - comprehensive lifecycle
   [TicketStatus.ONSITE_VISIT]: [
-    TicketStatus.ONSITE_VISIT_PLANNED, 
-    TicketStatus.IN_PROGRESS, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.ONSITE_VISIT_PLANNED,
+    TicketStatus.IN_PROGRESS,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.ONSITE_VISIT_PLANNED]: [
     TicketStatus.ONSITE_VISIT_STARTED,
     TicketStatus.IN_PROGRESS,
     TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.ONSITE_VISIT_STARTED]: [
     TicketStatus.ONSITE_VISIT_REACHED,
     TicketStatus.ONSITE_VISIT_PENDING,
     TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.ONSITE_VISIT_REACHED]: [
     TicketStatus.ONSITE_VISIT_IN_PROGRESS,
     TicketStatus.ONSITE_VISIT_PENDING,
     TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.ONSITE_VISIT_IN_PROGRESS]: [
     TicketStatus.ONSITE_VISIT_RESOLVED,
     TicketStatus.ONSITE_VISIT_PENDING,
@@ -112,116 +112,116 @@ const validTransitions = {
     TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.ONSITE_VISIT_RESOLVED]: [
     TicketStatus.ONSITE_VISIT_COMPLETED,
     TicketStatus.CLOSED_PENDING,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.ONSITE_VISIT_PENDING]: [
     TicketStatus.ONSITE_VISIT_IN_PROGRESS,
     TicketStatus.ONSITE_VISIT_COMPLETED,
     TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.ONSITE_VISIT_COMPLETED]: [
     TicketStatus.CLOSED_PENDING,
     TicketStatus.IN_PROGRESS,
     TicketStatus.PENDING
   ],
-  
+
   // Purchase order flow
   [TicketStatus.PO_NEEDED]: [
     TicketStatus.PO_REACHED,
-    TicketStatus.PO_RECEIVED, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.PO_RECEIVED,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.PO_REACHED]: [
     TicketStatus.PO_RECEIVED,
     TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.PO_RECEIVED]: [
-    TicketStatus.IN_PROGRESS, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.IN_PROGRESS,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   // Spare parts flow
   [TicketStatus.SPARE_PARTS_NEEDED]: [
-    TicketStatus.SPARE_PARTS_BOOKED, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.SPARE_PARTS_BOOKED,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.SPARE_PARTS_BOOKED]: [
-    TicketStatus.SPARE_PARTS_DELIVERED, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.SPARE_PARTS_DELIVERED,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   [TicketStatus.SPARE_PARTS_DELIVERED]: [
-    TicketStatus.IN_PROGRESS, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.IN_PROGRESS,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   // Closing flow
   [TicketStatus.CLOSED_PENDING]: [
-    TicketStatus.CLOSED, 
-    TicketStatus.REOPENED, 
+    TicketStatus.CLOSED,
+    TicketStatus.REOPENED,
     TicketStatus.PENDING
   ],
-  
+
   // Final state - no transitions out except REOPENED
   [TicketStatus.CLOSED]: [
     TicketStatus.REOPENED
   ],
-  
+
   // Cancelled state - can be reopened
   [TicketStatus.CANCELLED]: [
-    TicketStatus.REOPENED, 
+    TicketStatus.REOPENED,
     TicketStatus.PENDING
   ],
-  
+
   // Reopened ticket - goes back to assigned or in process
   [TicketStatus.REOPENED]: [
-    TicketStatus.ASSIGNED, 
-    TicketStatus.IN_PROGRESS, 
-    TicketStatus.CANCELLED, 
+    TicketStatus.ASSIGNED,
+    TicketStatus.IN_PROGRESS,
+    TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   // On hold state - temporarily paused
   [TicketStatus.ON_HOLD]: [
-    TicketStatus.IN_PROGRESS, 
+    TicketStatus.IN_PROGRESS,
     TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   // Escalated state - needs attention
   [TicketStatus.ESCALATED]: [
-    TicketStatus.IN_PROGRESS, 
+    TicketStatus.IN_PROGRESS,
     TicketStatus.CANCELLED,
     TicketStatus.PENDING
   ],
-  
+
   // Resolved state - ready for closing
   [TicketStatus.RESOLVED]: [
-    TicketStatus.CLOSED, 
-    TicketStatus.REOPENED, 
+    TicketStatus.CLOSED,
+    TicketStatus.REOPENED,
     TicketStatus.PENDING
   ],
-  
+
   // Pending state - initial or temporary state
   [TicketStatus.PENDING]: [
-    TicketStatus.OPEN, 
-    TicketStatus.ASSIGNED, 
+    TicketStatus.OPEN,
+    TicketStatus.ASSIGNED,
     TicketStatus.IN_PROGRESS
   ]
 } as Record<TicketStatus, TicketStatus[]>;
@@ -234,10 +234,10 @@ function isValidTransition(currentStatus: TicketStatus, newStatus: TicketStatus)
 // Helper to update time tracking
 function updateTimeTracking(ticket: any) {
   const now = new Date();
-  const timeInStatus = ticket.lastStatusChange 
-    ? Math.floor((now.getTime() - new Date(ticket.lastStatusChange).getTime()) / 60000) 
+  const timeInStatus = ticket.lastStatusChange
+    ? Math.floor((now.getTime() - new Date(ticket.lastStatusChange).getTime()) / 60000)
     : 0;
-  
+
   const totalTimeOpen = ticket.createdAt
     ? Math.floor((now.getTime() - new Date(ticket.createdAt).getTime()) / 60000)
     : 0;
@@ -249,29 +249,29 @@ function updateTimeTracking(ticket: any) {
 async function checkTicketAccess(user: any, ticketId: number) {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
-    select: { 
-      customerId: true, 
-      assignedToId: true, 
-      zoneId: true, 
-      ownerId: true, 
+    select: {
+      customerId: true,
+      assignedToId: true,
+      zoneId: true,
+      ownerId: true,
       subOwnerId: true,
       createdById: true
     }
   });
   if (!ticket) return { allowed: false, error: 'Ticket not found' };
-  
+
   // Admin can access any ticket
   if (user.role === UserRoleEnum.ADMIN) {
     return { allowed: true };
   }
-  
+
   // Expert helpdesk can access tickets assigned to them
   if (user.role === 'EXPERT_HELPDESK') {
     if (ticket.assignedToId === user.id) {
       return { allowed: true };
     }
   }
-  
+
   // Zone user and zone manager can access tickets in their zones (check against zoneIds array)
   if (user.role === UserRoleEnum.ZONE_USER || user.role === UserRoleEnum.ZONE_MANAGER) {
     // If user has zone IDs and ticket has a zone, check if it matches
@@ -285,7 +285,7 @@ async function checkTicketAccess(user: any, ticketId: number) {
       return { allowed: false, error: 'Ticket has no zone assigned' };
     }
   }
-  
+
   // Service person can access assigned tickets, tickets where they are sub-owner, tickets they created, or tickets with their accepted activity schedules
   if (user.role === UserRoleEnum.SERVICE_PERSON) {
     if (ticket.assignedToId === user.id) {
@@ -297,7 +297,7 @@ async function checkTicketAccess(user: any, ticketId: number) {
     if (ticket.createdById === user.id) {
       return { allowed: true };
     }
-    
+
     // Check if service person has an accepted activity schedule for this ticket
     try {
       const hasActivitySchedule = await prisma.activitySchedule.findFirst({
@@ -314,7 +314,7 @@ async function checkTicketAccess(user: any, ticketId: number) {
       // If activity schedule check fails, continue with other checks
     }
   }
-  
+
   // Owner can access their own tickets
   if (ticket.ownerId === user.id || ticket.subOwnerId === user.id) {
     return { allowed: true };
@@ -325,39 +325,39 @@ async function checkTicketAccess(user: any, ticketId: number) {
 // Create a new ticket (Service Coordinator workflow)
 export const createTicket = async (req: TicketRequest, res: Response) => {
   try {
-    const { 
-      title, 
-      description, 
+    const {
+      title,
+      description,
       priority = 'MEDIUM',
       callType,
-      customerId, 
-      assetId, 
+      customerId,
+      assetId,
       contactId,
       zoneId,
       errorDetails,
       proofImages,
       relatedMachineIds
     } = req.body;
-    
+
     const user = req.user as any;
 
     if (!title || !description || !zoneId) {
-      return res.status(400).json({ 
-        error: 'Title, description, and zone are required' 
+      return res.status(400).json({
+        error: 'Title, description, and zone are required'
       });
     }
 
     // Validate callType if provided
     if (callType && !['UNDER_MAINTENANCE_CONTRACT', 'NOT_UNDER_CONTRACT'].includes(callType)) {
-      return res.status(400).json({ 
-        error: 'Invalid call type. Must be UNDER_MAINTENANCE_CONTRACT or NOT_UNDER_CONTRACT' 
+      return res.status(400).json({
+        error: 'Invalid call type. Must be UNDER_MAINTENANCE_CONTRACT or NOT_UNDER_CONTRACT'
       });
     }
 
     // Validate zone access for non-admin users
     if ((user.role === UserRoleEnum.ZONE_USER || user.role === UserRoleEnum.ZONE_MANAGER) && user.zoneIds && !user.zoneIds.includes(zoneId)) {
-      return res.status(403).json({ 
-        error: 'You can only create tickets in your assigned zone' 
+      return res.status(403).json({
+        error: 'You can only create tickets in your assigned zone'
       });
     }
 
@@ -429,14 +429,14 @@ export const createTicket = async (req: TicketRequest, res: Response) => {
     // Send WhatsApp notification for OPEN status
     try {
       const ticketNotificationService = new TicketNotificationService();
-      
+
       // Format phone number to ensure international format
       let customerPhone = ticket.contact?.phone || '';
       if (customerPhone && !customerPhone.startsWith('+')) {
         // Add India country code as default
         customerPhone = '+91' + customerPhone.replace(/[^0-9]/g, '');
       }
-      
+
       await ticketNotificationService.sendTicketOpenedNotification({
         id: ticket.id.toString(),
         title: ticket.title,
@@ -453,9 +453,9 @@ export const createTicket = async (req: TicketRequest, res: Response) => {
 
     return res.status(201).json(ticket);
   } catch (error: any) {
-    return res.status(500).json({ 
-      error: 'Failed to create ticket', 
-      details: error?.message || 'Unknown error occurred' 
+    return res.status(500).json({
+      error: 'Failed to create ticket',
+      details: error?.message || 'Unknown error occurred'
     });
   }
 };
@@ -466,18 +466,19 @@ export const getTickets = async (req: TicketRequest, res: Response) => {
     const { status, priority, page = 1, limit = 20, view, search } = req.query;
     const user = req.user as any;
     const skip = (Number(page) - 1) * Number(limit);
-    
+
     const where: any = {};
-    
+
     // Role-based filtering for non-admin users
     if (user.role !== UserRoleEnum.ADMIN) {
       if (user.role === 'EXPERT_HELPDESK') {
         // Expert helpdesk users only see tickets assigned to themselves
         // This takes precedence over view filters
         where.assignedToId = user.id;
-      } else if ((user.role === UserRoleEnum.ZONE_USER || user.role === UserRoleEnum.ZONE_MANAGER) && user.zoneIds) {
-        // Zone users and zone managers can see tickets in their zones
-        where.zoneId = { in: user.zoneIds };
+      } else if (user.role === UserRoleEnum.ZONE_USER || user.role === UserRoleEnum.ZONE_MANAGER) {
+        // Zone users and zone managers only see tickets assigned to them
+        // They must be the assignedTo user
+        where.assignedToId = user.id;
       } else if (user.role === UserRoleEnum.SERVICE_PERSON) {
         // Service persons can see tickets assigned to them OR created by them
         if (!where.AND) where.AND = [];
@@ -493,11 +494,22 @@ export const getTickets = async (req: TicketRequest, res: Response) => {
       // Admin users can use view filters
       // View-based filtering
       if (view === 'unassigned') {
+        // Unassigned means no assignedTo
         where.assignedToId = null;
       } else if (view === 'assigned-to-zone') {
-        where.owner = {
-          role: UserRoleEnum.ZONE_USER
-        };
+        // Zone Users are now stored in assignedTo
+        where.AND = [
+          {
+            assignedToId: {
+              not: null
+            }
+          },
+          {
+            assignedTo: {
+              role: UserRoleEnum.ZONE_USER
+            }
+          }
+        ];
       } else if (view === 'assigned-to-service-person') {
         where.AND = [
           {
@@ -511,9 +523,36 @@ export const getTickets = async (req: TicketRequest, res: Response) => {
             }
           }
         ];
+      } else if (view === 'assigned-to-zone-manager') {
+        // Zone Managers are now stored in assignedTo
+        where.AND = [
+          {
+            assignedToId: {
+              not: null
+            }
+          },
+          {
+            assignedTo: {
+              role: UserRoleEnum.ZONE_MANAGER
+            }
+          }
+        ];
+      } else if (view === 'assigned-to-expert-helpdesk') {
+        where.AND = [
+          {
+            assignedToId: {
+              not: null
+            }
+          },
+          {
+            assignedTo: {
+              role: 'EXPERT_HELPDESK'
+            }
+          }
+        ];
       }
     }
-    
+
     if (status) where.status = { in: (status as string).split(',') };
     if (priority) where.priority = priority;
     if (search) {
@@ -534,11 +573,11 @@ export const getTickets = async (req: TicketRequest, res: Response) => {
         take: Number(limit),
         orderBy: { createdAt: 'desc' },
         include: {
-          customer: { 
-            select: { 
+          customer: {
+            select: {
               companyName: true,
               address: true
-            } 
+            }
           },
           contact: {
             select: {
@@ -557,13 +596,13 @@ export const getTickets = async (req: TicketRequest, res: Response) => {
               location: true
             }
           },
-          assignedTo: { 
-            select: { 
+          assignedTo: {
+            select: {
               id: true,
               email: true,
               name: true,
               role: true
-            } 
+            }
           },
           subOwner: {
             select: {
@@ -571,6 +610,12 @@ export const getTickets = async (req: TicketRequest, res: Response) => {
               email: true,
               name: true,
               role: true
+            }
+          },
+          zone: {
+            select: {
+              id: true,
+              name: true
             }
           }
         }
@@ -606,15 +651,15 @@ export const getTicket = async (req: TicketRequest, res: Response) => {
     const ticket = await prisma.ticket.findUnique({
       where: { id: Number(id) },
       include: {
-        customer: { 
-          select: { 
+        customer: {
+          select: {
             id: true,
             companyName: true,
             address: true,
             serviceZone: {
               select: { id: true, name: true }
             }
-          } 
+          }
         },
         asset: {
           select: {
@@ -635,13 +680,13 @@ export const getTicket = async (req: TicketRequest, res: Response) => {
             role: true
           }
         },
-        assignedTo: { 
-          select: { 
-            id: true, 
+        assignedTo: {
+          select: {
+            id: true,
             email: true,
             name: true,
             role: true
-          } 
+          }
         },
         owner: {
           select: {
@@ -833,7 +878,7 @@ export const updateStatus = async (req: Request, res: Response) => {
     // Handle photo data for onsite visit statuses - now store permanently in local storage
     let photoInfo = '';
     let storedPhotos: any[] = [];
-    
+
     if (photos && photos.photos && photos.photos.length > 0) {
       try {
         // Store photos permanently in local storage
@@ -848,23 +893,23 @@ export const updateStatus = async (req: Request, res: Response) => {
 
         const photoCount = storedPhotos.length;
         const totalSize = storedPhotos.reduce((sum: number, photo: any) => sum + photo.size, 0);
-        const formattedSize = totalSize > 1024 * 1024 
+        const formattedSize = totalSize > 1024 * 1024
           ? `${(totalSize / (1024 * 1024)).toFixed(1)}MB`
           : `${Math.round(totalSize / 1024)}KB`;
-        
+
         // Store photo info in notes but NOT the URLs (to avoid duplication)
         // Photos will be fetched via the /photos API endpoint
         photoInfo = `\n\n📸 Photos: ${photoCount} verification photo${photoCount > 1 ? 's' : ''} stored permanently (${formattedSize})\n🕒 Photo Time: ${new Date().toLocaleString()}`;
-        
+
         // Log photo storage for audit trail
       } catch (error) {
         // Fallback to metadata-only approach
         const photoCount = photos.photos.length;
         const totalSize = photos.photos.reduce((sum: number, photo: any) => sum + photo.size, 0);
-        const formattedSize = totalSize > 1024 * 1024 
+        const formattedSize = totalSize > 1024 * 1024
           ? `${(totalSize / (1024 * 1024)).toFixed(1)}MB`
           : `${Math.round(totalSize / 1024)}KB`;
-        
+
         photoInfo = `\n\n📸 Photos: ${photoCount} verification photo${photoCount > 1 ? 's' : ''} captured (${formattedSize}) - Storage failed, metadata only\n🕒 Photo Time: ${new Date().toLocaleString()}`;
       }
     }
@@ -881,7 +926,7 @@ export const updateStatus = async (req: Request, res: Response) => {
       // For manual locations, preserve the user's original input
       // For GPS locations, geocode to get full address
       let resolvedAddress = location.address || 'Unknown';
-      
+
       if (location.source === 'manual' && location.address) {
         // Manual address - preserve as-is
         resolvedAddress = location.address;
@@ -909,7 +954,7 @@ export const updateStatus = async (req: Request, res: Response) => {
     // Insert a new record into TicketStatusHistory with location data
     // Only save location if it's manual or has good accuracy (≤100m)
     const shouldSaveLocation = location && (
-      location.source === 'manual' || 
+      location.source === 'manual' ||
       (location.accuracy && location.accuracy <= 100)
     );
 
@@ -962,7 +1007,7 @@ export const updateStatus = async (req: Request, res: Response) => {
     try {
       if (status === 'OPEN' || status === 'CLOSED_PENDING') {
         const ticketNotificationService = new TicketNotificationService();
-        
+
         // Fetch complete ticket data for notification
         const ticketForNotification = await prisma.ticket.findUnique({
           where: { id: Number(id) },
@@ -1023,11 +1068,11 @@ export const updateStatus = async (req: Request, res: Response) => {
 export const getTicketComments = async (req: TicketRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id) {
       return res.status(400).json({ message: 'Ticket ID is required' });
     }
-    
+
     const ticketId = parseInt(id);
 
     if (isNaN(ticketId)) {
@@ -1094,11 +1139,11 @@ export const addTicketComment = async (req: TicketRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { content } = req.body;
-    
+
     if (!id) {
       return res.status(400).json({ message: 'Ticket ID is required' });
     }
-    
+
     const ticketId = parseInt(id);
 
     if (isNaN(ticketId)) {
@@ -1189,7 +1234,7 @@ export const assignTicket = async (req: TicketRequest, res: Response) => {
 
     // Check if the assigned user exists and is either a service person or expert helpdesk
     const assignedUser = await prisma.user.findUnique({
-      where: { 
+      where: {
         id: Number(assignedToId),
       },
     });
@@ -1212,6 +1257,10 @@ export const assignTicket = async (req: TicketRequest, res: Response) => {
         ...(subOwnerId && { subOwnerId: Number(subOwnerId) }),
         status: TicketStatus.ASSIGNED,
         lastStatusChange: new Date(),
+        // Set assignment status to PENDING so assigned user can accept/reject
+        assignmentStatus: 'PENDING',
+        assignmentRespondedAt: null,
+        assignmentNotes: null,
       },
       include: {
         assignedTo: {
@@ -1253,7 +1302,7 @@ export const assignTicket = async (req: TicketRequest, res: Response) => {
     // Send WhatsApp notification to assigned service person
     try {
       const ticketNotificationService = new TicketNotificationService();
-      
+
       // Get customer details for the notification
       const customerDetails = await prisma.customer.findUnique({
         where: { id: updatedTicket.customerId },
@@ -1392,7 +1441,7 @@ export const assignToZoneUser = async (req: TicketRequest, res: Response) => {
 
     // Verify zone user exists (can be either ZONE_USER or ZONE_MANAGER)
     const zoneUser = await prisma.user.findUnique({
-      where: { 
+      where: {
         id: Number(zoneUserId),
       },
     });
@@ -1416,13 +1465,17 @@ export const assignToZoneUser = async (req: TicketRequest, res: Response) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    // Update only the subOwnerId and lastStatusChange, explicitly setting status to its current value
+    // Update assignedToId (same as other roles for consistency)
     const updatedTicket = await prisma.ticket.update({
       where: { id: Number(ticketId) },
       data: {
-        subOwnerId: Number(zoneUserId),
+        assignedToId: Number(zoneUserId),
         status: currentTicket.status, // Explicitly set to current status
         lastStatusChange: new Date(),
+        // Set assignment status to PENDING so assigned user can accept/reject
+        assignmentStatus: 'PENDING',
+        assignmentRespondedAt: null,
+        assignmentNotes: null,
       },
       include: {
         assignedTo: {
@@ -1444,13 +1497,13 @@ export const assignToZoneUser = async (req: TicketRequest, res: Response) => {
       },
     });
 
-      // Create status history entry for the assignment
+    // Create status history entry for the assignment
     await prisma.ticketStatusHistory.create({
       data: {
         ticketId: updatedTicket.id,
         status: currentTicket.status,
         changedById: user.id,
-        notes: `Assigned to zone user: ${updatedTicket.subOwner?.name || 'zone user'}`,
+        notes: `Assigned to zone user: ${updatedTicket.assignedTo?.name || 'zone user'}`,
         timeInStatus: null,
         totalTimeOpen: null
       }
@@ -1466,7 +1519,7 @@ export const assignToZoneUser = async (req: TicketRequest, res: Response) => {
     // Send WhatsApp notification to assigned zone user
     try {
       const ticketNotificationService = new TicketNotificationService();
-      
+
       // Get customer details for the notification
       const customerDetails = await prisma.customer.findUnique({
         where: { id: updatedTicket.customerId },
@@ -1525,7 +1578,7 @@ export const completeOnsiteVisit = async (req: TicketRequest, res: Response) => 
     }
 
     let newStatus: TicketStatus;
-    
+
     if (isResolved) {
       newStatus = TicketStatus.RESOLVED;
     } else if (sparePartsNeeded) {
@@ -1725,7 +1778,7 @@ export const updateSparePartsStatus = async (req: TicketRequest, res: Response) 
     }
 
     let newTicketStatus: TicketStatus;
-    
+
     switch (sparePartsStatus) {
       case 'BOOKED':
         newTicketStatus = TicketStatus.SPARE_PARTS_BOOKED;
@@ -1843,8 +1896,8 @@ export const getTicketActivity = async (req: TicketRequest, res: Response) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Get ticket status history and notes as activities
-    const [statusHistory, notes] = await Promise.all([
+    // Get ticket status history, notes, and scheduled activities
+    const [statusHistory, notes, scheduledActivities] = await Promise.all([
       prisma.ticketStatusHistory.findMany({
         where: { ticketId },
         orderBy: { changedAt: 'desc' },
@@ -1881,13 +1934,36 @@ export const getTicketActivity = async (req: TicketRequest, res: Response) => {
             }
           }
         }
+      }),
+      // Fetch scheduled activities for this ticket
+      prisma.activitySchedule.findMany({
+        where: { ticketId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          servicePerson: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true
+            }
+          },
+          scheduledBy: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true
+            }
+          }
+        }
       })
     ]);
 
     // Define activity type
     type Activity = {
       id: string;
-      type: 'STATUS_CHANGE' | 'NOTE';
+      type: 'STATUS_CHANGE' | 'NOTE' | 'SCHEDULED';
       description: string;
       data: Record<string, any>;
       user: { id: number; email: string; name: string | null; role: string };
@@ -1900,11 +1976,11 @@ export const getTicketActivity = async (req: TicketRequest, res: Response) => {
       ...statusHistory.map((history: any) => ({
         id: `status_${history.id}`,
         type: 'STATUS_CHANGE' as const,
-        description: history.notes && history.notes.includes('assigned to') || history.notes && history.notes.includes('Assigned to') 
-          ? history.notes 
+        description: history.notes && history.notes.includes('assigned to') || history.notes && history.notes.includes('Assigned to')
+          ? history.notes
           : `changed status to ${history.status}`,
-        data: { 
-          status: history.status, 
+        data: {
+          status: history.status,
           notes: history.notes,
           location: history.location,
           latitude: history.latitude,
@@ -1930,6 +2006,37 @@ export const getTicketActivity = async (req: TicketRequest, res: Response) => {
         },
         createdAt: note.createdAt,
         updatedAt: note.updatedAt
+      })),
+      // Add scheduled activities to timeline
+      ...scheduledActivities.map((schedule: any) => ({
+        id: `schedule_${schedule.id}`,
+        type: 'SCHEDULED' as const,
+        description: `Scheduled ${schedule.activityType.toLowerCase().replace(/_/g, ' ')} to ${schedule.servicePerson.name || schedule.servicePerson.email.split('@')[0]}`,
+        data: {
+          activityType: schedule.activityType,
+          scheduledDate: schedule.scheduledDate,
+          status: schedule.status,
+          priority: schedule.priority,
+          estimatedDuration: schedule.estimatedDuration,
+          location: schedule.location,
+          notes: schedule.notes,
+          servicePerson: {
+            id: schedule.servicePerson.id,
+            name: schedule.servicePerson.name || schedule.servicePerson.email.split('@')[0],
+            email: schedule.servicePerson.email,
+            role: schedule.servicePerson.role
+          },
+          acceptedAt: schedule.acceptedAt,
+          rejectedAt: schedule.rejectedAt,
+          rejectionReason: schedule.rejectionReason,
+          completedAt: schedule.completedAt
+        },
+        user: {
+          ...schedule.scheduledBy,
+          name: schedule.scheduledBy.name || schedule.scheduledBy.email.split('@')[0]
+        },
+        createdAt: schedule.createdAt,
+        updatedAt: schedule.updatedAt
       }))
     ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
@@ -1982,32 +2089,32 @@ export const uploadTicketReports = async (req: TicketRequest, res: Response) => 
   try {
     const { id: ticketId } = req.params;
     const user = req.user as AuthUser;
-    
+
     if (!user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    
+
     // Check if ticket exists and user has access
     const ticket = await prisma.ticket.findUnique({
       where: { id: Number(ticketId) },
     });
-    
+
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
-    
+
     const hasAccess = await checkTicketAccess(user, Number(ticketId));
     if (!hasAccess.allowed) {
       return res.status(403).json({ error: hasAccess.error });
     }
-    
+
     if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
-    
+
     const files = req.files as Express.Multer.File[];
     const uploadedReports = [];
-    
+
     for (const file of files) {
       // Create report record in database
       const report = await prisma.ticketReport.create({
@@ -2029,7 +2136,7 @@ export const uploadTicketReports = async (req: TicketRequest, res: Response) => 
           },
         },
       });
-      
+
       uploadedReports.push({
         id: report.id,
         fileName: report.fileName,
@@ -2039,7 +2146,7 @@ export const uploadTicketReports = async (req: TicketRequest, res: Response) => 
         uploadedAt: report.createdAt,
         url: `${process.env.BACKEND_URL || 'http://localhost:5003'}/api/tickets/${ticketId}/reports/${report.id}/download`,
       });
-      
+
       // Create audit log for report upload
       await prisma.auditLog.create({
         data: {
@@ -2059,7 +2166,7 @@ export const uploadTicketReports = async (req: TicketRequest, res: Response) => 
         },
       });
     }
-    
+
     res.status(201).json(uploadedReports);
   } catch (error) {
     res.status(500).json({ error: 'Failed to upload reports' });
@@ -2071,25 +2178,25 @@ export const getTicketReports = async (req: TicketRequest, res: Response) => {
   try {
     const { id: ticketId } = req.params;
     const user = req.user as AuthUser;
-    
+
     if (!user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    
+
     // Check if ticket exists and user has access
     const ticket = await prisma.ticket.findUnique({
       where: { id: Number(ticketId) },
     });
-    
+
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
-    
+
     const hasAccess = await checkTicketAccess(user, Number(ticketId));
     if (!hasAccess.allowed) {
       return res.status(403).json({ error: hasAccess.error });
     }
-    
+
     const reports = await prisma.ticketReport.findMany({
       where: { ticketId: Number(ticketId) },
       orderBy: { createdAt: 'desc' },
@@ -2103,7 +2210,7 @@ export const getTicketReports = async (req: TicketRequest, res: Response) => {
         },
       },
     });
-    
+
     const formattedReports = reports.map((report: any) => ({
       id: report.id,
       fileName: report.fileName,
@@ -2113,7 +2220,7 @@ export const getTicketReports = async (req: TicketRequest, res: Response) => {
       uploadedAt: report.createdAt,
       url: `${process.env.BACKEND_URL || 'http://localhost:5003'}/api/tickets/${ticketId}/reports/${report.id}/download`,
     }));
-    
+
     res.json(formattedReports);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch reports' });
@@ -2128,21 +2235,21 @@ export const downloadTicketReport = async (req: TicketRequest, res: Response) =>
     if (!user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    
+
     // Check if ticket exists and user has access
     const ticket = await prisma.ticket.findUnique({
       where: { id: Number(ticketId) },
-      select: { 
+      select: {
         id: true,
-        customerId: true, 
-        assignedToId: true, 
-        zoneId: true, 
-        ownerId: true, 
+        customerId: true,
+        assignedToId: true,
+        zoneId: true,
+        ownerId: true,
         subOwnerId: true,
         createdById: true
       }
     });
-    
+
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
@@ -2150,48 +2257,48 @@ export const downloadTicketReport = async (req: TicketRequest, res: Response) =>
     if (!hasAccess.allowed) {
       return res.status(403).json({ error: hasAccess.error });
     }
-    
+
     const report = await prisma.ticketReport.findUnique({
       where: { id: Number(reportId) },
     });
-    
+
     if (!report) {
       return res.status(404).json({ error: 'Report not found' });
     }
-    
+
     if (report.ticketId !== Number(ticketId)) {
       return res.status(403).json({ error: 'Report does not belong to this ticket' });
     }
-    
+
     const fs = require('fs');
     const path = require('path');
-    
+
     if (!fs.existsSync(report.filePath)) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'File not found on server',
         details: 'The uploaded file has been removed or is no longer available. Please contact support if you need this file.'
       });
     }
-    
+
     res.download(report.filePath, report.fileName);
   } catch (error) {
     // Handle specific file system errors
     if (error && typeof error === 'object' && 'code' in error) {
       const errorCode = (error as any).code;
       if (errorCode === 'ENOENT') {
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: 'File not found on server',
           details: 'The requested file could not be found. It may have been deleted or moved.'
         });
       } else if (errorCode === 'EACCES') {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Permission denied',
           details: 'Unable to access the requested file due to permission restrictions.'
         });
       }
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Failed to download report',
       details: error instanceof Error ? error.message : 'Unknown error occurred'
     });
@@ -2203,53 +2310,53 @@ export const deleteTicketReport = async (req: TicketRequest, res: Response) => {
   try {
     const { id: ticketId, reportId } = req.params;
     const user = req.user as AuthUser;
-    
+
     if (!user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    
+
     // Check if ticket exists and user has access
     const ticket = await prisma.ticket.findUnique({
       where: { id: Number(ticketId) },
     });
-    
+
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
-    
+
     const hasAccess = await checkTicketAccess(user, Number(ticketId));
     if (!hasAccess.allowed) {
       return res.status(403).json({ error: hasAccess.error });
     }
-    
+
     const report = await prisma.ticketReport.findUnique({
       where: { id: Number(reportId) },
     });
-    
+
     if (!report) {
       return res.status(404).json({ error: 'Report not found' });
     }
-    
+
     if (report.ticketId !== Number(ticketId)) {
       return res.status(403).json({ error: 'Report does not belong to this ticket' });
     }
-    
+
     // Only allow deletion by the uploader or admin
     if (report.uploadedById !== user.id && user.role !== UserRoleEnum.ADMIN) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
+
     // Delete file from filesystem
     const fs = require('fs');
     if (fs.existsSync(report.filePath)) {
       fs.unlinkSync(report.filePath);
     }
-    
+
     // Delete record from database
     await prisma.ticketReport.delete({
       where: { id: Number(reportId) },
     });
-    
+
     res.json({ success: true, message: 'Report deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete report' });
@@ -2743,8 +2850,8 @@ export const updateStatusWithLifecycle = async (req: Request, res: Response) => 
 
     // Validate status transition
     if (!isValidTransition(currentTicket.status as TicketStatus, status)) {
-      return res.status(400).json({ 
-        error: `Invalid status transition from ${currentTicket.status} to ${status}` 
+      return res.status(400).json({
+        error: `Invalid status transition from ${currentTicket.status} to ${status}`
       });
     }
 
@@ -2870,26 +2977,158 @@ export const updateStatusWithLifecycle = async (req: Request, res: Response) => 
 export const getTicketPhotos = async (req: TicketRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Ticket ID is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Ticket ID is required'
       });
     }
 
     // Get photos from local storage service
     const photos = await LocalPhotoStorageService.getTicketPhotos(Number(id));
-    
+
     return res.json({
       success: true,
       photos: photos
     });
 
   } catch (error) {
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch photos' 
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch photos'
     });
+  }
+};
+
+// Respond to ticket assignment (accept or reject)
+export const respondToAssignment = async (req: TicketRequest, res: Response) => {
+  try {
+    const { id: ticketId } = req.params;
+    const { action, notes } = req.body; // action: 'ACCEPT' | 'REJECT'
+    const user = req.user as AuthUser;
+
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (!action || !['ACCEPT', 'REJECT'].includes(action)) {
+      return res.status(400).json({ error: 'Action must be ACCEPT or REJECT' });
+    }
+
+    // Get the ticket
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: Number(ticketId) },
+      include: {
+        assignedTo: {
+          select: { id: true, name: true, email: true, role: true }
+        },
+        owner: {
+          select: { id: true, name: true, email: true }
+        }
+      }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    // Verify the user is the assigned user
+    if (ticket.assignedToId !== user.id) {
+      return res.status(403).json({ error: 'You are not assigned to this ticket' });
+    }
+
+    // Check if already responded
+    if (ticket.assignmentStatus !== 'PENDING') {
+      return res.status(400).json({ error: `Assignment already ${ticket.assignmentStatus?.toLowerCase()}` });
+    }
+
+    // Update the ticket
+    const newAssignmentStatus = action === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED';
+
+    const updatedTicket = await prisma.ticket.update({
+      where: { id: Number(ticketId) },
+      data: {
+        assignmentStatus: newAssignmentStatus,
+        assignmentRespondedAt: new Date(),
+        assignmentNotes: notes || null,
+        // If rejected, clear the assignment
+        ...(action === 'REJECT' && {
+          assignedToId: null,
+          status: 'OPEN' // Reset to OPEN so admin can reassign
+        }),
+      },
+      include: {
+        assignedTo: {
+          select: { id: true, name: true, email: true, role: true }
+        },
+        customer: {
+          select: { id: true, companyName: true }
+        },
+        zone: {
+          select: { id: true, name: true }
+        }
+      }
+    });
+
+    // Create status history entry
+    await prisma.ticketStatusHistory.create({
+      data: {
+        ticketId: updatedTicket.id,
+        status: updatedTicket.status,
+        changedById: user.id,
+        notes: action === 'ACCEPT'
+          ? `${user.name || user.email} accepted the assignment`
+          : `${user.name || user.email} rejected the assignment${notes ? ': ' + notes : ''}`,
+      }
+    });
+
+    // Create notification for the ticket owner (admin who assigned)
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: ticket.ownerId,
+          title: action === 'ACCEPT' ? 'Assignment Accepted' : 'Assignment Rejected',
+          message: action === 'ACCEPT'
+            ? `${user.name || user.email} accepted the assignment for ticket #${ticket.id}`
+            : `${user.name || user.email} rejected the assignment for ticket #${ticket.id}${notes ? '. Reason: ' + notes : ''}`,
+          type: 'TICKET_UPDATED',
+          data: {
+            ticketId: ticket.id,
+            action: action,
+            respondedBy: user.id,
+            respondedByName: user.name || user.email,
+            notes: notes
+          }
+        }
+      });
+    } catch (notificationError) {
+      // Don't fail if notification fails
+      console.error('Failed to create notification:', notificationError);
+    }
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        action: action === 'ACCEPT' ? 'ASSIGNMENT_ACCEPTED' : 'ASSIGNMENT_REJECTED',
+        entityType: 'TICKET',
+        entityId: Number(ticketId),
+        userId: user.id,
+        details: action === 'ACCEPT'
+          ? `Accepted assignment for ticket #${ticketId}`
+          : `Rejected assignment for ticket #${ticketId}${notes ? ': ' + notes : ''}`,
+        updatedAt: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      message: action === 'ACCEPT' ? 'Assignment accepted' : 'Assignment rejected',
+      ticket: updatedTicket
+    });
+
+  } catch (error) {
+    console.error('Error responding to assignment:', error);
+    res.status(500).json({ error: 'Failed to respond to assignment' });
   }
 };

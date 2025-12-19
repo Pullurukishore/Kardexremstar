@@ -160,9 +160,7 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
       'INITIAL': 'text-blue-600 bg-blue-50',
       'PROPOSAL_SENT': 'text-indigo-600 bg-indigo-50',
       'NEGOTIATION': 'text-purple-600 bg-purple-50',
-      'FINAL_APPROVAL': 'text-amber-600 bg-amber-50',
       'PO_RECEIVED': 'text-cyan-600 bg-cyan-50',
-      'ORDER_BOOKED': 'text-teal-600 bg-teal-50',
       'WON': 'text-green-600 bg-green-50',
       'LOST': 'text-red-600 bg-red-50',
     }

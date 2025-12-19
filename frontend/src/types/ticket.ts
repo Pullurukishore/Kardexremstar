@@ -102,6 +102,12 @@ export interface Ticket {
   poApprovedAt?: string;
   feedback?: string;
   rating?: number;
+  // Assignment fields
+  assignedToId?: number;
+  assignmentStatus?: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  assignmentRespondedAt?: string;
+  assignmentNotes?: string;
+  // Relations
   customer: Customer;
   createdBy: User;
   owner: User;

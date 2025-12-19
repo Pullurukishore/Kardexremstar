@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select'
 import { 
   ArrowLeft, 
-  Edit, 
+  Pencil as Edit, 
   CheckCircle, 
   Clock, 
   FileText, 
@@ -42,19 +42,18 @@ import {
   Loader2,
   Wrench,
   IndianRupee,
-  ImageIcon
+  Image as ImageIcon
 } from 'lucide-react'
 import { apiService } from '@/services/api'
 import { toast } from 'sonner'
 
 // Main progression stages (excludes LOST as it's a separate outcome)
+// Note: PO_RECEIVED leads directly to WON (ORDER_BOOKED stage removed)
 const STAGES = [
   { key: 'INITIAL', label: 'Initial', icon: FileText },
   { key: 'PROPOSAL_SENT', label: 'Proposal Sent', icon: FileText },
   { key: 'NEGOTIATION', label: 'Negotiation', icon: TrendingUp },
-  { key: 'FINAL_APPROVAL', label: 'Final Approval', icon: CheckCircle },
   { key: 'PO_RECEIVED', label: 'PO Received', icon: Package },
-  { key: 'ORDER_BOOKED', label: 'Order Booked', icon: CheckCircle },
   { key: 'WON', label: 'Won', icon: CheckCircle }
 ]
 
@@ -84,22 +83,10 @@ const STAGE_INFO: Record<string, { description: string; color: string; icon: str
     icon: '💬',
     requiresAllFields: true
   },
-  'FINAL_APPROVAL': {
-    description: 'Awaiting final sign-off - Document decision makers, approval timeline, and any final conditions or commitments',
-    color: 'purple',
-    icon: '✅',
-    requiresAllFields: true
-  },
   'PO_RECEIVED': {
-    description: 'Purchase Order received - Capture PO details including PO number, date, and value for order processing',
+    description: 'Purchase Order received - Capture PO details and complete the order. PO received means WON!',
     color: 'green',
     icon: '📄',
-    requiresAllFields: true
-  },
-  'ORDER_BOOKED': {
-    description: 'Order booked in SAP system - Capture booking date and finalize order processing',
-    color: 'teal',
-    icon: '📦',
     requiresAllFields: true
   },
   'WON': {
@@ -220,8 +207,8 @@ export default function OfferDetailPage() {
         }
       }
 
-      // PO_RECEIVED stage specific validations (skip for LOST)
-      if ((updateData.stage === 'PO_RECEIVED' || updateData.stage === 'ORDER_BOOKED' || updateData.stage === 'WON')) {
+      // PO_RECEIVED stage specific validations (PO_RECEIVED = deal won!)
+      if ((updateData.stage === 'PO_RECEIVED' || updateData.stage === 'WON')) {
         if (!updateData.poNumber || !updateData.poNumber.trim()) {
           toast.error('PO Number is required for this stage')
           return
@@ -236,14 +223,6 @@ export default function OfferDetailPage() {
         }
         if (parseFloat(updateData.poValue) <= 0) {
           toast.error('PO Value must be greater than zero')
-          return
-        }
-      }
-
-      // ORDER_BOOKED stage specific validations (skip for LOST)
-      if ((updateData.stage === 'ORDER_BOOKED' || updateData.stage === 'WON')) {
-        if (!updateData.bookingDateInSap) {
-          toast.error('Booking Date in SAP is required for this stage')
           return
         }
       }
@@ -366,7 +345,7 @@ export default function OfferDetailPage() {
             <div>
               <CardTitle className="text-2xl font-bold text-white mb-2">Offer Progress Journey</CardTitle>
               <CardDescription className="text-blue-100">
-                Track your offer through each milestone - WON or LOST outcomes after Final Approval
+                Track your offer through each milestone - WON or LOST outcomes after Negotiation
               </CardDescription>
             </div>
             <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full border border-white/30">
@@ -795,7 +774,14 @@ export default function OfferDetailPage() {
                     </div>
                     <dt className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Machine Serial Number</dt>
                   </div>
-                  <dd className="text-base font-bold text-gray-900">{offer.machineSerialNumber || '-'}</dd>
+                  <dd className="text-base font-bold text-gray-900">
+                    {offer.machineSerialNumber || 
+                      (offer.offerAssets && offer.offerAssets.length > 0 
+                        ? offer.offerAssets.map((oa: any) => oa.asset?.serialNo || oa.asset?.machineId).filter(Boolean).join(', ')
+                        : '-'
+                      )
+                    }
+                  </dd>
                 </div>
                 {offer.title && (
                   <div className="md:col-span-2 bg-white rounded-xl p-5 shadow-md border border-purple-100 hover:shadow-lg transition-shadow">
@@ -811,6 +797,78 @@ export default function OfferDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Linked Assets Section */}
+          {offer.offerAssets && offer.offerAssets.length > 0 && (
+            <Card className="shadow-xl overflow-hidden border-0">
+              <CardHeader className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-b-0">
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <Wrench className="h-6 w-6" />
+                  Linked Assets
+                  <Badge className="bg-white/20 text-white border-white/30 ml-2">
+                    {offer.offerAssets.length} {offer.offerAssets.length === 1 ? 'Asset' : 'Assets'}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 bg-gradient-to-br from-gray-50 to-white">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {offer.offerAssets.map((offerAsset: any, index: number) => {
+                    const asset = offerAsset.asset;
+                    return (
+                      <div 
+                        key={offerAsset.id || index}
+                        className="bg-white rounded-xl p-5 shadow-md border border-cyan-100 hover:shadow-lg transition-all hover:border-cyan-300"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg shadow-sm">
+                              <Wrench className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-gray-900">{asset?.machineId || 'Unknown Machine'}</h4>
+                              <p className="text-xs text-gray-500">Machine ID</p>
+                            </div>
+                          </div>
+                          {asset?.status && (
+                            <Badge 
+                              className={`text-xs ${
+                                asset.status === 'ACTIVE' 
+                                  ? 'bg-green-100 text-green-700 border-green-300' 
+                                  : 'bg-gray-100 text-gray-700 border-gray-300'
+                              }`}
+                            >
+                              {asset.status}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 mt-4">
+                          {asset?.serialNo && (
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-xs text-gray-500 font-medium mb-1">Serial Number</p>
+                              <p className="text-sm font-semibold text-gray-900">{asset.serialNo}</p>
+                            </div>
+                          )}
+                          {asset?.model && (
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-xs text-gray-500 font-medium mb-1">Model</p>
+                              <p className="text-sm font-semibold text-gray-900">{asset.model}</p>
+                            </div>
+                          )}
+                          {asset?.location && (
+                            <div className="bg-gray-50 rounded-lg p-3 col-span-2">
+                              <p className="text-xs text-gray-500 font-medium mb-1">Location</p>
+                              <p className="text-sm font-semibold text-gray-900">{asset.location}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Spare Parts - Show for SPP or if parts exist */}
           {(offer.productType === 'SPP' || (offer.offerSpareParts && offer.offerSpareParts.length > 0)) && (
@@ -1428,8 +1486,8 @@ export default function OfferDetailPage() {
               </div>
             </div>
             
-            {/* PO Details Section - For PO_RECEIVED, ORDER_BOOKED, WON stages */}
-            {(updateData.stage === 'PO_RECEIVED' || updateData.stage === 'ORDER_BOOKED' || updateData.stage === 'WON') && (
+            {/* PO Details Section - For PO_RECEIVED and WON stages */}
+            {(updateData.stage === 'PO_RECEIVED' || updateData.stage === 'WON') && (
               <div className="space-y-4 pt-4 border-t">
                 <div className="flex items-center gap-2 mb-2">
                   <Package className="h-5 w-5 text-green-600" />
@@ -1477,29 +1535,7 @@ export default function OfferDetailPage() {
               </div>
             )}
             
-            {/* Order Booking Details Section - For ORDER_BOOKED and WON stages */}
-            {(updateData.stage === 'ORDER_BOOKED' || updateData.stage === 'WON') && (
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-5 w-5 text-teal-600" />
-                  <h3 className="font-semibold text-gray-900">Order Booking Details</h3>
-                </div>
-                
-                {/* Booking Date in SAP */}
-                <div className="space-y-2">
-                  <Label className="text-red-600">Booking Date in SAP *</Label>
-                  <Input 
-                    type="date"
-                    value={updateData.bookingDateInSap}
-                    onChange={(e) => setUpdateData(prev => ({ ...prev, bookingDateInSap: e.target.value }))}
-                    className={!updateData.bookingDateInSap ? 'border-red-300' : ''}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Date when the order was booked in SAP system
-                  </p>
-                </div>
-              </div>
-            )}
+
             
             {/* Loss Reason Section - For LOST stage */}
             {updateData.stage === 'LOST' && (
@@ -1511,7 +1547,7 @@ export default function OfferDetailPage() {
                       ❌ Reason for Loss *
                     </Label>
                     <p className="text-xs text-red-600 mt-1">
-                      This deal can be marked as LOST from any stage (Proposal Sent, Negotiation, Final Approval) if PO is not received
+                      This deal can be marked as LOST from any stage (Proposal Sent, Negotiation) if PO is not received
                     </p>
                   </div>
                 </div>
@@ -1528,7 +1564,7 @@ export default function OfferDetailPage() {
               </div>
             )}
             
-            {/* Remarks/Notes Section - Especially for Negotiation and Final Approval */}
+            {/* Remarks/Notes Section - Especially for Negotiation */}
             {(updateData.stage === 'NEGOTIATION' || updateData.stage === 'FINAL_APPROVAL' || updateData.stage === 'PROPOSAL_SENT') && (
               <div className="space-y-3 pt-4 border-t-2 border-indigo-100">
                 {/* Show previous stage remarks if any */}

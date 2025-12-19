@@ -12,10 +12,10 @@ export const dynamic = 'force-dynamic';
 
 export default function ActivitySchedulingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50/50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
       {/* Premium Header Section */}
       <div className="relative overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 py-10 px-4 md:px-8">
+        <div className="bg-gradient-to-r from-[#3d5a78] via-[#507295] to-[#6889ab] py-10 px-4 md:px-8">
           {/* Decorative Elements */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
@@ -40,7 +40,7 @@ export default function ActivitySchedulingPage() {
                   <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
                     Activity Scheduling
                   </h1>
-                  <p className="text-blue-100 text-lg max-w-2xl">
+                  <p className="text-white/80 text-lg max-w-2xl">
                     Efficiently schedule and manage all service activities with intelligent planning and real-time tracking
                   </p>
                 </div>
@@ -52,7 +52,7 @@ export default function ActivitySchedulingPage() {
                   <div className="flex items-center gap-3">
                     <Activity className="h-5 w-5 text-white" />
                     <div>
-                      <p className="text-white/70 text-xs uppercase tracking-wide">Today</p>
+                      <p className="text-white/70 text-xs uppercase tracking-wide">Admin</p>
                       <p className="text-white font-bold text-lg">Full Dashboard</p>
                     </div>
                   </div>

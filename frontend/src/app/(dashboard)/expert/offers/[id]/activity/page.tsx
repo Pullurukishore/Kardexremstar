@@ -11,7 +11,7 @@ import {
   Clock,
   User,
   FileText,
-  Edit,
+  Pencil as Edit,
   CheckCircle,
   XCircle,
   AlertTriangle,

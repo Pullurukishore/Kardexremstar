@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { 
   Calendar, Plus, Search, Filter, Clock, User, AlertCircle, CheckCircle, 
-  XCircle, TrendingUp, Users, Activity, Eye, Edit, MapPin, 
+  XCircle, TrendingUp, Users, Activity, Eye, Pencil as Edit, MapPin, 
   ChevronLeft, ChevronRight, Sparkles, Zap, Target, RefreshCw,
   LayoutGrid, List, ArrowUpRight, Timer, Building2, X
 } from 'lucide-react';
@@ -99,12 +99,12 @@ export default function ActivitySchedulingClient() {
   const [limit] = useState(100);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
   const [selectedSchedule, setSelectedSchedule] = useState<ActivitySchedule | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [zoneFilter, setZoneFilter] = useState('');
-  const [servicePersonFilter, setServicePersonFilter] = useState('');
+  const [zoneFilter, setZoneFilter] = useState('all');
+  const [servicePersonFilter, setServicePersonFilter] = useState('all');
   const [zones, setZones] = useState<any[]>([]);
   const [servicePersons, setServicePersons] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
@@ -119,11 +119,11 @@ export default function ActivitySchedulingClient() {
       const params = new URLSearchParams();
       params.append('page', page.toString());
       params.append('limit', limit.toString());
-      if (statusFilter) params.append('status', statusFilter);
-      if (priorityFilter) params.append('priority', priorityFilter);
+      if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+      if (priorityFilter && priorityFilter !== 'all') params.append('priority', priorityFilter);
       if (search) params.append('search', search);
-      if (zoneFilter) params.append('zoneId', zoneFilter);
-      if (servicePersonFilter) params.append('servicePersonId', servicePersonFilter);
+      if (zoneFilter && zoneFilter !== 'all') params.append('zoneId', zoneFilter);
+      if (servicePersonFilter && servicePersonFilter !== 'all') params.append('servicePersonId', servicePersonFilter);
       params.append('sortBy', 'date');
       params.append('sortOrder', 'desc');
 
@@ -162,13 +162,16 @@ export default function ActivitySchedulingClient() {
 
   const fetchFilterData = async () => {
     try {
+      // Fetch zones
       const zonesResponse = await apiClient.get('/service-zones');
-      if (zonesResponse.success) {
-        setZones(zonesResponse.data?.serviceZones || zonesResponse.data || []);
+      if (zonesResponse.success && zonesResponse.data) {
+        setZones(Array.isArray(zonesResponse.data) ? zonesResponse.data : []);
       }
+      
+      // Fetch service persons
       const servicePersonsResponse = await apiClient.get('/service-persons');
-      if (servicePersonsResponse.success) {
-        setServicePersons(servicePersonsResponse.data || []);
+      if (servicePersonsResponse.success && servicePersonsResponse.data) {
+        setServicePersons(Array.isArray(servicePersonsResponse.data) ? servicePersonsResponse.data : []);
       }
     } catch (error: any) {
       console.error('Error fetching filter data:', error);
@@ -270,14 +273,14 @@ export default function ActivitySchedulingClient() {
   };
 
   const clearFilters = () => {
-    setStatusFilter('');
-    setPriorityFilter('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
     setSearch('');
-    setZoneFilter('');
-    setServicePersonFilter('');
+    setZoneFilter('all');
+    setServicePersonFilter('all');
   };
 
-  const hasActiveFilters = statusFilter || priorityFilter || search || zoneFilter || servicePersonFilter;
+  const hasActiveFilters = (statusFilter && statusFilter !== 'all') || (priorityFilter && priorityFilter !== 'all') || search || (zoneFilter && zoneFilter !== 'all') || (servicePersonFilter && servicePersonFilter !== 'all');
 
   return (
     <div className="space-y-8">
@@ -476,7 +479,7 @@ export default function ActivitySchedulingClient() {
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All statuses</SelectItem>
+                    <SelectItem value="all">All statuses</SelectItem>
                     <SelectItem value="PENDING">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-amber-500 rounded-full" />
@@ -518,7 +521,7 @@ export default function ActivitySchedulingClient() {
                     <SelectValue placeholder="All priorities" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All priorities</SelectItem>
+                    <SelectItem value="all">All priorities</SelectItem>
                     <SelectItem value="URGENT">
                       <div className="flex items-center gap-2">
                         <Zap className="h-3 w-3 text-red-500" />
@@ -554,7 +557,7 @@ export default function ActivitySchedulingClient() {
                     <SelectValue placeholder="All zones" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All zones</SelectItem>
+                    <SelectItem value="all">All zones</SelectItem>
                     {zones.map((zone: any) => (
                       <SelectItem key={zone.id} value={zone.id.toString()}>
                         {zone.name}
@@ -571,7 +574,7 @@ export default function ActivitySchedulingClient() {
                     <SelectValue placeholder="All persons" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All persons</SelectItem>
+                    <SelectItem value="all">All persons</SelectItem>
                     {servicePersons.map((person: any) => (
                       <SelectItem key={person.id} value={person.id.toString()}>
                         {person.name}
@@ -723,14 +726,17 @@ export default function ActivitySchedulingClient() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-200">
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Activity</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned To</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Schedule</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Activity</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned To</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created By</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Zone</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Schedule</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
@@ -740,86 +746,110 @@ export default function ActivitySchedulingClient() {
 
                     return (
                       <tr key={schedule.id} className="hover:bg-blue-50/50 transition-colors group">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm">
-                              #{schedule.id}
-                            </div>
-                          </div>
+                        <td className="px-3 py-2">
+                          <span 
+                            onClick={() => router.push(`${getBasePath()}/activity-scheduling/${schedule.id}`)}
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded cursor-pointer hover:from-blue-600 hover:to-indigo-700 hover:shadow-md transition-all"
+                          >
+                            #{schedule.id}
+                          </span>
                         </td>
                         
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-xl bg-gradient-to-br ${statusConfig.gradient} text-white shadow-md`}>
-                              <Activity className="h-4 w-4" />
+                        <td className="px-3 py-2">
+                          <div 
+                            className="flex items-center gap-2 cursor-pointer"
+                            onClick={() => router.push(`${getBasePath()}/activity-scheduling/${schedule.id}`)}
+                          >
+                            <div className={`p-1.5 rounded-lg bg-gradient-to-br ${statusConfig.gradient} text-white`}>
+                              <Activity className="h-3 w-3" />
                             </div>
                             <div>
-                              <p className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                              <p className="font-medium text-sm text-gray-900 group-hover:text-blue-600 group-hover:underline">
                                 {schedule.activityType.replace(/_/g, ' ')}
                               </p>
                               {schedule.description && (
-                                <p className="text-xs text-gray-500 truncate max-w-[200px]">{schedule.description}</p>
+                                <p className="text-xs text-gray-500 truncate max-w-[120px]">{schedule.description}</p>
                               )}
                             </div>
                           </div>
                         </td>
                         
-                        <td className="px-6 py-4">
-                          <Badge className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.border} border shadow-sm`}>
+                        <td className="px-3 py-2">
+                          <Badge className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.border} border text-xs py-0.5`}>
                             {statusConfig.icon}
-                            <span className="ml-1.5 font-medium">{schedule.status}</span>
+                            <span className="ml-1">{schedule.status}</span>
                           </Badge>
                         </td>
                         
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2.5 h-2.5 rounded-full ${priorityConfig.color} shadow-sm`} />
-                            <span className={`font-medium text-sm ${priorityConfig.text}`}>{schedule.priority}</span>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-2 h-2 rounded-full ${priorityConfig.color}`} />
+                            <span className={`text-xs font-medium ${priorityConfig.text}`}>{schedule.priority}</span>
                           </div>
                         </td>
                         
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
                               {schedule.servicePerson.name.charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-gray-900 font-medium">{schedule.servicePerson.name}</span>
+                            <span className="text-sm text-gray-900">{schedule.servicePerson.name}</span>
                           </div>
                         </td>
                         
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-2 text-gray-900">
-                              <Calendar className="h-4 w-4 text-gray-400" />
-                              <span className="font-medium">{formatDate(schedule.scheduledDate)}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-gray-500 text-sm mt-1">
-                              <Clock className="h-3 w-3" />
-                              <span>{formatTime(schedule.scheduledDate)}</span>
-                            </div>
-                          </div>
-                        </td>
-                        
-                        <td className="px-6 py-4">
-                          {schedule.location ? (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <MapPin className="h-4 w-4 text-gray-400" />
-                              <span className="truncate max-w-[150px]">{schedule.location}</span>
+                        <td className="px-3 py-2">
+                          {schedule.scheduledBy ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                {schedule.scheduledBy.name?.charAt(0).toUpperCase() || 'U'}
+                              </div>
+                              <span className="text-sm text-gray-900">{schedule.scheduledBy.name || 'Unknown'}</span>
                             </div>
                           ) : (
-                            <span className="text-gray-400 text-sm">—</span>
+                            <span className="text-gray-400 text-xs">—</span>
                           )}
                         </td>
                         
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-3 py-2">
+                          {schedule.zone ? (
+                            <span className="text-sm text-gray-700 font-medium">{schedule.zone.name}</span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </td>
+                        
+                        <td className="px-3 py-2">
+                          {schedule.customer ? (
+                            <span className="text-sm text-gray-700 truncate max-w-[100px] block">{schedule.customer.companyName}</span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </td>
+                        
+                        <td className="px-3 py-2">
+                          <div className="text-xs">
+                            <span className="text-gray-900 font-medium">{formatDate(schedule.scheduledDate)}</span>
+                            <span className="text-gray-500 ml-1">{formatTime(schedule.scheduledDate)}</span>
+                          </div>
+                        </td>
+                        
+                        <td className="px-3 py-2">
+                          {schedule.location ? (
+                            <span className="text-xs text-gray-600 truncate max-w-[80px] block">{schedule.location}</span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </td>
+                        
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1">
                             <Button 
                               variant="outline" 
                               size="sm"
                               onClick={() => router.push(`${getBasePath()}/activity-scheduling/${schedule.id}`)}
-                              className="border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all"
+                              className="h-7 px-2 text-xs border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600"
                             >
-                              <Eye className="h-3.5 w-3.5 mr-1" />
+                              <Eye className="h-3 w-3 mr-1" />
                               View
                             </Button>
                             {schedule.status === 'PENDING' && (
@@ -827,9 +857,9 @@ export default function ActivitySchedulingClient() {
                                 variant="outline" 
                                 size="sm"
                                 onClick={() => router.push(`${getBasePath()}/activity-scheduling/${schedule.id}/edit`)}
-                                className="border-gray-200 hover:bg-amber-50 hover:border-amber-200 hover:text-amber-600 transition-all"
+                                className="h-7 px-2 text-xs border-gray-200 hover:bg-amber-50 hover:border-amber-200 hover:text-amber-600"
                               >
-                                <Edit className="h-3.5 w-3.5 mr-1" />
+                                <Edit className="h-3 w-3 mr-1" />
                                 Edit
                               </Button>
                             )}

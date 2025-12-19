@@ -5,7 +5,7 @@ export class CronService {
   private static instance: CronService;
   private jobs: Map<string, NodeJS.Timeout> = new Map();
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): CronService {
     if (!CronService.instance) {
@@ -21,14 +21,14 @@ export class CronService {
       const now = new Date();
       const next7PM = new Date();
       next7PM.setHours(19, 0, 0, 0); // 7 PM today
-      
+
       // If it's already past 7 PM today, schedule for tomorrow
       if (now >= next7PM) {
         next7PM.setDate(next7PM.getDate() + 1);
       }
-      
+
       const timeUntilNext = next7PM.getTime() - now.getTime();
-      
+
       const timeout = setTimeout(async () => {
         logger.info('Running auto-checkout job at 7 PM...');
         try {
@@ -36,15 +36,15 @@ export class CronService {
         } catch (error) {
           logger.error('Auto-checkout job failed:', error);
         }
-        
+
         // Schedule the next day's checkout
         scheduleNextCheckout();
       }, timeUntilNext);
-      
+
       this.jobs.set('auto-checkout', timeout);
       logger.info(`Auto-checkout job scheduled for ${next7PM.toLocaleString()}`);
     };
-    
+
     scheduleNextCheckout();
   }
 
@@ -101,7 +101,7 @@ export class CronService {
           try {
             const activityStartTime = new Date(activity.startTime);
             const durationMinutes = Math.round((autoCheckoutTime.getTime() - activityStartTime.getTime()) / (1000 * 60));
-            
+
             await prisma.dailyActivityLog.update({
               where: { id: activity.id },
               data: {

@@ -6,7 +6,7 @@ export enum Priority {
 }
 
 // Export auth types
-export type { UserRole } from './auth';
+export { UserRole } from './auth';
 export type { AuthResponseUser } from './auth.types';
 
 // Export asset types
@@ -60,7 +60,7 @@ export type {
 export * from './user.types';
 
 // Export ticket types
-export type { 
+export type {
   Ticket,
   TicketFormValues,
   TicketFormData,

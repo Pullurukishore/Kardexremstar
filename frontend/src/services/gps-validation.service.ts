@@ -42,7 +42,7 @@ export class EnhancedGPSService {
     config: Partial<LocationValidationConfig> = {}
   ): Promise<GPSValidationResult> {
     const finalConfig = { ...this.DEFAULT_CONFIG, ...config };
-    
+
     if (!navigator.geolocation) {
       return {
         success: false,
@@ -54,18 +54,18 @@ export class EnhancedGPSService {
     // Single GPS attempt - let the hook handle retries for better UX
     try {
       const location = await this.attemptGPSCapture(finalConfig, 1);
-      
+
       // Debug logging for accuracy validation
       console.log(`GPS Validation: accuracy=${location.accuracy}m, threshold=${finalConfig.maxAccuracy}m`);
       console.log(`GPS Validation: ${location.accuracy <= finalConfig.maxAccuracy ? 'ACCEPT' : 'REJECT'}`);
-      
+
       // Intelligent accuracy validation - be very lenient, accept all valid coordinates
       const isGoodAccuracy = location.accuracy <= 50; // Excellent accuracy
       const isAcceptableAccuracy = location.accuracy <= finalConfig.maxAccuracy; // Within threshold
       const isFairAccuracy = location.accuracy <= 150; // Fair but usable
       const isPoorAccuracy = location.accuracy <= 500; // Poor but still usable
       const isVeryPoorAccuracy = location.accuracy <= 2000; // Very poor but still usable (field service reality)
-      
+
       // Always accept excellent accuracy (≤50m) regardless of threshold
       if (isGoodAccuracy) {
         console.log(`GPS Success: Excellent ±${Math.round(location.accuracy)}m accuracy accepted`);
@@ -75,7 +75,7 @@ export class EnhancedGPSService {
           attemptsMade: 1
         };
       }
-      
+
       // Accept acceptable accuracy (≤100m by default)
       if (isAcceptableAccuracy) {
         console.log(`GPS Success: Acceptable ±${Math.round(location.accuracy)}m accuracy accepted`);
@@ -85,7 +85,7 @@ export class EnhancedGPSService {
           attemptsMade: 1
         };
       }
-      
+
       // For fair accuracy (≤150m), accept but with warning
       if (isFairAccuracy) {
         console.log(`GPS Success: Fair ±${Math.round(location.accuracy)}m accuracy accepted with warning`);
@@ -96,7 +96,7 @@ export class EnhancedGPSService {
           warning: `GPS accuracy is fair (±${Math.round(location.accuracy)}m). Consider moving to open area for better accuracy.`
         };
       }
-      
+
       // For poor accuracy (≤500m), accept but with strong warning
       if (isPoorAccuracy) {
         console.log(`GPS Success: Poor ±${Math.round(location.accuracy)}m accuracy accepted with warning`);
@@ -107,7 +107,7 @@ export class EnhancedGPSService {
           warning: `GPS accuracy is poor (±${Math.round(location.accuracy)}m). Move to open area or use manual address entry for better accuracy.`
         };
       }
-      
+
       // For very poor accuracy (≤2000m), accept but with very strong warning
       if (isVeryPoorAccuracy) {
         console.log(`GPS Success: Very poor ±${Math.round(location.accuracy)}m accuracy accepted with warning`);
@@ -118,7 +118,7 @@ export class EnhancedGPSService {
           warning: `GPS accuracy is very poor (±${Math.round(location.accuracy)}m). Consider using manual address entry for better accuracy.`
         };
       }
-      
+
       // Only reject extremely poor accuracy (>2000m) - GPS likely unavailable
       console.log(`GPS Failed: Extremely poor ±${Math.round(location.accuracy)}m accuracy exceeds acceptable threshold`);
       return {
@@ -147,57 +147,78 @@ export class EnhancedGPSService {
     attemptNumber: number
   ): Promise<GPSLocation> {
     return new Promise<GPSLocation>((resolve, reject) => {
-      // Use fixed timeout, not increasing - faster response
-      const timeout = config.timeout; // Fixed 15 seconds, not increasing
-      
-      const options: PositionOptions = {
-        // Enhanced GPS settings for field service
-        enableHighAccuracy: true, // Always use high accuracy
-        timeout: timeout,
-        maximumAge: 0 // Always get fresh location
+      /**
+       * Mobile-optimized GPS capture strategy:
+       * 1. Try high accuracy first (GPS on mobile) - quick timeout
+       * 2. Fall back to network location (cell tower / WiFi) - faster for indoors
+       * 3. Accept recent cached locations to avoid delays
+       */
+
+      // Try high accuracy GPS first (most mobile devices have good GPS)
+      const tryHighAccuracy = () => {
+        const highAccuracyOptions: PositionOptions = {
+          enableHighAccuracy: true,
+          timeout: 10000, // 10 seconds - mobile GPS is usually fast
+          maximumAge: 30000 // Accept 30-second old cached GPS location
+        };
+
+        console.log('[GPS Mobile] Trying high accuracy GPS...');
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => handleSuccess(position, 'gps'),
+          (error) => {
+            console.log(`[GPS Mobile] High accuracy failed (code: ${error.code}), trying network location...`);
+            tryNetworkLocation();
+          },
+          highAccuracyOptions
+        );
       };
-        
-      // Add additional GPS options for mobile devices
-      if ('permissions' in navigator) {
-        // Request precise location permission on supported browsers
-        navigator.permissions.query({ name: 'geolocation' }).then(result => {
-          if (result.state === 'granted') {
-            }
-        }).catch(err => {
-          });
-      }
-      
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location: GPSLocation = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp
-          };
-          
-          // Enhanced coordinate validation - allow warnings, only reject on critical failures
-          const validation = this.validateLocationByCoordinates(location);
-          
-          // Only reject if coordinates are fundamentally invalid (not just poor accuracy)
-          if (!validation.isValid && validation.warnings.some(w => 
-            w.includes('Invalid') || w.includes('Null Island') || w.includes('outside service region')
-          )) {
-            console.log(`[GPS] Attempt ${attemptNumber}: CRITICAL VALIDATION FAILURE - ${validation.warnings.join(', ')}`);
-            reject(new Error(`Invalid GPS coordinates: ${validation.warnings.join(', ')}`));
-            return;
-          }
-          
-          // Accept location even with accuracy warnings
-          console.log(`[GPS] Attempt ${attemptNumber}: SUCCESS - accuracy=${Math.round(location.accuracy)}m, warnings=${validation.warnings.length}`);
-          resolve(location);
-        },
-        (error) => {
-          console.log(`[GPS] Attempt ${attemptNumber}: ERROR - ${error.code} ${error.message}`);
-          reject(error);
-        },
-        options
-      );
+
+      // Fall back to network-based location (cell tower / WiFi)
+      const tryNetworkLocation = () => {
+        const networkOptions: PositionOptions = {
+          enableHighAccuracy: false, // Network-based location
+          timeout: 10000, // 10 seconds
+          maximumAge: 120000 // Accept 2-minute old cached network location
+        };
+
+        console.log('[GPS Mobile] Trying network location (cell/WiFi)...');
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => handleSuccess(position, 'network'),
+          (error) => {
+            console.log(`[GPS Mobile] Network location failed: code=${error.code}, ${error.message}`);
+            reject(error);
+          },
+          networkOptions
+        );
+      };
+
+      const handleSuccess = (position: GeolocationPosition, source: 'gps' | 'network') => {
+        const location: GPSLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp
+        };
+
+        // Basic coordinate validation - only reject invalid coordinates
+        const validation = this.validateLocationByCoordinates(location);
+
+        if (!validation.isValid && validation.warnings.some(w =>
+          w.includes('Invalid') || w.includes('Null Island')
+        )) {
+          console.log(`[GPS Mobile] Invalid coordinates - ${validation.warnings.join(', ')}`);
+          reject(new Error(`Invalid location: ${validation.warnings.join(', ')}`));
+          return;
+        }
+
+        console.log(`[GPS Mobile] SUCCESS via ${source} - accuracy=${Math.round(location.accuracy)}m`);
+        resolve(location);
+      };
+
+      // Start with high accuracy (GPS) attempt
+      tryHighAccuracy();
     });
   }
 
@@ -215,7 +236,7 @@ export class EnhancedGPSService {
       enableHighAccuracy: true,
       maximumAge: 0
     };
-    
+
     return this.getValidatedLocation(config);
   }
 
@@ -232,18 +253,18 @@ export class EnhancedGPSService {
     warnings: string[];
   } {
     const warnings: string[] = [];
-    
+
     // Basic coordinate validation
     if (!this.isValidCoordinate(currentLocation.latitude, currentLocation.longitude)) {
       warnings.push('Invalid GPS coordinates');
       return { isValid: false, warnings };
     }
-    
+
     // Check accuracy threshold
     if (currentLocation.accuracy > 100) {
       warnings.push(`GPS accuracy is ${Math.round(currentLocation.accuracy)}m (prefer <100m)`);
     }
-    
+
     // Validate against expected location if provided
     if (expectedLocation) {
       const distance = this.calculateDistance(
@@ -252,7 +273,7 @@ export class EnhancedGPSService {
         expectedLocation.latitude,
         expectedLocation.longitude
       );
-      
+
       if (distance > maxDistanceKm) {
         warnings.push(
           `Location is ${distance.toFixed(2)}km from expected position (max: ${maxDistanceKm}km)`
@@ -263,14 +284,14 @@ export class EnhancedGPSService {
           warnings
         };
       }
-      
+
       return {
         isValid: true,
         distance,
         warnings: warnings.length > 0 ? warnings : []
       };
     }
-    
+
     return {
       isValid: true,
       warnings: warnings.length > 0 ? warnings : []
@@ -290,23 +311,23 @@ export class EnhancedGPSService {
     ) {
       return false;
     }
-    
+
     // Check if coordinates are not at null island (0,0)
     if (lat === 0 && lng === 0) {
       return false;
     }
-    
+
     // Check if coordinates are within reasonable bounds for India
     // (This can be made configurable based on service region)
     const isInIndia = (
       lat >= 6.0 && lat <= 37.0 &&
       lng >= 68.0 && lng <= 97.0
     );
-    
+
     if (!isInIndia) {
       // Don't reject, just warn - coordinates might be valid for other regions
     }
-    
+
     return true;
   }
 
@@ -336,12 +357,12 @@ export class EnhancedGPSService {
     const R = 6371; // Earth's radius in kilometers
     const dLat = this.toRadians(lat2 - lat1);
     const dLng = this.toRadians(lng2 - lng1);
-    
-    const a = 
+
+    const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
       Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // Distance in kilometers
   }
@@ -365,13 +386,13 @@ export class EnhancedGPSService {
       previousLocation.latitude, previousLocation.longitude,
       newLocation.latitude, newLocation.longitude
     );
-    
+
     const timeElapsedHours = (newLocation.timestamp - previousLocation.timestamp) / (1000 * 60 * 60);
-    
+
     if (timeElapsedHours <= 0) return false; // No time elapsed
-    
+
     const speedKmh = distance / timeElapsedHours;
-    
+
     return speedKmh > maxSpeedKmh;
   }
 
@@ -438,7 +459,7 @@ export class EnhancedGPSService {
         longitude >= customBounds.minLng && longitude <= customBounds.maxLng
       );
     }
-    
+
     // Default India bounds
     return (
       latitude >= 6.0 && latitude <= 37.0 &&
@@ -448,33 +469,39 @@ export class EnhancedGPSService {
 
   /**
    * Get location with coordinate-based validation priority
+   * Note: Does NOT override success based on coordinate validation
+   * GPS accuracy is validated in getValidatedLocation() already
    */
   static async getLocationWithCoordinateValidation(
     expectedLocation?: { latitude: number; longitude: number },
     maxDistanceKm: number = 5,
-    maxAccuracyM: number = 100
+    maxAccuracyM: number = 2000 // Very lenient - accept up to 2km accuracy
   ): Promise<GPSValidationResult & { coordinateValidation?: any }> {
     const result = await this.getValidatedLocation({
       maxAccuracy: maxAccuracyM,
       enableHighAccuracy: true,
       timeout: 15000
     });
-    
-    if (result.success && result.location) {
+
+    if (result.location) {
       const coordinateValidation = this.validateLocationByCoordinates(
         result.location,
         expectedLocation,
         maxDistanceKm
       );
-      
+
+      // Log for debugging
+      console.log(`[GPS Validation] Accuracy: ${Math.round(result.location.accuracy)}m, Success: ${result.success}, Coordinate Valid: ${coordinateValidation.isValid}`);
+
       return {
         ...result,
         coordinateValidation,
-        // Override success based on coordinate validation
-        success: result.success && coordinateValidation.isValid
+        // Only fail if GPS itself failed - coordinate validation is just informational
+        // Don't override success based on coordinate validation
+        success: result.success
       };
     }
-    
+
     return result;
   }
 }

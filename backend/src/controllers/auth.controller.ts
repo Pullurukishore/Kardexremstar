@@ -56,7 +56,7 @@ export const register = async (req: Request, res: Response) => {
         where: { role: 'ADMIN' },
         select: { id: true }
       });
-      
+
       const systemUserId = adminUser?.id || 1; // Fallback to 1 if no admin found
 
       // Get the first active service zone or create a default one if none exists
@@ -129,13 +129,13 @@ export const register = async (req: Request, res: Response) => {
     const token = jwt.sign(
       { id: user.id, role: user.role, customerId: user.customerId },
       JWT_CONFIG.secret,
-      { expiresIn: '1d' }
+      { expiresIn: '7d' }
     );
 
     const refreshToken = jwt.sign(
       { id: user.id },
       REFRESH_TOKEN_CONFIG.secret,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
 
     // Save refresh token to database
@@ -149,15 +149,15 @@ export const register = async (req: Request, res: Response) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/'
     });
-    
+
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/'
     });
 
@@ -165,7 +165,7 @@ export const register = async (req: Request, res: Response) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: '/'
     });
 
@@ -186,7 +186,7 @@ export const login = async (req: Request, res: Response) => {
 
     // Validate input
     if (!email || !password) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'Email and password are required',
         code: 'MISSING_CREDENTIALS'
@@ -202,7 +202,7 @@ export const login = async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
         code: 'INVALID_CREDENTIALS'
@@ -211,7 +211,7 @@ export const login = async (req: Request, res: Response) => {
 
     // Check if user is active
     if (!user.isActive) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
         message: 'Your account has been deactivated. Please contact support.',
         code: 'ACCOUNT_DEACTIVATED'
@@ -235,7 +235,7 @@ export const login = async (req: Request, res: Response) => {
       const failedAttempts = (user.failedLoginAttempts || 0) + 1;
       const MAX_ATTEMPTS = 5;
       const LOCKOUT_MINUTES = 15;
-      
+
       const updateData: any = {
         failedLoginAttempts: failedAttempts,
         lastFailedLogin: new Date()
@@ -256,11 +256,11 @@ export const login = async (req: Request, res: Response) => {
       const attemptsLeft = MAX_ATTEMPTS - failedAttempts;
       return res.status(401).json({
         success: false,
-        message: attemptsLeft > 0 
+        message: attemptsLeft > 0
           ? `Invalid email or password. ${attemptsLeft} attempt(s) left.`
           : 'Account locked due to too many failed attempts. Please try again later.',
         code: attemptsLeft > 0 ? 'INVALID_CREDENTIALS' : 'ACCOUNT_LOCKED',
-        ...(attemptsLeft <= 0 && { 
+        ...(attemptsLeft <= 0 && {
           retryAfter: LOCKOUT_MINUTES * 60 // seconds
         })
       });
@@ -285,26 +285,26 @@ export const login = async (req: Request, res: Response) => {
     if (!tokenVersion || tokenVersion === '0') {
       tokenVersion = Math.random().toString(36).substring(2, 15);
     }
-    
+
     // Generate tokens with existing or new version
     const token = jwt.sign(
-      { 
-        id: user.id, 
-        role: user.role, 
+      {
+        id: user.id,
+        role: user.role,
         customerId: user.customerId,
         version: tokenVersion
       },
       JWT_CONFIG.secret,
-      { expiresIn: '1d' }
+      { expiresIn: '7d' }
     );
 
     const refreshToken = jwt.sign(
-      { 
+      {
         id: user.id,
         version: tokenVersion
       },
       REFRESH_TOKEN_CONFIG.secret,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
 
     // Update user with login info but preserve existing refreshToken for concurrent sessions
@@ -337,7 +337,7 @@ export const login = async (req: Request, res: Response) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax', // Using 'lax' for better compatibility
-      maxAge: 24 * 60 * 60 * 1000, // 1 day for access token
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days for access token
       path: '/'
     };
 
@@ -345,12 +345,12 @@ export const login = async (req: Request, res: Response) => {
     res.cookie('token', token, cookieOptions);
     res.cookie('refreshToken', refreshToken, {
       ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days for refresh token
+      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days for refresh token
     });
 
     // Return user data without sensitive information
-    const { password: _, refreshToken: rt, tokenVersion: tv, ...userData } = user;
-    
+    const { password: _, refreshToken: _oldRefreshToken, tokenVersion: tv, ...userData } = user;
+
     // For backward compatibility, include both token and accessToken
     res.json({
       success: true,
@@ -360,7 +360,7 @@ export const login = async (req: Request, res: Response) => {
       },
       token, // For backward compatibility
       accessToken: token, // New standard field
-      refreshToken: rt // Include refresh token in the response
+      refreshToken // Return the NEWLY GENERATED refresh token, not the old one
     });
 
   } catch (error: unknown) {
@@ -372,13 +372,13 @@ export const login = async (req: Request, res: Response) => {
       error?: string;
       stack?: string;
     };
-    
+
     const errorResponse: ErrorResponse = {
       success: false,
       message: 'An error occurred during login',
       code: 'INTERNAL_SERVER_ERROR'
     };
-    
+
     if (error instanceof Error) {
       if (process.env.NODE_ENV === 'development') {
         errorResponse.error = error.message;
@@ -387,7 +387,7 @@ export const login = async (req: Request, res: Response) => {
         }
       }
     }
-    
+
     res.status(500).json(errorResponse);
   }
 };
@@ -403,10 +403,14 @@ export const getCurrentUser = async (req: AuthenticatedRequest, res: Response) =
       select: {
         id: true,
         email: true,
+        name: true,
         role: true,
+        phone: true,
         customerId: true,
         zoneId: true,
         isActive: true,
+        tokenVersion: true,
+        lastPasswordChange: true,
         customer: {
           select: {
             id: true,
@@ -464,7 +468,7 @@ export const logout = async (req: AuthenticatedRequest, res: Response) => {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax' as const
     };
-    
+
     res.clearCookie('accessToken', clearCookieOptions);
     res.clearCookie('token', clearCookieOptions);
     res.clearCookie('refreshToken', clearCookieOptions);
@@ -489,7 +493,7 @@ export const refreshToken = async (req: Request, res: Response) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: 'Refresh token required',
         code: 'NO_REFRESH_TOKEN'
@@ -502,13 +506,13 @@ export const refreshToken = async (req: Request, res: Response) => {
       decoded = verifyRefreshToken(refreshToken);
     } catch (verifyError) {
       if (verifyError instanceof jwt.TokenExpiredError) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
           message: 'Refresh token expired. Please login again.',
           code: 'REFRESH_TOKEN_EXPIRED'
         });
       }
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: 'Invalid refresh token',
         code: 'INVALID_REFRESH_TOKEN'
@@ -530,7 +534,7 @@ export const refreshToken = async (req: Request, res: Response) => {
     });
     // Validate user exists and is active
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: 'User not found',
         code: 'USER_NOT_FOUND'
@@ -538,7 +542,7 @@ export const refreshToken = async (req: Request, res: Response) => {
     }
 
     if (!user.isActive) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
         message: 'Account is deactivated',
         code: 'ACCOUNT_DEACTIVATED'
@@ -548,7 +552,7 @@ export const refreshToken = async (req: Request, res: Response) => {
     // For concurrent sessions, be more flexible with refresh token validation
     // Check if the refresh token is valid for this user and version
     let isValidRefreshToken = false;
-    
+
     try {
       // Verify the refresh token structure and user ID match
       const refreshDecoded = jwt.verify(refreshToken, REFRESH_TOKEN_CONFIG.secret) as any;
@@ -556,7 +560,7 @@ export const refreshToken = async (req: Request, res: Response) => {
         isValidRefreshToken = true;
       } else if (refreshDecoded.id === user.id && refreshDecoded.version !== user.tokenVersion) {
         // Version mismatch - token was revoked
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
           message: 'Token version mismatch. Please login again.',
           code: 'TOKEN_VERSION_MISMATCH'
@@ -564,27 +568,27 @@ export const refreshToken = async (req: Request, res: Response) => {
       }
     } catch (refreshError) {
       if (refreshError instanceof jwt.TokenExpiredError) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
           message: 'Refresh token expired. Please login again.',
           code: 'REFRESH_TOKEN_EXPIRED'
         });
       } else if (refreshError instanceof jwt.JsonWebTokenError) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
           message: 'Invalid refresh token format.',
           code: 'INVALID_TOKEN_FORMAT'
         });
       }
     }
-    
+
     // Also check if it matches the stored refresh token (for backward compatibility)
     if (!isValidRefreshToken && user.refreshToken === refreshToken) {
       isValidRefreshToken = true;
     }
-    
+
     if (!isValidRefreshToken) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: 'Invalid refresh token',
         code: 'TOKEN_MISMATCH'
@@ -593,9 +597,9 @@ export const refreshToken = async (req: Request, res: Response) => {
 
     // Generate new access token
     const newToken = jwt.sign(
-      { 
-        id: user.id, 
-        role: user.role, 
+      {
+        id: user.id,
+        role: user.role,
         customerId: user.customerId,
         version: user.tokenVersion
       },
@@ -607,13 +611,13 @@ export const refreshToken = async (req: Request, res: Response) => {
     // Only rotate if the refresh token is old (more than 3 days)
     const shouldRotateRefreshToken = false; // Disabled for concurrent session support
     let newRefreshToken = refreshToken;
-    
+
     if (shouldRotateRefreshToken) {
       newRefreshToken = generateRefreshToken(user.id);
       // Update stored refresh token
       await prisma.user.update({
         where: { id: user.id },
-        data: { 
+        data: {
           refreshToken: newRefreshToken,
           lastActiveAt: new Date()
         }
@@ -631,21 +635,21 @@ export const refreshToken = async (req: Request, res: Response) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax' as const,
-      maxAge: 24 * 60 * 60 * 1000, // 1 day for access token
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days for access token
       path: '/'
     };
-    
+
     res.cookie('accessToken', newToken, cookieOptions);
     res.cookie('token', newToken, cookieOptions);
     res.cookie('userRole', user.role, cookieOptions);
-    
+
     if (shouldRotateRefreshToken) {
       res.cookie('refreshToken', newRefreshToken, {
         ...cookieOptions,
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days for refresh token
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days for refresh token
       });
     }
-    const responseData: any = { 
+    const responseData: any = {
       success: true,
       accessToken: newToken,
       user: {
@@ -665,22 +669,22 @@ export const refreshToken = async (req: Request, res: Response) => {
 
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: 'Refresh token expired',
         code: 'REFRESH_TOKEN_EXPIRED'
       });
     }
-    
+
     if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: 'Invalid refresh token',
         code: 'INVALID_JWT'
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
       message: 'Internal server error',
       code: 'INTERNAL_ERROR'
@@ -693,7 +697,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'Email is required',
         code: 'MISSING_EMAIL'
@@ -757,7 +761,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     res.json(successResponse);
 
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'An error occurred while processing your request',
       code: 'INTERNAL_SERVER_ERROR'

@@ -82,7 +82,7 @@ export default function NewActivitySchedulePageShared() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
       {/* Hero Header */}
       <div className="relative overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 py-12 px-4 md:px-8">
+        <div className="bg-gradient-to-r from-[#3d5a78] via-[#507295] to-[#6889ab] py-12 px-4 md:px-8">
           {/* Decorative Elements */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
@@ -113,7 +113,7 @@ export default function NewActivitySchedulePageShared() {
                   <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
                     Create New Schedule
                   </h1>
-                  <p className="text-blue-100 text-lg max-w-xl">
+                  <p className="text-white/80 text-lg max-w-xl">
                     Schedule a new activity for your service team with optimal planning and resource allocation
                   </p>
                 </div>
@@ -141,7 +141,7 @@ export default function NewActivitySchedulePageShared() {
             <Card className="border-0 shadow-xl overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-white to-gray-50 border-b p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl text-white shadow-lg">
+                  <div className="p-2.5 bg-gradient-to-br from-[#507295] to-[#6889ab] rounded-xl text-white shadow-lg">
                     <FileText className="h-5 w-5" />
                   </div>
                   <div>
@@ -165,7 +165,7 @@ export default function NewActivitySchedulePageShared() {
           <div className="space-y-6">
             {/* Quick Setup Guide */}
             <Card className="border-0 shadow-xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-6">
+              <CardHeader className="bg-gradient-to-r from-[#507295] to-[#6889ab] text-white p-6">
                 <CardTitle className="flex items-center gap-3 text-lg">
                   <div className="p-2 bg-white/20 rounded-lg">
                     <Sparkles className="h-5 w-5" />
@@ -237,11 +237,11 @@ export default function NewActivitySchedulePageShared() {
             </Card>
 
             {/* Info Card */}
-            <Card className="border border-blue-100 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+            <Card className="border border-[#507295]/20 shadow-lg bg-gradient-to-br from-[#507295]/5 to-[#6889ab]/5">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <AlertCircle className="h-6 w-6 text-blue-600" />
+                  <div className="p-3 bg-[#507295]/15 rounded-xl">
+                    <AlertCircle className="h-6 w-6 text-[#507295]" />
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900 mb-1">Need Help?</h4>

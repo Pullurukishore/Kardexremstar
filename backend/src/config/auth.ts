@@ -36,12 +36,12 @@ export const OTP_CONFIG = {
 
 export const JWT_CONFIG = {
   secret: JWT_SECRET,
-  expiresIn: '1d' as const
+  expiresIn: '7d' as const // Extended from 1d for better UX
 };
 
 export const REFRESH_TOKEN_CONFIG = {
   secret: REFRESH_TOKEN_SECRET,
-  expiresIn: '7d' as const
+  expiresIn: '30d' as const // Extended from 7d for better UX
 };
 
 export const generateToken = (userId: number, role: UserRole): string => {

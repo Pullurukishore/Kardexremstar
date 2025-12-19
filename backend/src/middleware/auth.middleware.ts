@@ -56,14 +56,14 @@ const verifyToken = (token: string, secret: string): JwtPayload | null => {
 // Helper to generate new access token
 const generateAccessToken = (user: { id: number; role: UserRole; customerId?: number }, version: string) => {
   return jwt.sign(
-    { 
-      id: user.id, 
-      role: user.role, 
+    {
+      id: user.id,
+      role: user.role,
       customerId: user.customerId,
-      version 
+      version
     },
     JWT_CONFIG.secret,
-    { expiresIn: '1d' } // 1 day expiry for access token
+    { expiresIn: '7d' } // 7 day expiry for access token
   );
 };
 
@@ -76,7 +76,7 @@ export const authenticate = async (
     // Check for token in Authorization header first
     let accessToken: string | undefined;
     let refreshToken: string | undefined;
-    
+
     // Get access token from Authorization header or cookie
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
@@ -86,26 +86,26 @@ export const authenticate = async (
     } else if (req.cookies?.token) {
       accessToken = req.cookies.token;
     }
-    
+
     // Get refresh token from cookie
     refreshToken = req.cookies?.refreshToken;
-    
+
     // If no tokens provided
     if (!accessToken && !refreshToken) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         error: 'No authentication token provided',
         code: 'MISSING_AUTH_TOKEN'
       });
     }
-    
+
     // Try to verify access token first
     let decoded: JwtPayload | null = null;
-    
+
     if (accessToken) {
       decoded = verifyToken(accessToken, JWT_CONFIG.secret);
     }
-    
+
     // If we don't have a valid decoded token and have refresh token, 
     // let the frontend handle refresh via the dedicated endpoint
     // Don't automatically refresh here to avoid conflicts with frontend logic
@@ -129,7 +129,7 @@ export const authenticate = async (
     // Find user with minimal required fields
     try {
       const user = await prisma.user.findUnique({
-        where: { 
+        where: {
           id: decoded.id,
           isActive: true // Only allow active users
         },
@@ -173,14 +173,14 @@ export const authenticate = async (
         where: { userId: user.id },
         select: { serviceZoneId: true }
       });
-      
+
       const zoneIds = serviceZones.map(sz => sz.serviceZoneId);
-      
+
       // For ZONE_MANAGER, also include direct zoneId assignment
       if (user.zoneId && !zoneIds.includes(Number(user.zoneId))) {
         zoneIds.push(Number(user.zoneId));
       }
-      
+
       // Create user object with only necessary properties
       const userPayload: AuthUser = {
         id: user.id,
@@ -216,7 +216,7 @@ export const authenticate = async (
           });
         }
       }
-      
+
       // Handle other errors
       return res.status(500).json({
         success: false,
@@ -237,7 +237,7 @@ export const authenticate = async (
         code: 'INVALID_TOKEN'
       });
     }
-    
+
     if (error instanceof jwt.TokenExpiredError) {
       return res.status(401).json({
         success: false,
@@ -245,7 +245,7 @@ export const authenticate = async (
         code: 'TOKEN_EXPIRED'
       });
     }
-    
+
     // Generic error response
     return res.status(500).json({
       success: false,
@@ -325,7 +325,7 @@ export const canManageAssets = async (req: AuthedRequest, res: Response, next: N
       code: 'FORBIDDEN'
     });
   } catch (error) {
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       error: 'Internal server error during authorization',
       code: 'INTERNAL_SERVER_ERROR'

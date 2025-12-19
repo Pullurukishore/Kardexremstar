@@ -48,19 +48,20 @@ const SimpleAddressEntry: React.FC<SimpleAddressEntryProps> = ({
       return;
     }
 
-    // Create location data with approximate coordinates
-    // In production, you might geocode the address, but for simplicity we'll use default coordinates
+    // Simple approach: Use default coordinates with user's typed address
+    // The address is what matters for records - coordinates are just for schema compliance
     const locationData: SimpleLocationData = {
-      latitude: 12.9716, // Default to Bangalore center
-      longitude: 77.5946,
+      latitude: 12.9716,  // Default: Bangalore center
+      longitude: 77.5946, // Default: Bangalore center
       address: address.trim(),
-      accuracy: 50, // Manual address gets reasonable accuracy
+      accuracy: 500, // Manual entry gets lower accuracy indicator
       timestamp: Date.now(),
       source: 'manual'
     };
 
     onLocationSelect(locationData);
     onClose();
+    setAddress('');
     
     toast({
       title: "Address Confirmed",

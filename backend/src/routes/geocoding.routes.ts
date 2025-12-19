@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query, body } from 'express-validator';
-import { reverseGeocode, validateLocationJump } from '../controllers/geocoding.controller';
+import { reverseGeocode, validateLocationJump, forwardGeocode } from '../controllers/geocoding.controller';
 import { authenticate, requireRole } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validate-request';
 
@@ -31,6 +31,21 @@ router.get(
   reverseGeocode
 );
 
+// Forward geocode address to coordinates
+router.get(
+  '/forward',
+  authenticate,
+  [
+    query('address')
+      .isString()
+      .isLength({ min: 3 })
+      .withMessage('Address must be at least 3 characters'),
+    validateRequest
+  ],
+  requireRole(['ADMIN', 'SERVICE_PERSON', 'ZONE_USER']),
+  forwardGeocode
+);
+
 // Validate location jump detection
 router.post(
   '/validate-jump',
@@ -59,3 +74,4 @@ router.post(
 );
 
 export default router;
+

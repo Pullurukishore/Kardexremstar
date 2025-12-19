@@ -160,86 +160,104 @@ export default function SparePartsList({ defaultView = 'list', readOnly = false 
   const totalCategories = useMemo(() => new Set(spareParts.map(p => p.category).filter(Boolean)).size, [spareParts])
 
   return (
-    <div className="space-y-8 p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
-      {/* Header Section with Stats */}
-      <div className="space-y-6">
-        <div className="flex justify-between items-start">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
-                <Package className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Spare Parts</h1>
-                <p className="text-gray-600 mt-1">Browse spare parts inventory and pricing for SSP offers</p>
+    <div className="space-y-8 p-6 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 min-h-screen">
+      {/* Premium Hero Header */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 p-8 shadow-2xl">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOGM5Ljk0MSAwIDE4LTguMDU5IDE4LTE4cy04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-30"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+        
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-5">
+            <div className="relative">
+              <div className="absolute inset-0 bg-white/20 rounded-2xl blur-xl"></div>
+              <div className="relative bg-white/20 backdrop-blur-xl p-4 rounded-2xl border border-white/30 shadow-xl">
+                <Package className="w-12 h-12 text-white" />
               </div>
             </div>
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
+                Spare Parts Catalog
+                <Sparkles className="w-8 h-8 text-yellow-300 animate-pulse" />
+              </h1>
+              <p className="text-blue-100 text-lg max-w-xl">
+                Browse spare parts inventory and pricing for SPP offers
+              </p>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" className="shadow-sm hover:shadow-md transition-shadow" onClick={fetchSpareParts}>
-              <RefreshCw className="h-4 w-4 mr-2" />
+          
+          <div className="flex items-center gap-3">
+            <Button variant="outline" className="bg-white/20 hover:bg-white/30 backdrop-blur-xl border border-white/30 text-white px-6 py-6 rounded-xl font-semibold transition-all hover:scale-105 shadow-lg" onClick={fetchSpareParts}>
+              <RefreshCw className="h-5 w-5 mr-2" />
               Refresh
             </Button>
           </div>
         </div>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Parts</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{pagination.total}</p>
-                </div>
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <Package className="h-6 w-6 text-blue-600" />
-                </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100 hover:border-blue-200">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2"></div>
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">Total Parts</p>
+                <p className="text-4xl font-black text-slate-900">{pagination.total}</p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
+                <Package className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <Card className="border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Active Parts</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{totalActive}</p>
-                </div>
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Sparkles className="h-6 w-6 text-green-600" />
-                </div>
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100 hover:border-emerald-200">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2"></div>
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">Active Parts</p>
+                <p className="text-4xl font-black text-slate-900">{totalActive}</p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-3 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <Card className="border-l-4 border-l-orange-500 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Avg. Price</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{avgPrice}</p>
-                </div>
-                <div className="p-3 bg-orange-100 rounded-lg">
-                  <TrendingUp className="h-6 w-6 text-orange-600" />
-                </div>
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100 hover:border-amber-200">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2"></div>
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-1">Avg. Price</p>
+                <p className="text-4xl font-black text-slate-900">{avgPrice}</p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <Card className="border-l-4 border-l-purple-500 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Categories</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{totalCategories}</p>
-                </div>
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <Tag className="h-6 w-6 text-purple-600" />
-                </div>
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100 hover:border-purple-200">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2"></div>
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-1">Categories</p>
+                <p className="text-4xl font-black text-slate-900">{totalCategories}</p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
+                <Tag className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -498,26 +516,18 @@ export default function SparePartsList({ defaultView = 'list', readOnly = false 
           )}
         </>
       ) : (
-        <Card className="shadow-lg border-0">
-          <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="h-5 w-5 text-blue-600" />
-                Spare Parts Inventory
-              </CardTitle>
-            </div>
-          </CardHeader>
+        <Card className="shadow-2xl border-0 overflow-hidden bg-white">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gradient-to-r from-gray-100 to-gray-50 border-b-2 border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Image</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Part Details</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Category</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Base Price</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Created</th>
+                <thead>
+                  <tr className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 text-white">
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Image</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Part Details</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Base Price</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Created</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">

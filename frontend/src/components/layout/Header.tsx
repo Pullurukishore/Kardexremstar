@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { Menu, LogOut, ChevronDown, Ticket, Zap, Shield, Users, Bell, Search, Sparkles, Activity } from 'lucide-react';
+import { Menu, LogOut, ChevronDown, Zap, Shield, Users, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,7 +21,7 @@ import { useState, useEffect } from 'react';
 
 // Kardex brand colors
 const KARDEX_PRIMARY = "#507295"; // Steel blue from logo
-const KARDEX_LIGHT = "#6889ab";
+const KARDEX_ACCENT = "#aac01d"; // Lime green accent
 const KARDEX_DARK = "#3d5a78";
 
 interface HeaderProps {
@@ -35,20 +35,7 @@ interface HeaderProps {
 export function Header({ onMenuClick, className, isMobile = false, sidebarOpen = false, showSidebar = true }: HeaderProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [isOnline, setIsOnline] = useState(true);
-  const [hasMounted, setHasMounted] = useState(false);
-  
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
-  
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
   
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -104,13 +91,13 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
   const getRoleBadgeStyle = (role?: UserRole) => {
     switch (role) {
       case UserRole.ADMIN:
-        return 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 shadow-lg shadow-purple-600/30';
+        return 'bg-gradient-to-r from-[#507295] to-[#3d7a9e] text-white border-0 shadow-lg shadow-[#507295]/30';
       case UserRole.ZONE_MANAGER:
-        return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg shadow-blue-500/30';
+        return 'bg-gradient-to-r from-[#507295] to-[#6889ab] text-white border-0 shadow-lg shadow-[#507295]/30';
       case UserRole.ZONE_USER:
-        return 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white border-0 shadow-lg shadow-cyan-500/30';
+        return 'bg-gradient-to-r from-[#6889ab] to-[#7a9cb8] text-white border-0 shadow-lg shadow-[#6889ab]/30';
       case UserRole.SERVICE_PERSON:
-        return 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-0 shadow-lg shadow-emerald-500/30';
+        return 'bg-gradient-to-r from-[#aac01d] to-[#96b216] text-white border-0 shadow-lg shadow-[#aac01d]/30';
       case UserRole.EXPERT_HELPDESK:
         return 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-0 shadow-lg shadow-amber-500/30';
       default:
@@ -121,17 +108,48 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
   const getAvatarGradient = (role?: UserRole) => {
     switch (role) {
       case UserRole.ADMIN:
-        return 'from-blue-600 via-purple-600 to-indigo-600';
+        return 'from-[#507295] via-[#3d7a9e] to-[#2c5a7e]';
       case UserRole.ZONE_MANAGER:
-        return 'from-blue-500 via-blue-600 to-blue-700';
+        return 'from-[#507295] via-[#5a8bab] to-[#6889ab]';
       case UserRole.ZONE_USER:
-        return 'from-cyan-500 via-cyan-600 to-cyan-700';
+        return 'from-[#6889ab] via-[#7a9cb8] to-[#8aacca]';
       case UserRole.SERVICE_PERSON:
-        return 'from-emerald-500 via-emerald-600 to-emerald-700';
+        return 'from-[#aac01d] via-[#96b216] to-[#82a010]';
       case UserRole.EXPERT_HELPDESK:
         return 'from-amber-500 via-amber-600 to-amber-700';
       default:
-        return 'from-blue-600 via-purple-600 to-indigo-600';
+        return 'from-[#507295] via-[#3d7a9e] to-[#2c5a7e]';
+    }
+  };
+
+  // Role-based URL helpers
+  const getNewTicketUrl = () => {
+    switch (user?.role) {
+      case UserRole.ADMIN:
+        return '/admin/tickets/create';
+      case UserRole.ZONE_MANAGER:
+      case UserRole.ZONE_USER:
+        return '/zone/tickets/create';
+      case UserRole.EXPERT_HELPDESK:
+        return '/expert/tickets/create';
+      case UserRole.EXTERNAL_USER:
+        return '/external/tickets/create';
+      default:
+        return '/admin/tickets/create';
+    }
+  };
+
+  const getNewOfferUrl = () => {
+    switch (user?.role) {
+      case UserRole.ADMIN:
+        return '/admin/offers/new';
+      case UserRole.ZONE_MANAGER:
+      case UserRole.ZONE_USER:
+        return '/zone/offers/new';
+      case UserRole.EXPERT_HELPDESK:
+        return '/expert/offers/new';
+      default:
+        return '/admin/offers/new';
     }
   };
 
@@ -142,25 +160,28 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
       transition={{ duration: 0.3, ease: "easeOut" }}
       className={cn(
         'relative z-50',
-        'bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100',
-        'border-b border-purple-600/20',
-        'shadow-lg shadow-purple-600/10',
+        'bg-white/90 backdrop-blur-2xl',
+        'border-b border-[#507295]/10',
+        'shadow-[0_4px_30px_-4px_rgba(80,114,149,0.12)]',
         className
       )}
       suppressHydrationWarning
     >
-      {/* Top gradient accent - Blue to Purple */}
-      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600" />
+      {/* Top gradient accent - Kardex brand colors */}
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#507295] via-[#6889ab] to-[#aac01d]">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#507295] via-[#6889ab] to-[#aac01d] blur-sm opacity-50" />
+      </div>
       
-      {/* Bottom gradient line */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-600/30 to-transparent" />
-      
-      {/* Subtle background glow - Blue to Purple */}
-      <div className="absolute top-0 right-1/4 w-96 h-20 bg-gradient-to-r from-purple-600/5 via-indigo-600/5 to-transparent blur-3xl pointer-events-none" />
+      {/* Subtle animated background effects */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-24 right-0 w-[500px] h-48 bg-gradient-to-bl from-[#507295]/[0.03] via-[#6889ab]/[0.02] to-transparent blur-3xl" />
+        <div className="absolute -top-12 left-1/4 w-80 h-36 bg-gradient-to-br from-[#aac01d]/[0.04] via-transparent to-transparent blur-2xl" />
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#507295]/10 to-transparent" />
+      </div>
       
       <div className={cn(
         "relative flex items-center justify-between",
-        isMobile ? "h-18 px-5" : "h-[72px] px-8"
+        isMobile ? "h-18 px-5" : "h-[76px] px-8"
       )}>
         {/* Left section */}
         <motion.div 
@@ -175,9 +196,11 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
               size="icon"
               className={cn(
                 "lg:hidden rounded-xl",
-                "text-slate-500 hover:text-purple-600",
-                "hover:bg-purple-600/10 hover:shadow-md",
+                "text-[#507295] hover:text-[#3d5a78]",
+                "hover:bg-gradient-to-br hover:from-[#507295]/10 hover:to-[#507295]/5",
+                "hover:shadow-lg hover:shadow-[#507295]/10",
                 "transition-all duration-300",
+                "border border-transparent hover:border-[#507295]/15",
                 isMobile ? "h-11 w-11" : "h-10 w-10"
               )}
               onClick={onMenuClick}
@@ -190,59 +213,105 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
             </Button>
           )}
           
-          {/* Title section */}
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">
-                Field Service Management
-              </h1>
+          {/* Title section with enhanced styling */}
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              {/* Decorative element */}
+              <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-[#507295] to-[#aac01d] rounded-full opacity-80" />
+              
+              <div className="pl-2">
+                <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] font-bold tracking-tight leading-tight">
+                  <span className="bg-gradient-to-r from-[#3d5a78] via-[#507295] to-[#6889ab] bg-clip-text text-transparent">
+                    Kardex
+                  </span>
+                  <span className="text-[#507295]/20 mx-2 font-light">|</span>
+                  <span className="bg-gradient-to-r from-[#507295] via-[#6889ab] to-[#aac01d] bg-clip-text text-transparent">
+                    Field Service
+                  </span>
+                </h1>
+                <p className="text-[11px] font-medium text-[#507295]/50 tracking-wide uppercase mt-0.5 hidden sm:block">
+                  Management System
+                </p>
+              </div>
             </div>
           </div>
         </motion.div>
 
         {/* Right section */}
         <motion.div 
-          className="flex items-center gap-3"
+          className="flex items-center gap-4"
           initial={{ x: 10, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.2, delay: 0.1 }}
         >
-          {/* Time display */}
-          {hasMounted && (
+          {/* Quick Action Buttons - Hidden for Service Person */}
+          {user?.role !== UserRole.SERVICE_PERSON && (
             <div className={cn(
-              "items-center gap-2 px-3 py-2 rounded-xl",
-              "bg-gradient-to-r from-slate-50 to-purple-600/5",
-              "border border-slate-200/50",
-              "shadow-sm",
-              isMobile ? "hidden" : "hidden lg:flex"
+              "flex items-center gap-3",
+              isMobile ? "hidden" : "hidden md:flex"
             )}>
-              <div className="relative">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping" style={{ animationDuration: '2s' }} />
-              </div>
-              <span className="text-sm font-semibold text-slate-700">
-                {currentTime.toLocaleTimeString('en-US', { 
-                  hour: '2-digit', 
-                  minute: '2-digit',
-                  hour12: true 
-                })}
-              </span>
-              <span className="text-slate-300">|</span>
-              <span className="text-sm font-medium text-slate-500">
-                {currentTime.toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric' 
-                })}
-              </span>
+              {/* New Ticket Button */}
+              <a href={getNewTicketUrl()}>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "relative overflow-hidden rounded-xl px-4 py-2.5 h-11",
+                    "bg-gradient-to-r from-[#507295] to-[#6889ab]",
+                    "hover:from-[#3d5a78] hover:to-[#507295]",
+                    "text-white font-semibold text-sm",
+                    "shadow-lg shadow-[#507295]/25 hover:shadow-xl hover:shadow-[#507295]/30",
+                    "transition-all duration-300",
+                    "hover:scale-105 active:scale-95",
+                    "border border-white/10",
+                    "group"
+                  )}
+                >
+                  {/* Shimmer effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                  
+                  <span className="relative flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>New Ticket</span>
+                  </span>
+                </Button>
+              </a>
+              
+              {/* New Offer Button */}
+              <a href={getNewOfferUrl()}>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "relative overflow-hidden rounded-xl px-4 py-2.5 h-11",
+                    "bg-gradient-to-r from-[#aac01d] to-[#96b216]",
+                    "hover:from-[#96b216] hover:to-[#82a010]",
+                    "text-white font-semibold text-sm",
+                    "shadow-lg shadow-[#aac01d]/25 hover:shadow-xl hover:shadow-[#aac01d]/30",
+                    "transition-all duration-300",
+                    "hover:scale-105 active:scale-95",
+                    "border border-white/10",
+                    "group"
+                  )}
+                >
+                  {/* Shimmer effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                  
+                  <span className="relative flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>New Offer</span>
+                  </span>
+                </Button>
+              </a>
             </div>
           )}
-          
-
 
           {/* Divider */}
           <div className={cn(
-            "w-px h-8 bg-gradient-to-b from-transparent via-slate-200 to-transparent",
-            isMobile ? "hidden" : "hidden sm:block"
+            "w-px h-10 bg-gradient-to-b from-transparent via-[#507295]/15 to-transparent",
+            isMobile ? "hidden" : "hidden md:block"
           )} />
 
           {/* User dropdown */}
@@ -251,81 +320,118 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
               <Button
                 variant="ghost"
                 className={cn(
-                  "rounded-xl transition-all duration-300",
-                "hover:bg-gradient-to-r hover:from-slate-50 hover:to-purple-600/10",
-                "hover:shadow-md",
-                "border border-transparent hover:border-purple-600/20",
-                  isMobile ? "h-11 px-2" : "h-11 px-2.5"
+                  "rounded-2xl transition-all duration-300",
+                  "hover:bg-gradient-to-r hover:from-[#507295]/[0.08] hover:via-white hover:to-[#aac01d]/[0.05]",
+                  "hover:shadow-xl hover:shadow-[#507295]/10",
+                  "border border-transparent hover:border-[#507295]/15",
+                  "group",
+                  isMobile ? "h-12 px-2" : "h-14 px-4"
                 )}
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3">
                   <div className="relative">
+                    {/* Avatar ambient glow */}
+                    <div className={cn(
+                      "absolute -inset-1.5 rounded-full opacity-0 group-hover:opacity-60 transition-all duration-500 blur-lg",
+                      "bg-gradient-to-br",
+                      getAvatarGradient(user?.role)
+                    )} />
+                    
+                    {/* Avatar ring animation on hover */}
+                    <div className={cn(
+                      "absolute -inset-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300",
+                      "ring-2 ring-[#507295]/20"
+                    )} />
+                    
                     <Avatar className={cn(
-                      "ring-2 ring-offset-1 ring-offset-white shadow-lg transition-all",
-                      "ring-purple-600/40",
-                      isMobile ? "h-9 w-9" : "h-9 w-9"
+                      "relative ring-2 ring-offset-2 ring-offset-white shadow-lg transition-all duration-300",
+                      "ring-[#507295]/25 group-hover:ring-[#507295]/40",
+                      "group-hover:scale-110",
+                      isMobile ? "h-9 w-9" : "h-11 w-11"
                     )}>
                       <AvatarFallback className={cn(
-                        "bg-gradient-to-br text-white font-bold text-sm",
+                        "bg-gradient-to-br text-white font-bold",
+                        isMobile ? "text-sm" : "text-base",
                         getAvatarGradient(user?.role)
                       )}>
                         {getEmailInitial()}
                       </AvatarFallback>
                     </Avatar>
+                    
+                    {/* Online status indicator */}
                     <div className={cn(
-                      "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm",
-                      isOnline ? "bg-gradient-to-br from-emerald-400 to-green-500" : "bg-gray-400"
-                    )} />
+                      "absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-[2.5px] border-white shadow-md transition-all duration-300",
+                      isOnline 
+                        ? "bg-gradient-to-br from-[#aac01d] to-[#96b216]" 
+                        : "bg-gray-400"
+                    )}>
+                      {isOnline && (
+                        <div className="absolute inset-0 rounded-full bg-[#aac01d] animate-ping opacity-40" style={{ animationDuration: '2s' }} />
+                      )}
+                    </div>
                   </div>
                   
                   <div className={cn(
                     "text-left",
                     isMobile ? "hidden" : "hidden sm:block"
                   )}>
-                    <p className="text-sm font-semibold text-slate-800 truncate max-w-[100px]">
+                    <p className="text-sm font-bold text-[#3d5a78] truncate max-w-[130px] group-hover:text-[#507295] transition-colors">
                       {getUserDisplayName()}
                     </p>
-                    <p className="text-[11px] font-medium text-slate-400 truncate max-w-[100px]">
+                    <p className="text-[11px] font-semibold text-[#507295]/50 truncate max-w-[130px]">
                       {getRoleDisplayName(user?.role)}
                     </p>
                   </div>
                   
-                  <ChevronDown className={cn(
-                    "h-4 w-4 text-slate-400 transition-transform duration-200",
-                    isMobile ? "hidden" : "hidden sm:block"
-                  )} />
+                  <div className={cn(
+                    "flex items-center justify-center w-6 h-6 rounded-lg bg-[#507295]/5 group-hover:bg-[#507295]/10 transition-all",
+                    isMobile ? "hidden" : "hidden sm:flex"
+                  )}>
+                    <ChevronDown className="h-3.5 w-3.5 text-[#507295]/60 transition-all duration-300 group-hover:text-[#507295] group-hover:translate-y-0.5" />
+                  </div>
                 </div>
               </Button>
             </DropdownMenuTrigger>
             
             <DropdownMenuContent
-              className="w-80 bg-white/95 backdrop-blur-xl border border-slate-200/60 shadow-2xl rounded-2xl p-0 overflow-hidden"
+              className="w-80 bg-white/[0.97] backdrop-blur-2xl border border-[#507295]/10 shadow-2xl shadow-[#507295]/15 rounded-2xl p-0 overflow-hidden"
               align="end"
               forceMount
             >
-              {/* User header */}
-              <div className="p-5 bg-gradient-to-br from-slate-50 via-purple-600/5 to-indigo-600/5 border-b border-slate-200/50">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-14 w-14 ring-2 ring-offset-2 ring-offset-white ring-purple-600/30 shadow-xl">
-                    <AvatarFallback className={cn(
-                      "bg-gradient-to-br text-white font-bold text-xl",
+              {/* User header with premium styling */}
+              <div className="relative p-6 border-b border-[#507295]/10 overflow-hidden">
+                {/* Background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#507295]/5 via-white to-[#aac01d]/5" />
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#aac01d]/10 via-transparent to-transparent blur-2xl" />
+                
+                <div className="relative flex items-center gap-4">
+                  <div className="relative">
+                    <div className={cn(
+                      "absolute -inset-2 rounded-full blur-xl opacity-40",
+                      "bg-gradient-to-br",
                       getAvatarGradient(user?.role)
-                    )}>
-                      {getEmailInitial()}
-                    </AvatarFallback>
-                  </Avatar>
+                    )} />
+                    <Avatar className="relative h-16 w-16 ring-3 ring-offset-2 ring-offset-white ring-[#507295]/20 shadow-xl">
+                      <AvatarFallback className={cn(
+                        "bg-gradient-to-br text-white font-bold text-2xl",
+                        getAvatarGradient(user?.role)
+                      )}>
+                        {getEmailInitial()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-bold text-slate-800 truncate">
+                    <p className="text-lg font-bold text-[#3d5a78] truncate">
                       {getUserDisplayName()}
                     </p>
                     {user?.email && (
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                      <p className="text-xs text-[#507295]/60 truncate mt-0.5">
                         {user.email}
                       </p>
                     )}
                     {user?.role && (
                       <Badge className={cn(
-                        "mt-2 text-[10px] px-2.5 py-0.5 font-semibold",
+                        "mt-2.5 text-[10px] px-3 py-1 font-bold",
                         getRoleBadgeStyle(user.role)
                       )}>
                         {getRoleDisplayName(user.role)}
@@ -334,21 +440,25 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
                   </div>
                 </div>
                 
-                {/* Online status */}
-                <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-white/80 rounded-xl border border-slate-100">
+                {/* Online status card */}
+                <div className="relative mt-5 flex items-center gap-3 px-4 py-3 bg-white/80 rounded-xl border border-[#507295]/10 shadow-sm">
                   <div className="relative">
                     <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      isOnline ? "bg-emerald-500" : "bg-gray-400"
+                      "w-3 h-3 rounded-full",
+                      isOnline ? "bg-gradient-to-br from-[#aac01d] to-[#96b216]" : "bg-gray-400"
                     )} />
                     {isOnline && (
-                      <div className="absolute inset-0 w-2 h-2 bg-emerald-400 rounded-full animate-ping" style={{ animationDuration: '2s' }} />
+                      <div className="absolute inset-0 w-3 h-3 bg-[#aac01d] rounded-full animate-ping opacity-40" style={{ animationDuration: '2s' }} />
                     )}
                   </div>
-                  <span className="text-xs font-medium text-slate-600">
-                    {isOnline ? 'Online' : 'Offline'}
+                  <span className="text-sm font-semibold text-[#3d5a78]">
+                    {isOnline ? 'Online & Active' : 'Offline'}
                   </span>
-                  <Activity className="w-3 h-3 text-slate-400 ml-auto" />
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-1 px-2 py-1 bg-[#507295]/5 rounded-lg">
+                    <Activity className="w-3 h-3 text-[#507295]/60" />
+                    <span className="text-[10px] font-medium text-[#507295]/60">Active</span>
+                  </div>
                 </div>
               </div>
               
@@ -356,43 +466,55 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
               {user?.role === 'ADMIN' && (
                 <>
                   <div className="p-2">
-                    <DropdownMenuLabel className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <DropdownMenuLabel className="px-3 py-2 text-[10px] font-bold text-[#507295]/40 uppercase tracking-widest">
                       Administration
                     </DropdownMenuLabel>
                     <DropdownMenuItem asChild>
-                      <a href="/admin/manage-admins" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-purple-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50/50 transition-all cursor-pointer group">
-                        <div className="p-2 bg-purple-100 rounded-xl group-hover:scale-110 group-hover:shadow-md transition-all">
-                          <Shield className="h-4 w-4 text-purple-600" />
+                      <a href="/admin/manage-admins" className="flex items-center gap-3 px-3 py-3 rounded-xl text-[#3d5a78] hover:text-[#507295] hover:bg-gradient-to-r hover:from-[#507295]/10 hover:to-[#507295]/5 transition-all cursor-pointer group">
+                        <div className="p-2.5 bg-gradient-to-br from-[#507295]/10 to-[#507295]/5 rounded-xl group-hover:from-[#507295]/15 group-hover:to-[#507295]/10 group-hover:scale-110 group-hover:shadow-lg transition-all">
+                          <Shield className="h-4 w-4 text-[#507295]" />
                         </div>
-                        <span className="font-semibold text-sm">Manage Admins</span>
+                        <div>
+                          <span className="font-semibold text-sm block">Manage Admins</span>
+                          <span className="text-[10px] text-[#507295]/50">System administrators</span>
+                        </div>
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <a href="/admin/manage-external" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-blue-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100/50 transition-all cursor-pointer group">
-                        <div className="p-2 bg-blue-100 rounded-xl group-hover:scale-110 group-hover:shadow-md transition-all">
-                          <Users className="h-4 w-4 text-blue-600" />
+                      <a href="/admin/manage-external" className="flex items-center gap-3 px-3 py-3 rounded-xl text-[#3d5a78] hover:text-[#507295] hover:bg-gradient-to-r hover:from-[#6889ab]/10 hover:to-[#6889ab]/5 transition-all cursor-pointer group">
+                        <div className="p-2.5 bg-gradient-to-br from-[#6889ab]/10 to-[#6889ab]/5 rounded-xl group-hover:from-[#6889ab]/15 group-hover:to-[#6889ab]/10 group-hover:scale-110 group-hover:shadow-lg transition-all">
+                          <Users className="h-4 w-4 text-[#6889ab]" />
                         </div>
-                        <span className="font-semibold text-sm">External Users</span>
+                        <div>
+                          <span className="font-semibold text-sm block">External Users</span>
+                          <span className="text-[10px] text-[#507295]/50">Customer accounts</span>
+                        </div>
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <a href="/admin/manage-expert-helpdesk" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-amber-700 hover:bg-gradient-to-r hover:from-amber-50 hover:to-amber-100/50 transition-all cursor-pointer group">
-                        <div className="p-2 bg-amber-100 rounded-xl group-hover:scale-110 group-hover:shadow-md transition-all">
+                      <a href="/admin/manage-expert-helpdesk" className="flex items-center gap-3 px-3 py-3 rounded-xl text-[#3d5a78] hover:text-amber-600 hover:bg-gradient-to-r hover:from-amber-50 hover:to-amber-100/50 transition-all cursor-pointer group">
+                        <div className="p-2.5 bg-gradient-to-br from-amber-100 to-amber-50 rounded-xl group-hover:from-amber-100 group-hover:to-amber-50 group-hover:scale-110 group-hover:shadow-lg transition-all">
                           <Zap className="h-4 w-4 text-amber-600" />
                         </div>
-                        <span className="font-semibold text-sm">Expert Helpdesk</span>
+                        <div>
+                          <span className="font-semibold text-sm block">Expert Helpdesk</span>
+                          <span className="text-[10px] text-[#507295]/50">Support specialists</span>
+                        </div>
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <a href="/admin/pin-management" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-cyan-700 hover:bg-gradient-to-r hover:from-cyan-50 hover:to-cyan-100/50 transition-all cursor-pointer group">
-                        <div className="p-2 bg-cyan-100 rounded-xl group-hover:scale-110 group-hover:shadow-md transition-all">
-                          <svg className="h-4 w-4 text-cyan-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 7a2 2 0 1 0-4 0v2a2 2 0 1 0 4 0V7z"/><path d="M12 15v2"/><circle cx="12" cy="12" r="10"/></svg>
+                      <a href="/admin/pin-management" className="flex items-center gap-3 px-3 py-3 rounded-xl text-[#3d5a78] hover:text-[#aac01d] hover:bg-gradient-to-r hover:from-[#aac01d]/10 hover:to-[#aac01d]/5 transition-all cursor-pointer group">
+                        <div className="p-2.5 bg-gradient-to-br from-[#aac01d]/10 to-[#aac01d]/5 rounded-xl group-hover:from-[#aac01d]/15 group-hover:to-[#aac01d]/10 group-hover:scale-110 group-hover:shadow-lg transition-all">
+                          <svg className="h-4 w-4 text-[#aac01d]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 7a2 2 0 1 0-4 0v2a2 2 0 1 0 4 0V7z"/><path d="M12 15v2"/><circle cx="12" cy="12" r="10"/></svg>
                         </div>
-                        <span className="font-semibold text-sm">Pin Management</span>
+                        <div>
+                          <span className="font-semibold text-sm block">Pin Management</span>
+                          <span className="text-[10px] text-[#507295]/50">Access control</span>
+                        </div>
                       </a>
                     </DropdownMenuItem>
                   </div>
-                  <DropdownMenuSeparator className="bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+                  <DropdownMenuSeparator className="bg-gradient-to-r from-transparent via-[#507295]/10 to-transparent" />
                 </>
               )}
 
@@ -401,28 +523,34 @@ export function Header({ onMenuClick, className, isMobile = false, sidebarOpen =
                 <>
                   <div className="p-2">
                     <DropdownMenuItem asChild>
-                      <a href="/expert/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-amber-700 hover:bg-gradient-to-r hover:from-amber-50 hover:to-amber-100/50 transition-all cursor-pointer group">
-                        <div className="p-2 bg-amber-100 rounded-xl group-hover:scale-110 group-hover:shadow-md transition-all">
+                      <a href="/expert/dashboard" className="flex items-center gap-3 px-3 py-3 rounded-xl text-[#3d5a78] hover:text-amber-600 hover:bg-gradient-to-r hover:from-amber-50 hover:to-amber-100/50 transition-all cursor-pointer group">
+                        <div className="p-2.5 bg-gradient-to-br from-amber-100 to-amber-50 rounded-xl group-hover:scale-110 group-hover:shadow-lg transition-all">
                           <Zap className="h-4 w-4 text-amber-600" />
                         </div>
-                        <span className="font-semibold text-sm">Expert Dashboard</span>
+                        <div>
+                          <span className="font-semibold text-sm block">Expert Dashboard</span>
+                          <span className="text-[10px] text-[#507295]/50">Your workspace</span>
+                        </div>
                       </a>
                     </DropdownMenuItem>
                   </div>
-                  <DropdownMenuSeparator className="bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+                  <DropdownMenuSeparator className="bg-gradient-to-r from-transparent via-[#507295]/10 to-transparent" />
                 </>
               )}
               
-              {/* Logout */}
+              {/* Logout with enhanced styling */}
               <div className="p-2">
                 <DropdownMenuItem 
                   onClick={handleLogout} 
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-600 hover:text-red-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100/50 transition-all cursor-pointer group"
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-red-600 hover:text-red-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100/50 transition-all cursor-pointer group"
                 >
-                  <div className="p-2 bg-red-100 rounded-xl group-hover:scale-110 group-hover:shadow-md transition-all">
+                  <div className="p-2.5 bg-gradient-to-br from-red-100 to-red-50 rounded-xl group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-red-200/50 transition-all">
                     <LogOut className="h-4 w-4 text-red-600" />
                   </div>
-                  <span className="font-semibold text-sm">Sign Out</span>
+                  <div>
+                    <span className="font-semibold text-sm block">Sign Out</span>
+                    <span className="text-[10px] text-red-400">End your session</span>
+                  </div>
                 </DropdownMenuItem>
               </div>
             </DropdownMenuContent>

@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../constants';
 export class ApiError extends Error {
   status: number;
   data: any;
-  
+
   constructor(message: string, status: number, data?: any) {
     super(message);
     this.name = 'ApiError';
@@ -34,17 +34,39 @@ let isBackendDown = false;
 api.interceptors.request.use(
   async (config) => {
     // Skip token refresh for auth endpoints
-    if (config.url?.includes('/auth/login') || 
-        config.url?.includes('/auth/refresh-token')) {
+    if (config.url?.includes('/auth/login') ||
+      config.url?.includes('/auth/refresh-token')) {
       return config;
     }
 
-    const accessToken = getCookie('accessToken');
-    const token = getCookie('token');
-    
-    // Use fallback token logic like other parts of the app
-    const authToken = accessToken || token;
-    
+    // Check localStorage first (where tokens are typically stored after login)
+    // Then fallback to cookies - matching the pattern in AuthContext.tsx
+    let authToken: string | null = null;
+
+    if (typeof window !== 'undefined') {
+      // Check all possible localStorage locations (matching AuthContext.tsx)
+      // 1. Direct localStorage keys
+      authToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
+
+      // 2. Development mode keys (AuthContext uses these in dev)
+      if (!authToken) {
+        authToken = localStorage.getItem('dev_accessToken');
+      }
+
+      // 3. Cookie fallback keys stored in localStorage
+      if (!authToken) {
+        authToken = localStorage.getItem('cookie_accessToken');
+      }
+
+      // 4. Finally check actual cookies
+      if (!authToken) {
+        authToken = getCookie('accessToken') || getCookie('token') || null;
+      }
+    } else {
+      // Server-side: only check cookies
+      authToken = getCookie('accessToken') || getCookie('token') || null;
+    }
+
     if (authToken) {
       // Check if token is expired or about to expire (within 5 minutes)
       if (isTokenExpired(authToken)) {
@@ -58,21 +80,21 @@ api.interceptors.request.use(
                   {},
                   { withCredentials: true }
                 );
-                
+
                 if (response.data?.success && response.data.accessToken) {
                   setCookie('accessToken', response.data.accessToken);
                   setCookie('token', response.data.accessToken);
-                  
+
                   // Update refresh token if rotated
                   if (response.data.refreshToken) {
                     setCookie('refreshToken', response.data.refreshToken);
                   }
-                  
+
                   // Set userRole cookie if provided in response
                   if (response.data.user?.role) {
                     setCookie('userRole', response.data.user.role);
                   }
-                  
+
                   return response.data.accessToken;
                 } else {
                   throw new Error('No access token in refresh response');
@@ -83,25 +105,25 @@ api.interceptors.request.use(
               }
             })();
           } else {
-            }
-          
+          }
+
           // Wait for the refresh to complete
           const newToken = await refreshTokenPromise;
           config.headers.Authorization = `Bearer ${newToken}`;
-          
+
         } catch (error: any) {
           // Clear tokens on refresh failure
           deleteCookie('accessToken');
           deleteCookie('token');
           deleteCookie('refreshToken');
-          
+
           // Check if backend is down
           if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || !error.response) {
             isBackendDown = true;
             // Don't redirect immediately when backend is down
             return Promise.reject(error);
           }
-          
+
           // Redirect to login (client-side only)
           if (typeof window !== 'undefined' && window.location.pathname !== '/auth/login') {
             // Show user-friendly message
@@ -114,7 +136,7 @@ api.interceptors.request.use(
             }
             window.location.href = '/auth/login';
           }
-          
+
           return Promise.reject(error);
         }
       } else {
@@ -122,7 +144,7 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${authToken}`;
       }
     }
-    
+
     return config;
   },
   (error) => {
@@ -152,10 +174,10 @@ api.interceptors.response.use(
   },
   async (error: AxiosError) => {
     const originalRequest = error.config as any;
-    
+
     // Don't intercept if the request is for login or refresh-token endpoints
-    if (originalRequest.url?.includes('/auth/login') || 
-        originalRequest.url?.includes('/auth/refresh-token')) {
+    if (originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/refresh-token')) {
       return Promise.reject(error);
     }
 
@@ -171,7 +193,7 @@ api.interceptors.response.use(
       if (typeof window !== 'undefined' && window.location.pathname === '/auth/login') {
         return Promise.reject(error);
       }
-      
+
       // Check retry count to prevent infinite loops
       if (retryCount >= maxRetries) {
         // Max retries reached, clear tokens and redirect
@@ -185,15 +207,16 @@ api.interceptors.response.use(
         }
         return Promise.reject(error);
       }
-      
+
       originalRequest._retry = true;
       retryCount++;
 
       try {
-        // Implement exponential backoff
-        const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000); // 1s, 2s, 4s max
+        // Implement shorter delay for first retry, then exponential backoff
+        // First retry: 100ms, then 500ms, 1s max
+        const delay = retryCount === 1 ? 100 : Math.min(500 * Math.pow(2, retryCount - 2), 1000);
         await new Promise(resolve => setTimeout(resolve, delay));
-        
+
         // Reuse the refresh token promise if one is in flight
         if (!refreshTokenPromise) {
           refreshTokenPromise = (async () => {
@@ -208,21 +231,21 @@ api.interceptors.response.use(
                   }
                 }
               );
-              
+
               if (response.data?.success && response.data.accessToken) {
                 setCookie('accessToken', response.data.accessToken);
                 setCookie('token', response.data.accessToken);
-                
+
                 // Update refresh token if rotated
                 if (response.data.refreshToken) {
                   setCookie('refreshToken', response.data.refreshToken);
                 }
-                
+
                 // Set userRole cookie if provided
                 if (response.data.user?.role) {
                   setCookie('userRole', response.data.user.role);
                 }
-                
+
                 // Reset retry count on success
                 retryCount = 0;
                 return response.data.accessToken;
@@ -234,23 +257,23 @@ api.interceptors.response.use(
             }
           })();
         } else {
-          }
-        
+        }
+
         const newToken = await refreshTokenPromise;
-        
+
         // Update the authorization header for the original request
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        
+
         // Retry the original request with new token
         return api(originalRequest);
-        
+
       } catch (refreshError: any) {
         // Clear any existing tokens (client-side only)
         if (typeof window !== 'undefined') {
           deleteCookie('accessToken');
           deleteCookie('token');
           deleteCookie('refreshToken');
-          
+
           // Check error code for user-friendly messaging
           const errorCode = refreshError?.response?.data?.code;
           if (errorCode === 'REFRESH_TOKEN_EXPIRED' || errorCode === 'NO_REFRESH_TOKEN') {
@@ -259,13 +282,13 @@ api.interceptors.response.use(
               sessionStorage.setItem('sessionExpiredReason', errorCode);
             }
           }
-          
+
           // Only redirect to login if not already there
           if (window.location.pathname !== '/auth/login') {
             window.location.href = '/auth/login';
           }
         }
-        
+
         return Promise.reject(refreshError);
       }
     }

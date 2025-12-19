@@ -50,7 +50,7 @@ export function DashboardClientWrapper({ children, userRole }: DashboardClientWr
   return (
     <div className="min-h-screen bg-white">
       {/* Animated background elements - more subtle */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none print:hidden">
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#507295]/3 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
         <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-blue-200/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
         <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-indigo-200/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '12s', animationDelay: '4s' }} />
@@ -65,7 +65,7 @@ export function DashboardClientWrapper({ children, userRole }: DashboardClientWr
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm print:hidden"
               onClick={() => setSidebarOpen(false)}
             />
           )}
@@ -82,6 +82,7 @@ export function DashboardClientWrapper({ children, userRole }: DashboardClientWr
               exit={isMobile ? { x: -320 } : undefined}
               transition={{ duration: 0.3, ease: "easeInOut" }}
               className={cn(
+                "print:hidden",
                 isMobile ? "fixed z-[60]" : "lg:block",
                 !isMobile && !sidebarOpen ? "hidden lg:block" : "block"
               )}
@@ -116,6 +117,7 @@ export function DashboardClientWrapper({ children, userRole }: DashboardClientWr
           isMobile={isMobile}
           sidebarOpen={sidebarOpen}
           showSidebar={showSidebar}
+          className="print:hidden"
         />
         
         <main className="flex-1 overflow-y-auto focus:outline-none">

@@ -46,7 +46,7 @@ const EntityPerformanceMatrix: React.FC<EntityPerformanceMatrixProps> = ({ class
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.getActivityByEntity({ timeframe });
+      const response = await apiService.getActivityStats({ timeframe });
       setEntityData(
         Object.entries(response.entityStats || {}).map(([entityType, stats]: [string, any]) => ({
           entityType,

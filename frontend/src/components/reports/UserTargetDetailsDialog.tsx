@@ -62,8 +62,7 @@ const UserTargetDetailsDialog: React.FC<UserTargetDetailsDialogProps> = ({
       
       const response = await apiService.getUserTargetDetails(
         userId,
-        targetPeriod,
-        periodType
+        { targetPeriod, periodType }
       );
 
       console.log('User target details response:', response);

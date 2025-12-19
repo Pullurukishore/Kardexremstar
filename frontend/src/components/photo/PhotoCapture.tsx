@@ -169,169 +169,174 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   };
 
   return (
-    <Card className={cn("border-2 border-blue-200 bg-blue-50", className)}>
-      <CardContent className="p-4">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Camera className="h-4 w-4 text-blue-600" />
-              <span className="font-medium text-blue-900">{label}</span>
-              {required && <Badge variant="destructive" className="text-xs">Required</Badge>}
-            </div>
-            <Badge variant="secondary" className="text-xs">
-              {capturedPhotos.length}/{maxPhotos} Photos
-            </Badge>
+    <div className={cn("bg-white rounded-xl border border-gray-200 overflow-hidden", className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-100">
+            <Camera className="h-4 w-4 text-purple-600" />
           </div>
-
-          {description && (
-            <p className="text-sm text-blue-700">{description}</p>
-          )}
-
-          {/* Camera Controls */}
-          {!isCapturing && capturedPhotos.length < maxPhotos && (
-            <div className="space-y-2">
-              <Button
-                onClick={startCamera}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-                size="lg"
-              >
-                <Camera className="h-4 w-4 mr-2" />
-                Start Camera
-              </Button>
-              <p className="text-xs text-blue-600 text-center">
-                Take photos to verify your onsite presence
-              </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-gray-900">{label}</span>
+              {required && (
+                <span className="px-2 py-0.5 text-xs font-medium text-red-600 bg-red-50 rounded-full">
+                  Required
+                </span>
+              )}
             </div>
-          )}
+            {description && (
+              <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-sm">
+          <span className="font-bold text-purple-600">{capturedPhotos.length}</span>
+          <span className="text-gray-400">/</span>
+          <span className="text-gray-500">{maxPhotos}</span>
+        </div>
+      </div>
 
-          {/* Camera View */}
-          {isCapturing && (
-            <div className="space-y-3">
-              <div className="relative bg-black rounded-lg overflow-hidden">
-                <video
-                  ref={videoRef}
-                  className="w-full h-64 object-cover"
-                  playsInline
-                  muted
-                />
+      <div className="p-4 space-y-4">
+        {/* Camera Controls - Start Button */}
+        {!isCapturing && capturedPhotos.length < maxPhotos && (
+          <Button
+            onClick={startCamera}
+            className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg shadow-sm"
+          >
+            <Camera className="h-5 w-5 mr-2" />
+            Open Camera
+          </Button>
+        )}
+
+        {/* Camera View */}
+        {isCapturing && (
+          <div className="space-y-3">
+            <div className="relative bg-gray-900 rounded-xl overflow-hidden shadow-inner">
+              <video
+                ref={videoRef}
+                className="w-full h-56 object-cover"
+                playsInline
+                muted
+              />
+              
+              {/* Camera mode indicator */}
+              <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-md text-white text-xs font-medium">
+                {facingMode === 'environment' ? '📷 Back' : '🤳 Front'}
+              </div>
+
+              {/* Capture button overlay */}
+              <div className="absolute bottom-3 inset-x-3 flex items-center justify-center gap-3">
+                <button
+                  onClick={switchCamera}
+                  className="w-10 h-10 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition-colors"
+                >
+                  <RotateCcw className="h-5 w-5" />
+                </button>
                 
-                {/* Camera overlay */}
-                <div className="absolute inset-0 border-2 border-white/30 rounded-lg pointer-events-none">
-                  <div className="absolute top-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
-                    {facingMode === 'environment' ? 'Back Camera' : 'Front Camera'}
+                <button
+                  onClick={capturePhoto}
+                  disabled={capturedPhotos.length >= maxPhotos}
+                  className="w-16 h-16 flex items-center justify-center bg-white rounded-full shadow-lg hover:scale-105 transition-transform disabled:opacity-50"
+                >
+                  <div className="w-14 h-14 flex items-center justify-center bg-purple-600 rounded-full">
+                    <Camera className="h-6 w-6 text-white" />
+                  </div>
+                </button>
+                
+                <button
+                  onClick={stopCamera}
+                  className="w-10 h-10 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Captured Photos Grid */}
+        {capturedPhotos.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 flex items-center justify-center bg-green-100 rounded-full">
+                <Check className="h-3 w-3 text-green-600" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">
+                {capturedPhotos.length} photo{capturedPhotos.length > 1 ? 's' : ''} captured
+              </span>
+            </div>
+            
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {capturedPhotos.map((photo, index) => (
+                <div
+                  key={photo.id}
+                  className="relative flex-shrink-0 group"
+                >
+                  <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200 shadow-sm">
+                    <img
+                      src={photo.dataUrl}
+                      alt={`Photo ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  
+                  {/* Delete button */}
+                  <button
+                    onClick={() => deletePhoto(photo.id)}
+                    className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  
+                  {/* Photo number */}
+                  <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/60 rounded text-white text-xs font-medium">
+                    {index + 1}
                   </div>
                 </div>
-              </div>
-
-              {/* Camera Controls */}
-              <div className="flex items-center justify-center gap-3">
-                <Button
-                  onClick={switchCamera}
-                  variant="outline"
-                  size="sm"
-                  className="bg-white"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-                
-                <Button
-                  onClick={capturePhoto}
-                  size="lg"
-                  className="bg-blue-600 hover:bg-blue-700 px-8"
-                  disabled={capturedPhotos.length >= maxPhotos}
-                >
-                  <Camera className="h-5 w-5 mr-2" />
-                  Capture
-                </Button>
-                
-                <Button
-                  onClick={stopCamera}
-                  variant="outline"
-                  size="sm"
-                  className="bg-white"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <p className="text-xs text-blue-600 text-center">
-                Position camera to capture clear verification photo
-              </p>
-            </div>
-          )}
-
-          {/* Captured Photos */}
-          {capturedPhotos.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-700">
-                  {capturedPhotos.length} Photo{capturedPhotos.length > 1 ? 's' : ''} Captured
-                </span>
-              </div>
+              ))}
               
-              <div className="grid grid-cols-1 gap-2">
-                {capturedPhotos.map((photo, index) => (
-                  <div
-                    key={photo.id}
-                    className="flex items-center gap-3 p-3 bg-white rounded-lg border"
-                  >
-                    <div className="relative w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                      <img
-                        src={photo.dataUrl}
-                        alt={`Captured photo ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        Photo {index + 1}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatFileSize(photo.size)} • {new Date(photo.timestamp).toLocaleTimeString()}
-                      </p>
-                    </div>
-                    
-                    <Button
-                      onClick={() => deletePhoto(photo.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              {/* Add more button */}
+              {capturedPhotos.length < maxPhotos && !isCapturing && (
+                <button
+                  onClick={startCamera}
+                  className="w-20 h-20 flex-shrink-0 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-purple-400 hover:text-purple-500 hover:bg-purple-50 transition-colors"
+                >
+                  <Camera className="h-5 w-5" />
+                  <span className="text-xs mt-1">Add</span>
+                </button>
+              )}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Status Messages */}
-          {required && capturedPhotos.length === 0 && (
-            <div className="flex items-center gap-2 p-2 bg-orange-50 border border-orange-200 rounded-md">
-              <AlertTriangle className="h-4 w-4 text-orange-600" />
-              <span className="text-sm text-orange-700">
-                Photo verification is required for onsite visits
-              </span>
+        {/* Status Messages */}
+        {required && capturedPhotos.length === 0 && !isCapturing && (
+          <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-amber-100">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
             </div>
-          )}
+            <p className="text-sm text-amber-700">
+              Photo verification is required to continue
+            </p>
+          </div>
+        )}
 
-          {capturedPhotos.length >= maxPhotos && (
-            <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-md">
+        {capturedPhotos.length >= maxPhotos && (
+          <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-green-100">
               <Check className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">
-                Maximum photos captured. Ready to proceed.
-              </span>
             </div>
-          )}
-        </div>
+            <p className="text-sm text-green-700">
+              All photos captured! Ready to proceed.
+            </p>
+          </div>
+        )}
+      </div>
 
-        {/* Hidden canvas for photo capture */}
-        <canvas ref={canvasRef} className="hidden" />
-      </CardContent>
-    </Card>
+      {/* Hidden canvas for photo capture */}
+      <canvas ref={canvasRef} className="hidden" />
+    </div>
   );
 };
 

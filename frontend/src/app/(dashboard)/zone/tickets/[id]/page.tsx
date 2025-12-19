@@ -17,7 +17,15 @@ import {
   Wrench,
   Pencil,
   Upload,
-  Camera
+  Camera,
+  ArrowLeft,
+  Clock,
+  Hash,
+  Zap,
+  AlertCircle,
+  XCircle,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Ticket } from '@/types/ticket';
@@ -46,6 +54,9 @@ export default function TicketDetailPage() {
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [assignmentStep, setAssignmentStep] = useState<'ZONE_USER' | 'SERVICE_PERSON'>('ZONE_USER');
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [isRespondingToAssignment, setIsRespondingToAssignment] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState('');
 
   const fetchTicketDetails = async () => {
     try {
@@ -85,6 +96,46 @@ export default function TicketDetailPage() {
       fetchTicket();
     }
   }, [id, router, toast]);
+
+  // Handle accept/reject assignment
+  const handleRespondToAssignment = async (action: 'ACCEPT' | 'REJECT', notes?: string) => {
+    if (!ticket) return;
+    
+    setIsRespondingToAssignment(true);
+    try {
+      const response = await api.post(`/tickets/${ticket.id}/respond-assignment`, {
+        action,
+        notes: notes || undefined
+      });
+      
+      toast({
+        title: action === 'ACCEPT' ? 'Assignment Accepted' : 'Assignment Rejected',
+        description: action === 'ACCEPT' 
+          ? 'You have accepted this ticket assignment' 
+          : 'You have rejected this ticket assignment',
+        variant: action === 'ACCEPT' ? 'default' : 'destructive',
+      });
+      
+      if (action === 'REJECT') {
+        // Redirect back to tickets list after rejection
+        router.push('/zone/tickets');
+      } else {
+        // Refresh ticket data
+        await fetchTicketDetails();
+      }
+      
+      setShowRejectDialog(false);
+      setRejectNotes('');
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to respond to assignment',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRespondingToAssignment(false);
+    }
+  };
 
   const handleStatusChange = async (
     status: string, 
@@ -156,79 +207,216 @@ export default function TicketDetailPage() {
 
   if (loading || !ticket) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <p>{loading ? 'Loading ticket details...' : 'Ticket not found'}</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/20">
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <div className="text-center space-y-4">
+            <div className="relative mx-auto w-16 h-16">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 opacity-20 animate-ping" />
+              <div className="relative w-16 h-16 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-slate-800">{loading ? 'Loading ticket details...' : 'Ticket not found'}</p>
+              <p className="text-sm text-slate-500 mt-1">Please wait while we fetch the information</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4">
-      {/* Ticket Header - Moved to proper position */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-              <span className="sr-only">Go back</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m12 19-7-7 7-7"/>
-                <path d="M19 12H5"/>
-              </svg>
-            </Button>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Ticket #{ticket.id}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge status={ticket.status} />
-            <span className="text-sm text-muted-foreground">
-              Created on {format(new Date(ticket.createdAt), 'MMM d, yyyy')}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-        {/* Left Column - Main Ticket Info */}
-        <div className="space-y-4 md:space-y-6">
-          <Card className="shadow-sm border-border/50 hover:shadow-md transition-shadow duration-200">
-            <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-slate-100/50 rounded-t-lg border-b p-4 md:p-6">
-              <div className="space-y-3">
-                <div className="flex flex-col space-y-2">
-                  <CardTitle className="text-lg md:text-xl break-words">{ticket.title}</CardTitle>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={ticket.status} />
-                    <PriorityBadge priority={ticket.priority} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/20">
+      <div className="w-full p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Premium Header with Glassmorphism */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 rounded-2xl shadow-2xl shadow-emerald-500/20 p-6 md:p-8">
+          {/* Decorative Elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-400/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+          <div className="absolute top-1/2 left-1/3 w-32 h-32 bg-teal-400/10 rounded-full blur-2xl" />
+          
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => router.back()}
+                  className="h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white border border-white/20 transition-all duration-200"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl ring-2 ring-white/30">
+                    <Hash className="h-7 w-7 text-white" />
                   </div>
-                  <p className="text-xs md:text-sm text-muted-foreground">
-                    Created {formatDistanceToNow(new Date(ticket.createdAt))} ago
-                  </p>
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+                      Ticket #{ticket.id}
+                    </h1>
+                    <p className="text-emerald-100 mt-1 text-sm md:text-base flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Created {formatDistanceToNow(new Date(ticket.createdAt))} ago
+                    </p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-9 px-3 text-xs md:text-sm bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-blue-200 hover:border-blue-300 text-blue-700 hover:text-blue-800 transition-all duration-200 shadow-sm hover:shadow-md btn-touch" 
-                    onClick={() => setIsStatusDialogOpen(true)}
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                    Change Status
-                  </Button>
-                  {(ticket.status === 'ONSITE_VISIT_REACHED' || ticket.status === 'ONSITE_VISIT_IN_PROGRESS' || ticket.status === 'ONSITE_VISIT_RESOLVED') && (
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={ticket.status} />
+                  <PriorityBadge priority={ticket.priority} />
+                </div>
+                <div className="flex items-center gap-2">
+                  {ticket.assignmentStatus === 'PENDING' && ticket.assignedToId === user?.id ? (
+                    <div className="relative group">
+                      <Button 
+                        disabled
+                        className="relative overflow-hidden bg-gradient-to-r from-gray-400 to-gray-500 text-white border-0 shadow-lg cursor-not-allowed opacity-70"
+                        size="default"
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        Change Status
+                      </Button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50">
+                        Accept or reject assignment first
+                      </div>
+                    </div>
+                  ) : (
                     <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-9 px-3 text-xs md:text-sm bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 border-green-200 hover:border-green-300 text-green-700 hover:text-green-800 transition-all duration-200 shadow-sm hover:shadow-md btn-touch" 
-                      onClick={() => setActiveTab('photos')}
+                      onClick={() => setIsStatusDialogOpen(true)}
+                      className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white hover:from-amber-400 hover:via-orange-400 hover:to-rose-400 border-0 shadow-xl shadow-orange-500/40 hover:shadow-2xl hover:shadow-orange-500/50 transition-all duration-300 hover:scale-105 font-semibold"
+                      size="default"
                     >
-                      <Camera className="h-3.5 w-3.5 mr-1.5" />
-                      <span className="hidden sm:inline">View Photos</span>
-                      <span className="sm:hidden">Photos</span>
+                      <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] animate-shimmer" />
+                      <Zap className="h-4 w-4 mr-2" />
+                      Change Status
                     </Button>
                   )}
                 </div>
               </div>
-            </CardHeader>
+            </div>
+            
+            {/* Quick Stats Strip */}
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-emerald-100 text-xs font-medium uppercase tracking-wide">Priority</p>
+                <p className="text-white font-bold text-lg capitalize">{ticket.priority?.toLowerCase() || 'Normal'}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-emerald-100 text-xs font-medium uppercase tracking-wide">Zone</p>
+                <p className="text-white font-bold text-lg truncate">{ticket.zone?.name || 'Unassigned'}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-emerald-100 text-xs font-medium uppercase tracking-wide">Call Type</p>
+                <p className="text-white font-bold text-lg truncate">{ticket.callType === 'UNDER_MAINTENANCE_CONTRACT' ? 'Under Contract' : 'Not Under Contract'}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-emerald-100 text-xs font-medium uppercase tracking-wide">Created On</p>
+                <p className="text-white font-bold text-lg">{format(new Date(ticket.createdAt), 'MMM d, yyyy')}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Assignment Response Banner - Show if pending and user is assigned */}
+        {ticket.assignmentStatus === 'PENDING' && ticket.assignedToId === user?.id && (
+          <div className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl shadow-xl shadow-amber-500/20 p-6">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-yellow-400/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+            
+            <div className="relative z-10">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl ring-2 ring-white/30 animate-pulse">
+                    <AlertCircle className="h-8 w-8 text-white" />
+                  </div>
+                  <div className="text-white">
+                    <h3 className="text-xl font-bold">New Assignment</h3>
+                    <p className="text-amber-100 text-sm">You have been assigned this ticket. Please review and respond.</p>
+                  </div>
+                </div>
+                
+                {!showRejectDialog ? (
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={() => handleRespondToAssignment('ACCEPT')}
+                      disabled={isRespondingToAssignment}
+                      className="bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl transition-all font-bold px-6"
+                    >
+                      {isRespondingToAssignment ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                      )}
+                      Accept
+                    </Button>
+                    <Button
+                      onClick={() => setShowRejectDialog(true)}
+                      disabled={isRespondingToAssignment}
+                      className="bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl transition-all font-bold px-6"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Reject
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 w-full md:w-auto">
+                    <textarea
+                      placeholder="Reason for rejection (optional)"
+                      value={rejectNotes}
+                      onChange={(e) => setRejectNotes(e.target.value)}
+                      className="w-full md:w-80 px-4 py-2 rounded-lg border-2 border-white/30 bg-white/20 backdrop-blur-sm text-white placeholder-white/60 focus:outline-none focus:border-white text-sm"
+                      rows={2}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => handleRespondToAssignment('REJECT', rejectNotes)}
+                        disabled={isRespondingToAssignment}
+                        className="bg-red-600 hover:bg-red-700 text-white shadow-lg font-bold flex-1"
+                      >
+                        {isRespondingToAssignment ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <XCircle className="h-4 w-4 mr-2" />
+                        )}
+                        Confirm Reject
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowRejectDialog(false);
+                          setRejectNotes('');
+                        }}
+                        disabled={isRespondingToAssignment}
+                        variant="outline"
+                        className="border-2 border-white text-white hover:bg-white/20"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
+          {/* Left Column - Main Ticket Info */}
+          <div className="space-y-4 md:space-y-6">
+            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm hover:shadow-xl transition-shadow duration-200">
+              <CardHeader className="pb-3 bg-gradient-to-r from-emerald-50 to-teal-50/50 rounded-t-lg border-b p-4 md:p-6">
+                <div className="space-y-3">
+                  <div className="flex flex-col space-y-2">
+                    <CardTitle className="text-lg md:text-xl break-words text-emerald-900">{ticket.title}</CardTitle>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={ticket.status} />
+                      <PriorityBadge priority={ticket.priority} />
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
             <CardContent className="p-4 md:p-6">
               <div className="space-y-4">
                 <div>
@@ -396,44 +584,18 @@ export default function TicketDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Zone User</span>
                   <div className="flex items-center">
-                    {ticket.subOwner && ticket.subOwner.role === 'ZONE_USER' ? (
+                    {ticket.assignedTo && (ticket.assignedTo.role === 'ZONE_USER' || ticket.assignedTo.role === 'ZONE_MANAGER') ? (
                       <>
                         <Avatar className="h-5 w-5 mr-2">
-                          <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                            {ticket.subOwner.name?.charAt(0) || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                          <span>{ticket.subOwner.name || 'No name'}</span>
-                          {ticket.zone?.name && (
-                            <span className="text-xs text-emerald-600 font-medium">Zone: {ticket.zone.name}</span>
-                          )}
-                          {ticket.subOwner.phone && (
-                            <span className="text-xs text-muted-foreground">{ticket.subOwner.phone}</span>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Service Person</span>
-                  <div className="flex items-center">
-                    {ticket.assignedTo && ticket.assignedTo.role === 'SERVICE_PERSON' ? (
-                      <>
-                        <Avatar className="h-5 w-5 mr-2">
-                          <AvatarFallback className="bg-blue-100 text-blue-700">
-                            {ticket.assignedTo.name?.charAt(0) || 'S'}
+                          <AvatarFallback className={`${ticket.assignedTo.role === 'ZONE_MANAGER' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {ticket.assignedTo.name?.charAt(0) || 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col">
                           <span>{ticket.assignedTo.name || 'No name'}</span>
-                          {ticket.zone?.name && (
-                            <span className="text-xs text-blue-600 font-medium">Zone: {ticket.zone.name}</span>
-                          )}
+                          <span className={`text-xs font-medium ${ticket.assignedTo.role === 'ZONE_MANAGER' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {ticket.assignedTo.role === 'ZONE_MANAGER' ? 'Zone Manager' : 'Zone User'}
+                          </span>
                           {ticket.assignedTo.phone && (
                             <span className="text-xs text-muted-foreground">{ticket.assignedTo.phone}</span>
                           )}
@@ -472,7 +634,7 @@ export default function TicketDetailPage() {
                     setAssignmentStep('ZONE_USER');
                     setIsAssignDialogOpen(true);
                   }}
-                  disabled={!ticket}
+                  disabled={!ticket || (ticket.assignmentStatus === 'PENDING' && ticket.assignedToId === user?.id)}
                   variant="outline"
                   className="w-full justify-start h-12 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border-emerald-200 hover:border-emerald-300 text-emerald-700 hover:text-emerald-800 transition-all duration-200 shadow-sm hover:shadow-md group"
                 >
@@ -573,11 +735,11 @@ export default function TicketDetailPage() {
         onSuccess={fetchTicketDetails}
         zoneId={ticket.zone?.id}
         initialStep={assignmentStep}
-        currentAssignedZoneUser={ticket.subOwner && ticket.subOwner.role === 'ZONE_USER' ? {
-          id: ticket.subOwner.id.toString(),
-          name: ticket.subOwner.name || 'No name',
-          email: ticket.subOwner.email,
-          phone: ticket.subOwner.phone || undefined
+        currentAssignedZoneUser={ticket.assignedTo && (ticket.assignedTo.role === 'ZONE_USER' || ticket.assignedTo.role === 'ZONE_MANAGER') ? {
+          id: ticket.assignedTo.id.toString(),
+          name: ticket.assignedTo.name || 'No name',
+          email: ticket.assignedTo.email,
+          phone: ticket.assignedTo.phone || undefined
         } : null}
         currentAssignedServicePerson={ticket.assignedTo && ticket.assignedTo.role === 'SERVICE_PERSON' ? {
           id: ticket.assignedTo.id.toString(),
@@ -595,6 +757,7 @@ export default function TicketDetailPage() {
         userRole={user?.role}
         onStatusChange={handleStatusChange}
       />
+      </div>
     </div>
   );
 }

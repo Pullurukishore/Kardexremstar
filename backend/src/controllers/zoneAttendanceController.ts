@@ -9,12 +9,12 @@ export const zoneAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ZONE_USER', 'ZONE_MANAGER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -30,22 +30,22 @@ export const zoneAttendanceController = {
         }
       });
       if (!userWithZone || !userWithZone.serviceZones.length) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           success: false,
-          error: 'No zone assigned to user' 
+          error: 'No zone assigned to user'
         });
       }
 
       const userZoneId = userWithZone.serviceZones[0].serviceZoneId;
-      const { 
-        startDate, 
-        endDate, 
+      const {
+        startDate,
+        endDate,
         status,
         userId: filterUserId,
         activityType,
         search,
-        page = 1, 
-        limit = 20 
+        page = 1,
+        limit = 20
       } = req.query;
 
       const skip = (Number(page) - 1) * Number(limit);
@@ -182,14 +182,14 @@ export const zoneAttendanceController = {
       });
       // Group attendance records by user and date for consolidation
       const consolidatedRecords = new Map();
-      
+
       attendanceRecords.forEach(record => {
         const userId = record.userId;
-        const dateKey = record.checkInAt ? 
-          new Date(record.checkInAt).toDateString() : 
+        const dateKey = record.checkInAt ?
+          new Date(record.checkInAt).toDateString() :
           new Date().toDateString();
         const key = `${userId}-${dateKey}`;
-        
+
         if (!consolidatedRecords.has(key)) {
           consolidatedRecords.set(key, {
             ...record,
@@ -201,7 +201,7 @@ export const zoneAttendanceController = {
         } else {
           const existing = consolidatedRecords.get(key);
           existing.sessions.push(record);
-          
+
           // Update consolidated record with earliest check-in and latest check-out
           if (record.checkInAt && (!existing.checkInAt || record.checkInAt < existing.checkInAt)) {
             existing.checkInAt = record.checkInAt;
@@ -209,25 +209,25 @@ export const zoneAttendanceController = {
             existing.checkInLongitude = record.checkInLongitude;
             existing.checkInAddress = record.checkInAddress;
           }
-          
+
           if (record.checkOutAt && (!existing.checkOutAt || record.checkOutAt > existing.checkOutAt)) {
             existing.checkOutAt = record.checkOutAt;
             existing.checkOutLatitude = record.checkOutLatitude;
             existing.checkOutLongitude = record.checkOutLongitude;
             existing.checkOutAddress = record.checkOutAddress;
           }
-          
+
           // Sum total hours
           existing.totalHours = (existing.totalHours || 0) + (record.totalHours || 0);
-          
+
           // Sum activity counts
           existing.activityCount = (existing.activityCount || 0) + (record.user._count?.activityLogs || 0);
-          
+
           // Combine notes
           if (record.notes) {
             existing.notes = existing.notes ? `${existing.notes}; ${record.notes}` : record.notes;
           }
-          
+
           // Update status priority (CHECKED_IN > LATE > EARLY_CHECKOUT > CHECKED_OUT > ABSENT)
           const statusPriority: Record<string, number> = {
             'CHECKED_IN': 5,
@@ -236,7 +236,7 @@ export const zoneAttendanceController = {
             'CHECKED_OUT': 2,
             'ABSENT': 1
           };
-          
+
           if ((statusPriority[record.status] || 0) > (statusPriority[existing.status] || 0)) {
             existing.status = record.status;
           }
@@ -292,7 +292,7 @@ export const zoneAttendanceController = {
       // Convert map to array and add flagging
       const finalRecords = Array.from(consolidatedRecords.values()).map((record: any) => {
         const flags = [...(record.flags || [])];
-        
+
         // Skip additional flagging for absent users (they already have ABSENT flag)
         if (record.status !== 'ABSENT') {
           // Add multiple sessions flag
@@ -303,7 +303,7 @@ export const zoneAttendanceController = {
               severity: 'info' as const
             });
           }
-          
+
           // Add late check-in flag
           if (record.checkInAt) {
             const checkInTime = new Date(record.checkInAt);
@@ -316,7 +316,7 @@ export const zoneAttendanceController = {
               });
             }
           }
-          
+
           // Add early checkout flag
           if (record.checkOutAt) {
             const checkOutTime = new Date(record.checkOutAt);
@@ -329,7 +329,7 @@ export const zoneAttendanceController = {
               });
             }
           }
-          
+
           // Add long day flag
           if (record.totalHours && record.totalHours > 12) {
             flags.push({
@@ -338,7 +338,7 @@ export const zoneAttendanceController = {
               severity: 'warning' as const
             });
           }
-          
+
           // Add auto checkout flag
           if (record.notes && record.notes.includes('Auto-checkout')) {
             flags.push({
@@ -347,7 +347,7 @@ export const zoneAttendanceController = {
               severity: 'info' as const
             });
           }
-          
+
           // Add no activity flag
           if ((record.activityCount || 0) === 0) {
             flags.push({
@@ -357,7 +357,7 @@ export const zoneAttendanceController = {
             });
           }
         }
-        
+
         return {
           ...record,
           flags
@@ -367,7 +367,7 @@ export const zoneAttendanceController = {
       // Apply pagination
       const totalRecords = finalRecords.length;
       const paginatedRecords = finalRecords.slice(skip, skip + Number(limit));
-      
+
       const totalPages = Math.ceil(totalRecords / Number(limit));
       return res.json({
         success: true,
@@ -383,9 +383,9 @@ export const zoneAttendanceController = {
       });
 
     } catch (error) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        error: 'Failed to fetch attendance records' 
+        error: 'Failed to fetch attendance records'
       });
     }
   },
@@ -395,12 +395,12 @@ export const zoneAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ZONE_USER', 'ZONE_MANAGER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -483,16 +483,16 @@ export const zoneAttendanceController = {
           totalRecords,
           statusBreakdown: statusCounts,
           averageHours: Number(averageHours.toFixed(2)),
-          period: startDate && endDate ? 
+          period: startDate && endDate ?
             `${new Date(startDate as string).toLocaleDateString()} - ${new Date(endDate as string).toLocaleDateString()}` :
             'All time'
         }
       });
 
     } catch (error) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        error: 'Failed to fetch attendance statistics' 
+        error: 'Failed to fetch attendance statistics'
       });
     }
   },
@@ -502,12 +502,12 @@ export const zoneAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ZONE_USER', 'ZONE_MANAGER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -561,9 +561,9 @@ export const zoneAttendanceController = {
       });
 
     } catch (error) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        error: 'Failed to fetch service persons' 
+        error: 'Failed to fetch service persons'
       });
     }
   },
@@ -573,12 +573,12 @@ export const zoneAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ZONE_USER', 'ZONE_MANAGER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -606,9 +606,9 @@ export const zoneAttendanceController = {
       });
 
     } catch (error) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        error: 'Failed to fetch service zones' 
+        error: 'Failed to fetch service zones'
       });
     }
   },
@@ -618,12 +618,12 @@ export const zoneAttendanceController = {
     try {
       const userId = req.user?.id;
       const userRole = req.user?.role;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ZONE_USER', 'ZONE_MANAGER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -714,7 +714,7 @@ export const zoneAttendanceController = {
 
       const fields = [
         'Service Person',
-        'Email', 
+        'Email',
         'Zone',
         'Date',
         'Check-In Time',
@@ -734,13 +734,13 @@ export const zoneAttendanceController = {
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      
+
       return res.send(csv);
 
     } catch (error) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        error: 'Failed to export attendance data' 
+        error: 'Failed to export attendance data'
       });
     }
   },
@@ -751,12 +751,12 @@ export const zoneAttendanceController = {
       const userId = req.user?.id;
       const userRole = req.user?.role;
       const attendanceId = req.params.id;
-      
+
       if (!userId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      if (!userRole || !['ZONE_USER', 'SERVICE_PERSON'].includes(userRole)) {
+      if (!userRole || !['ZONE_USER', 'ZONE_MANAGER', 'SERVICE_PERSON'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
@@ -782,7 +782,7 @@ export const zoneAttendanceController = {
       if (attendanceId.startsWith('absent-')) {
         const parts = attendanceId.split('-');
         const servicePersonId = parseInt(parts[1]);
-        
+
         // Verify the service person belongs to the current zone
         const servicePerson = await prisma.user.findFirst({
           where: {
@@ -805,9 +805,9 @@ export const zoneAttendanceController = {
         });
 
         if (!servicePerson) {
-          return res.status(404).json({ 
+          return res.status(404).json({
             success: false,
-            error: 'Attendance record not found' 
+            error: 'Attendance record not found'
           });
         }
 
@@ -1000,9 +1000,9 @@ export const zoneAttendanceController = {
       });
 
       if (!attendanceRecord) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           success: false,
-          error: 'Attendance record not found' 
+          error: 'Attendance record not found'
         });
       }
 
@@ -1071,7 +1071,7 @@ export const zoneAttendanceController = {
 
       // Add flags and analysis
       const flags = [];
-      
+
       // Add late check-in flag
       if (attendanceRecord.checkInAt) {
         const checkInTime = new Date(attendanceRecord.checkInAt);
@@ -1084,7 +1084,7 @@ export const zoneAttendanceController = {
           });
         }
       }
-      
+
       // Add early checkout flag
       if (attendanceRecord.checkOutAt) {
         const checkOutTime = new Date(attendanceRecord.checkOutAt);
@@ -1097,7 +1097,7 @@ export const zoneAttendanceController = {
           });
         }
       }
-      
+
       // Add long day flag
       if (attendanceRecord.totalHours && Number(attendanceRecord.totalHours) > 12) {
         flags.push({
@@ -1106,7 +1106,7 @@ export const zoneAttendanceController = {
           severity: 'warning'
         });
       }
-      
+
       // Add auto checkout flag
       if (attendanceRecord.notes && attendanceRecord.notes.includes('Auto-checkout')) {
         flags.push({
@@ -1115,7 +1115,7 @@ export const zoneAttendanceController = {
           severity: 'info'
         });
       }
-      
+
       // Add no activity flag
       if (activityLogs.length === 0) {
         flags.push({
@@ -1179,12 +1179,12 @@ export const zoneAttendanceController = {
       // Calculate gaps between activities (same as admin controller)
       const activities = activityLogs;
       const gaps = [];
-      
+
       for (let i = 1; i < activities.length; i++) {
         const prevEnd = activities[i - 1].endTime ? new Date(activities[i - 1].endTime!) : new Date(activities[i - 1].startTime);
         const currentStart = new Date(activities[i].startTime);
         const gapMinutes = (currentStart.getTime() - prevEnd.getTime()) / (1000 * 60);
-        
+
         if (gapMinutes > 30) { // 30+ minute gap
           gaps.push({
             start: prevEnd,
@@ -1232,9 +1232,9 @@ export const zoneAttendanceController = {
       });
 
     } catch (error) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        error: 'Failed to fetch attendance record details' 
+        error: 'Failed to fetch attendance record details'
       });
     }
   }

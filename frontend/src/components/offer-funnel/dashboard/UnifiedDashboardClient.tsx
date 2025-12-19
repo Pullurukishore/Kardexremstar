@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -97,6 +97,10 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
   const [heatmapView, setHeatmapView] = useState<'zone' | 'user'>('zone')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
+  // Refs to prevent duplicate API calls (React Strict Mode protection)
+  const hasInitialized = useRef(false)
+  const isFetching = useRef(false)
+
 
   const getDateParams = () => {
     const now = new Date()
@@ -117,7 +121,15 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
   }
 
   useEffect(() => {
+    // Prevent duplicate fetches (React Strict Mode protection)
+    if (isFetching.current) {
+      return
+    }
+
     const fetchDashboardData = async () => {
+      // Mark as fetching to prevent concurrent calls
+      isFetching.current = true
+      
       try {
         setLoading(true)
         const params = getDateParams()
@@ -144,8 +156,10 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
           setError('Failed to load dashboard data')
         }
       } finally {
+        isFetching.current = false
         setLoading(false)
         setIsRefreshing(false)
+        hasInitialized.current = true
       }
     }
 
@@ -153,7 +167,13 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
   }, [range, mode])
 
   const handleRefresh = async () => {
+    // Prevent duplicate refreshes
+    if (isFetching.current) {
+      return
+    }
+    
     try {
+      isFetching.current = true
       setIsRefreshing(true)
       const params = getDateParams()
       let dashData: any
@@ -174,6 +194,7 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
     } catch (err: any) {
       console.error('Failed to refresh dashboard data:', err)
     } finally {
+      isFetching.current = false
       setIsRefreshing(false)
     }
   }
@@ -192,9 +213,7 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
       'INITIAL': 'text-blue-600 bg-blue-50',
       'PROPOSAL_SENT': 'text-indigo-600 bg-indigo-50',
       'NEGOTIATION': 'text-purple-600 bg-purple-50',
-      'FINAL_APPROVAL': 'text-amber-600 bg-amber-50',
       'PO_RECEIVED': 'text-cyan-600 bg-cyan-50',
-      'ORDER_BOOKED': 'text-teal-600 bg-teal-50',
       'WON': 'text-green-600 bg-green-50',
       'LOST': 'text-red-600 bg-red-50',
     }
@@ -376,81 +395,43 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 p-4 sm:p-6 lg:p-8">
-        {/* Animated background */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
+      <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+        {/* Premium Background */}
+        <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20"></div>
+        <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.08),_transparent_50%)]"></div>
+        <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(168,85,247,0.08),_transparent_50%)]"></div>
+        
+        {/* Floating orbs */}
+        <div className="fixed top-20 left-10 w-72 h-72 bg-gradient-to-br from-blue-400/15 to-indigo-400/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="fixed bottom-20 right-10 w-96 h-96 bg-gradient-to-br from-purple-400/15 to-pink-400/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="fixed top-1/2 left-1/3 w-64 h-64 bg-gradient-to-br from-indigo-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        
+        <div className="text-center relative z-10">
+          <div className="relative mb-8">
+            {/* Premium animated spinner */}
+            <div className="relative w-24 h-24 mx-auto">
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-indigo-500 animate-spin"></div>
+              <div className="absolute inset-2 rounded-full border-4 border-transparent border-b-purple-400 border-l-blue-400 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+              <div className="absolute inset-4 rounded-full border-4 border-transparent border-t-indigo-300 border-r-purple-300 animate-spin" style={{ animationDuration: '2s' }}></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-800 via-blue-800 to-purple-800 bg-clip-text text-transparent">
+              Loading Offer Analytics
+            </h2>
+            <p className="text-gray-600 animate-pulse font-medium">Preparing your dashboard...</p>
+            <div className="flex items-center justify-center space-x-2 mt-6">
+              <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce shadow-lg shadow-blue-500/50"></div>
+              <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce shadow-lg shadow-indigo-500/50" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-2.5 h-2.5 bg-purple-500 rounded-full animate-bounce shadow-lg shadow-purple-500/50" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          </div>
         </div>
-
-        <div className="relative z-10 mx-auto max-w-7xl space-y-8">
-          {/* Header skeleton */}
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-xl animate-pulse" />
-            <div className="h-10 w-64 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg animate-pulse" />
-          </div>
-
-          {/* Main card skeleton */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/50">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-200/60 to-purple-200/60 rounded-2xl animate-pulse" />
-              <div className="space-y-2 flex-1">
-                <div className="h-6 bg-slate-200/60 rounded w-64 animate-pulse" />
-                <div className="h-4 bg-slate-200/40 rounded w-96 animate-pulse" />
-              </div>
-            </div>
-
-            {/* Stats grid skeleton */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              {[1, 2, 3, 4].map(i => (
-                <div 
-                  key={i}
-                  className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-xl p-5 border border-slate-200animate-pulse"
-                  style={{ animationDelay: `${i * 100}ms` }}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-slate-200/60 rounded-xl" />
-                    <div className="w-16 h-6 bg-slate-200/50 rounded-full" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="h-4 bg-slate-200/60 rounded w-3/4" />
-                    <div className="h-8 bg-slate-200/80 rounded-lg w-1/2" />
-                    <div className="h-2 bg-slate-200/40 rounded w-full" />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Secondary stats skeleton */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="bg-slate-50 rounded-xl p-4 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
-                  <div className="h-3 bg-slate-200/60 rounded w-2/3 mb-2" />
-                  <div className="h-7 bg-slate-200/80 rounded-lg w-1/2" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Charts skeleton */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[1, 2].map(i => (
-              <div key={i} className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/50">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-slate-200/60 rounded-xl animate-pulse" />
-                  <div className="h-6 bg-slate-200/60 rounded w-48 animate-pulse" />
-                </div>
-                <div className="h-64 bg-slate-200/50 rounded-xl animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {/* Loading indicator */}
-          <div className="fixed bottom-8 right-8 flex items-center gap-3 bg-white/95 backdrop-blur-xl px-5 py-3 rounded-full shadow-xl border border-slate-200/50">
-            <div className="w-5 h-5 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm font-semibold text-slate-700">Loading analytics...</span>
-          </div>
-</div>
       </div>
     )
   }
@@ -480,62 +461,87 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
     : stats.conversionRate
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Enhanced Header with Buttons */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-600 rounded-xl shadow-lg">
-                <BarChart3 className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                  Offer Analytics Dashboard
-                </h1>
-                <p className="text-slate-600 font-medium">Real-time Operations & Field Service Intelligence</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4 text-sm text-slate-500">
-              <div className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </div>
-              <div className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                Last updated: {new Date().toLocaleTimeString()}
-                {isRefreshing && <RefreshCw className="w-4 h-4 ml-1 animate-spin" />}
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen pb-safe overflow-x-hidden w-full max-w-full relative">
+      {/* Premium Background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 -z-10"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.06),_transparent_50%)] -z-10"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(168,85,247,0.06),_transparent_50%)] -z-10"></div>
+      
+      {/* Floating decorative orbs */}
+      <div className="fixed top-20 left-10 w-64 h-64 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full blur-3xl animate-pulse pointer-events-none"></div>
+      <div className="fixed bottom-32 right-10 w-80 h-80 bg-gradient-to-br from-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-pulse pointer-events-none" style={{ animationDelay: '1s' }}></div>
+      <div className="fixed top-1/2 left-1/3 w-72 h-72 bg-gradient-to-br from-indigo-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse pointer-events-none" style={{ animationDelay: '0.5s' }}></div>
 
-          <div className="flex flex-wrap gap-3">
-            <div className="flex gap-2">
-              <Button
-                onClick={() => window.location.href = '/admin/offers'}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 flex items-center gap-2"
-              >
-                <Package className="h-4 w-4" />
-                New Offer
-              </Button>
-              <Button
-                onClick={handleRefresh}
-                variant="default"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 flex items-center gap-2"
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
-              </Button>
+      {/* Premium Header Banner */}
+      <header className="relative bg-gradient-to-r from-[#3d5a78] via-[#507295] to-[#6889ab] text-white overflow-hidden">
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOGM5Ljk0MSAwIDE4LTguMDU5IDE4LTE4cy04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCA0IDYuMjY4IDE0IDE0LTYuMjY4IDE0LTE0IDE0eiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIvPjwvZz48L3N2Zz4=')] opacity-50"></div>
+        </div>
+        
+        <div className="relative z-10 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              {/* Header Left Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 lg:w-16 lg:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30 shadow-xl group-hover:scale-110 transition-transform duration-300">
+                    <BarChart3 className="w-7 h-7 lg:w-8 lg:h-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-white tracking-tight">
+                      Offer Analytics Dashboard
+                    </h1>
+                    <p className="text-white/70 text-sm lg:text-base mt-1">
+                      Real-time Operations & Field Service Intelligence
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
+                  <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <Calendar className="w-4 h-4" />
+                    <span>{new Date().toLocaleDateString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <Clock className="w-4 h-4" />
+                    <span>Updated: {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                    {isRefreshing && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Header Right Section - Action Buttons */}
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={() => window.location.href = mode === 'admin' ? '/admin/offers' : mode === 'zoneUser' ? '/zone/offers' : '/zone-manager/offers'}
+                  className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                >
+                  <Package className="h-4 w-4" />
+                  New Offer
+                </Button>
+                <Button
+                  onClick={handleRefresh}
+                  className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
+      </header>
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
         {/* Overall Performance */}
         <Card className="group overflow-hidden border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 bg-gradient-to-br from-violet-50 via-white to-indigo-50 hover:from-violet-50 hover:to-indigo-100 relative">
@@ -2061,6 +2067,29 @@ export default function UnifiedDashboardClient({ mode }: UnifiedDashboardClientP
           )
         })()}
       </div>
+
+      {/* Refreshing Overlay */}
+      {isRefreshing && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 px-5 py-3 flex items-center gap-3">
+            <div className="relative">
+              <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />
+            </div>
+            <span className="text-sm text-gray-700 font-semibold">Updating...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Custom animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+      `}</style>
     </div>
   )
 }

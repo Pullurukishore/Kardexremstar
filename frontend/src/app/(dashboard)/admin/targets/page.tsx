@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/user.types';
 import { apiService } from '@/services/api';
 import { 
-  Plus, Target, TrendingUp, Users, Package, Building2, Edit2, Eye, RefreshCw, 
+  Plus, Target, TrendingUp, Users, Package, Building2, Pencil as Edit2, Eye, RefreshCw, 
   Filter, Award, BarChart3, Calendar, ChevronRight, Sparkles, ChevronDown,
   TrendingDown, Percent, ArrowUpRight, ArrowDownRight, Zap, Crown
 } from 'lucide-react';
@@ -137,20 +137,47 @@ export default function TargetsPage() {
   const [userTargets, setUserTargets] = useState<UserTarget[]>([]);
   const [productTypeData, setProductTypeData] = useState<ProductTypeBreakdown[]>([]);
 
-  // Initialize with current period
+  // Initialize with current period only on first load or when period type changes
   useEffect(() => {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const currentPeriod = periodType === 'MONTHLY' ? `${year}-${month}` : `${year}`;
-    setTargetPeriod(currentPeriod);
+    
+    // Only set default period if not already set OR when switching period types
+    if (!targetPeriod) {
+      const currentPeriod = periodType === 'MONTHLY' ? `${year}-${month}` : `${year}`;
+      setTargetPeriod(currentPeriod);
+    } else {
+      // When switching period types, convert the existing period appropriately
+      if (periodType === 'MONTHLY') {
+        // If switching to monthly and we have a year, default to that year's current month
+        if (targetPeriod.length === 4) {
+          setTargetPeriod(`${targetPeriod}-${month}`);
+        }
+      } else {
+        // If switching to yearly and we have a month, extract just the year
+        if (targetPeriod.includes('-')) {
+          setTargetPeriod(targetPeriod.split('-')[0]);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodType]);
 
-  // Fetch data
+  // Fetch data with debounce to prevent excessive API calls when typing
   useEffect(() => {
-    if (targetPeriod) {
+    if (!targetPeriod) return;
+    
+    // For yearly view, validate that we have a complete 4-digit year before fetching
+    if (periodType === 'YEARLY' && targetPeriod.length < 4) return;
+    
+    // Debounce the fetch to prevent multiple calls while typing
+    const timeoutId = setTimeout(() => {
       fetchTargets();
-    }
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, targetPeriod, periodType]);
 
   const fetchTargets = async () => {

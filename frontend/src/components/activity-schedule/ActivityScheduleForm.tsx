@@ -83,11 +83,12 @@ export default function ActivityScheduleForm({
     scheduledDate: initialData?.scheduledDate ? new Date(initialData.scheduledDate).toISOString().slice(0, 16) : '',
     estimatedDuration: initialData?.estimatedDuration || 1,
     location: initialData?.location || '',
-    ticketId: initialData?.ticketId || '',
+    ticketId: initialData?.ticketId ? String(initialData.ticketId) : '',
     notes: initialData?.notes || '',
-    zoneId: initialData?.zoneId || '',
-    customerId: initialData?.customerId || '',
-    assetIds: initialData?.assetIds || [],
+    // Convert zoneId and customerId to strings for Select components
+    zoneId: initialData?.zoneId != null ? String(initialData.zoneId) : '',
+    customerId: initialData?.customerId != null ? String(initialData.customerId) : '',
+    assetIds: initialData?.assetIds ? initialData.assetIds.map((id: any) => typeof id === 'string' ? id : String(id)) : [],
   });
 
   const [servicePersons, setServicePersons] = useState<ServicePerson[]>([]);
@@ -95,9 +96,13 @@ export default function ActivityScheduleForm({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [zones, setZones] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
+  // Pre-seed zones, customers, assets from initialData so they display immediately
+  const [zones, setZones] = useState<any[]>(initialData?.zone ? [initialData.zone] : []);
+  const [customers, setCustomers] = useState<any[]>(initialData?.customer ? [{
+    ...initialData.customer,
+    assets: initialData?.assets || []
+  }] : []);
+  const [assets, setAssets] = useState<any[]>(initialData?.assets || []);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [assetsLoading, setAssetsLoading] = useState(false);
 
@@ -128,8 +133,8 @@ export default function ActivityScheduleForm({
         console.log('Fetched service persons:', persons);
         setServicePersons(persons);
         
-        // Fetch zones
-        if (isAdmin) {
+        // Fetch zones - for admin, zone users, zone managers, expert helpdesk, or when editing
+        if (isAdmin || isZone || isExpert || isEditing) {
           console.log('Fetching zones...');
           const zonesResponse = await api.get('/service-zones', { params: { limit: 100 } });
           console.log('Zones response:', zonesResponse);
@@ -146,7 +151,7 @@ export default function ActivityScheduleForm({
     };
 
     fetchInitialData();
-  }, [isAdmin, user]);
+  }, [isAdmin, isZone, isExpert, isEditing, user]);
 
   // Handle initial data when editing
   useEffect(() => {
@@ -215,8 +220,11 @@ export default function ActivityScheduleForm({
       
       if (!formData.zoneId) {
         console.log('No zone selected, clearing customers');
-        setCustomers([]);
-        setAssets([]);
+        // Don't clear if we have initial data (editing mode)
+        if (!isEditing || !initialData?.customerId) {
+          setCustomers([]);
+          setAssets([]);
+        }
         return;
       }
 
@@ -241,50 +249,86 @@ export default function ActivityScheduleForm({
         console.log('Formatted customers data:', customersData);
         
         // Map the API response to match our expected format
-        const formattedCustomers = customersData.map((customer: any) => ({
+        let formattedCustomers = customersData.map((customer: any) => ({
           ...customer,
           contacts: customer.contacts || [],
           assets: customer.assets || []
         }));
         
+        // When editing, ensure the initial customer is in the list even if not in fetched data
+        if (isEditing && initialData?.customer && initialData.customer.id) {
+          const initialCustomerExists = formattedCustomers.some((c: any) => c.id === initialData.customer.id);
+          if (!initialCustomerExists) {
+            formattedCustomers = [
+              {
+                ...initialData.customer,
+                assets: Array.isArray(initialData.assets) ? initialData.assets : [],
+              },
+              ...formattedCustomers
+            ];
+          }
+        }
+        
         console.log('Setting customers:', formattedCustomers);
         setCustomers(formattedCustomers);
-        setAssets([]);
+        
+        // Only clear assets if not editing or if zone actually changed from initial
+        if (!isEditing || (initialData?.zoneId && formData.zoneId !== initialData.zoneId.toString())) {
+          setAssets([]);
+        }
       } catch (error) {
         console.error('Error fetching customers:', error);
         toast.error(formData.zoneId === 'all' 
           ? 'Failed to load customers from all zones'
           : 'Failed to load customers for selected zone');
-        setCustomers([]);
+        // Don't clear customers if we have initial data
+        if (!isEditing || !initialData?.customerId) {
+          setCustomers([]);
+        }
       } finally {
         setCustomersLoading(false);
       }
     };
 
     fetchZoneCustomers();
-  }, [formData.zoneId, initialData?.zoneId]);
+  }, [formData.zoneId, isEditing, initialData?.zoneId, initialData?.customerId, initialData?.customer, initialData?.assets]);
 
   // Update assets when customer changes
   useEffect(() => {
     if (!formData.customerId) {
-      setAssets([]);
-      setFormData(prev => ({
-        ...prev,
-        assetIds: [],
-      }));
+      // Don't clear assets if editing and we have initial assets
+      if (!isEditing || !initialData?.assetIds?.length) {
+        setAssets([]);
+        setFormData(prev => ({
+          ...prev,
+          assetIds: [],
+        }));
+      }
       return;
     }
 
     const selectedCustomer = customers.find(c => c.id.toString() === formData.customerId);
     if (selectedCustomer) {
-      setAssets(selectedCustomer.assets || []);
-      // Preserve initial asset IDs when editing
-      setFormData(prev => ({
-        ...prev,
-        assetIds: initialData?.assetIds || prev.assetIds || [],
-      }));
+      // If editing and customer hasn't changed, use initial assets first
+      if (isEditing && initialData?.customerId?.toString() === formData.customerId && initialData?.assets?.length) {
+        setAssets(initialData.assets);
+      } else {
+        setAssets(selectedCustomer.assets || []);
+      }
+      // Preserve initial asset IDs when editing and customer hasn't changed
+      if (isEditing && initialData?.customerId?.toString() === formData.customerId && initialData?.assetIds?.length) {
+        setFormData(prev => ({
+          ...prev,
+          assetIds: initialData.assetIds.map((id: any) => typeof id === 'string' ? id : String(id)),
+        }));
+      }
+    } else if (isEditing && initialData?.customerId?.toString() === formData.customerId) {
+      // Customer not in list yet, but we're editing - use initial assets
+      if (initialData?.assets?.length) {
+        setAssets(initialData.assets);
+      }
     }
-  }, [formData.customerId, customers, initialData?.customerId]);
+  }, [formData.customerId, customers, isEditing, initialData?.customerId, initialData?.assets, initialData?.assetIds]);
 
   // Fetch tickets based on activity type
   useEffect(() => {
@@ -655,7 +699,7 @@ export default function ActivityScheduleForm({
           </div>
         </div>
 
-        {(isAdmin || (isEditing && formData.zoneId)) && (
+        {(isAdmin || isZone || isExpert || isEditing) && (
           <div className="space-y-2">
             <Label htmlFor="zoneId" className="text-gray-700 font-semibold flex items-center gap-2">
               <MapPin className="h-4 w-4" />
@@ -663,8 +707,8 @@ export default function ActivityScheduleForm({
             </Label>
             <Select 
               value={formData.zoneId} 
-              onValueChange={(value) => isAdmin ? handleSelectChange('zoneId', value) : undefined}
-              disabled={!isAdmin || loading}
+              onValueChange={(value) => handleSelectChange('zoneId', value)}
+              disabled={loading}
             >
               <SelectTrigger id="zoneId" className="border-2 border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 h-11 rounded-lg transition-all disabled:opacity-50">
                 <SelectValue placeholder={loading ? 'Loading zones...' : 'Select a zone'} />
@@ -677,11 +721,8 @@ export default function ActivityScheduleForm({
                 ))}
               </SelectContent>
             </Select>
-            {!isAdmin && formData.zoneId && (
-              <p className="text-xs text-gray-500 mt-1">
-                Zone: {zones.find(z => z.id.toString() === formData.zoneId)?.name || 'Unknown'}
-              </p>
-            )}
+
+
           </div>
         )}
 
@@ -693,12 +734,12 @@ export default function ActivityScheduleForm({
           <Select 
             value={formData.customerId} 
             onValueChange={(value) => handleSelectChange('customerId', value)}
-            disabled={customersLoading || (!isAdmin && !formData.zoneId)}
+            disabled={customersLoading || (!isAdmin && !isEditing && !formData.zoneId)}
           >
             <SelectTrigger id="customerId" className="border-2 border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 h-11 rounded-lg transition-all disabled:opacity-50">
               <SelectValue placeholder={
                 customersLoading ? 'Loading customers...' : 
-                (!isAdmin && !formData.zoneId) ? 'Select a zone first' :
+                (!isAdmin && !isEditing && !formData.zoneId) ? 'Select a zone first' :
                 'Select a customer'
               } />
             </SelectTrigger>

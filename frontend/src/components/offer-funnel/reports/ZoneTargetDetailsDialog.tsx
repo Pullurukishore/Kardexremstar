@@ -63,8 +63,7 @@ const ZoneTargetDetailsDialog: React.FC<ZoneTargetDetailsDialogProps> = ({
       
       const response = await apiService.getZoneTargetDetails(
         zoneId,
-        targetPeriod,
-        periodType
+        { targetPeriod, periodType }
       );
 
       console.log('Zone target details response:', response);

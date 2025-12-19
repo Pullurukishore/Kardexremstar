@@ -34,25 +34,38 @@ export const listServicePersons = async (req: Request & { user?: AuthUser }, res
 
     // Build where clause for search
     const where: any = { role: 'SERVICE_PERSON' };
-    
+
     // For ZONE_USER and ZONE_MANAGER, only show service persons from their zones
     if (req.user?.role === 'ZONE_USER' || req.user?.role === 'ZONE_MANAGER') {
-      where.serviceZones = {
-        some: {
-          serviceZone: {
-            servicePersons: {
-              some: {
-                userId: req.user.id
-              }
-            }
+      // First, get the zones that this user belongs to
+      const userZones = await prisma.servicePersonZone.findMany({
+        where: { userId: req.user.id },
+        select: { serviceZoneId: true }
+      });
+
+      const zoneIds = userZones.map(z => z.serviceZoneId);
+
+      if (zoneIds.length > 0) {
+        // Find service persons who belong to any of these zones
+        where.serviceZones = {
+          some: {
+            serviceZoneId: { in: zoneIds }
           }
-        }
-      };
+        };
+      } else {
+        // User has no zones, return empty result
+        return res.json({
+          success: true,
+          data: [],
+          pagination: { page, limit, total: 0, totalPages: 0 }
+        });
+      }
     }
-    
+
     if (search) {
       where.OR = [
         { email: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
         { id: { equals: parseInt(search) || 0 } }
       ];
     }
@@ -79,10 +92,11 @@ export const listServicePersons = async (req: Request & { user?: AuthUser }, res
       }),
       prisma.user.count({ where })
     ]);
-    
+
     const totalPages = Math.ceil(total / limit);
-    
+
     res.json({
+      success: true,
       data: servicePersons,
       pagination: {
         page,
@@ -99,9 +113,9 @@ export const listServicePersons = async (req: Request & { user?: AuthUser }, res
 export const getServicePerson = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     const servicePerson = await prisma.user.findUnique({
-      where: { 
+      where: {
         id: Number(id),
         role: 'SERVICE_PERSON'
       },
@@ -187,7 +201,7 @@ export const updateServicePerson = async (req: ServicePersonRequest, res: Respon
 
     // Check if service person exists
     const existingPerson = await prisma.user.findUnique({
-      where: { 
+      where: {
         id: Number(id),
         role: 'SERVICE_PERSON'
       }
@@ -263,7 +277,7 @@ export const deleteServicePerson = async (req: Request, res: Response) => {
 
     // Check if service person exists
     const servicePerson = await prisma.user.findUnique({
-      where: { 
+      where: {
         id: Number(id),
         role: 'SERVICE_PERSON'
       }
@@ -301,7 +315,7 @@ export const deleteServicePerson = async (req: Request, res: Response) => {
       where: { id: Number(id) }
     });
 
-    res.json({ 
+    res.json({
       message: 'Service person deleted successfully',
       cleanedRecords: {
         serviceZones: serviceZonesCount

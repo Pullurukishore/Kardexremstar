@@ -3,20 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { useForm, ControllerRenderProps } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -25,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, Mail, Lock, Shield, Sparkles } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 const loginSchema = z.object({
@@ -41,6 +33,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Redirect authenticated users to their dashboard
   useEffect(() => {
@@ -102,22 +95,18 @@ export default function LoginPage() {
 
   // Load saved credentials on component mount
   useEffect(() => {
-    // Add a small delay to ensure component is fully mounted
     const timer = setTimeout(() => {
       const savedEmail = localStorage.getItem('rememberedEmail');
       const savedPassword = localStorage.getItem('rememberedPassword');
       const wasRemembered = localStorage.getItem('wasRemembered') === 'true';
       
       if (savedEmail && savedPassword && wasRemembered) {
-        // Use reset to set all values at once and trigger re-render
         form.reset({
           email: savedEmail,
           password: savedPassword,
           rememberMe: true,
         });
-        
-        } else {
-        }
+      }
     }, 100);
 
     return () => clearTimeout(timer);
@@ -131,7 +120,6 @@ export default function LoginPage() {
       const result = await login(values.email, values.password, values.rememberMe);
       
       if (result.success) {
-        // Save credentials if Remember Me is checked
         if (values.rememberMe) {
           localStorage.setItem('rememberedEmail', values.email);
           localStorage.setItem('rememberedPassword', values.password);
@@ -142,15 +130,12 @@ export default function LoginPage() {
           localStorage.removeItem('wasRemembered');
         }
         
-        // Show success state before redirect
         setLoginSuccess(true);
         
-        // Keep success state visible for 2 seconds before redirect
         setTimeout(() => {
           setLoginSuccess(false);
         }, 2000);
-      } else {
-        }
+      }
     } catch (error: any) {
       toast({
         title: "Login failed",
@@ -167,116 +152,157 @@ export default function LoginPage() {
   // Show loading screen if user is already authenticated
   if (isAuthenticated && user && !isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#507295]">
+      <div className="min-h-screen flex items-center justify-center" style={{
+        background: 'linear-gradient(135deg, #1a365d 0%, #2d5a87 30%, #507295 50%, #3d7a9e 70%, #2c5282 100%)'
+      }}>
         <div className="text-center p-8">
-          <div className="mb-6">
-            <div className="mb-2">
-              {/* White background container for logo visibility */}
-              <div className="bg-white rounded-2xl p-4 shadow-lg mx-auto inline-block">
-                <Image
-                  src="/kardex.png"
-                  alt="Kardex Logo"
-                  width={200}
-                  height={80}
-                  className="mx-auto"
-                  priority
-                />
+          <div className="mb-8 relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#aac01d]/20 to-[#507295]/20 rounded-3xl blur-xl animate-pulse"></div>
+            <div className="relative bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/20">
+              <Image
+                src="/kardex.png"
+                alt="Kardex Logo"
+                width={200}
+                height={80}
+                className="mx-auto"
+                priority
+              />
+            </div>
+          </div>
+          
+          <div className="mb-6 relative">
+            <div className="w-20 h-20 mx-auto relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#aac01d] to-[#507295] rounded-full animate-spin" style={{ animationDuration: '3s' }}></div>
+              <div className="absolute inset-1 bg-gradient-to-br from-[#1a365d] to-[#2d5a87] rounded-full flex items-center justify-center">
+                <Sparkles className="h-8 w-8 text-white animate-pulse" />
               </div>
             </div>
           </div>
           
-          <div className="mb-4">
-            <Loader2 className="h-12 w-12 text-white mx-auto animate-spin" />
-          </div>
-          
-          <p className="text-white/70 text-sm">
-            Welcome! Redirecting to your dashboard...
+          <h3 className="text-2xl font-bold text-white mb-2">Welcome Back!</h3>
+          <p className="text-white/70 text-sm mb-6">
+            Redirecting to your dashboard...
           </p>
           
-          <div className="mt-4 w-48 h-1 bg-white/20 rounded-full mx-auto overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-white to-[#aac01d] rounded-full animate-pulse"></div>
+          <div className="w-56 h-1.5 bg-white/10 rounded-full mx-auto overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-[#aac01d] via-white to-[#aac01d] rounded-full animate-[shimmer_2s_infinite]" 
+              style={{
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 2s infinite linear'
+              }}
+            ></div>
           </div>
         </div>
+        
+        <style jsx>{`
+          @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+          }
+        `}</style>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#507295] via-[#5a7ba0] to-[#4a6b8a]"></div>
+      {/* Deep Premium Background */}
+      <div className="absolute inset-0" style={{
+        background: 'linear-gradient(135deg, #1a365d 0%, #2d5a87 25%, #507295 50%, #3d7a9e 75%, #2c5282 100%)'
+      }}></div>
       
-      {/* Animated Gradient Orbs */}
+      {/* Animated Mesh Gradient */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-[#aac01d]/20 to-transparent rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-[#507295]/30 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-[#aac01d]/10 to-[#507295]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-[#aac01d]/15 via-transparent to-transparent rounded-full blur-3xl animate-[float_20s_ease-in-out_infinite]"></div>
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-[#507295]/20 via-transparent to-transparent rounded-full blur-3xl animate-[float_25s_ease-in-out_infinite_reverse]"></div>
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-gradient-to-br from-[#aac01d]/10 to-[#507295]/10 rounded-full blur-3xl animate-[pulse_8s_ease-in-out_infinite]"></div>
       </div>
       
-      {/* Geometric Pattern Overlay */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `
-            radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 2px, transparent 2px),
-            radial-gradient(circle at 75% 75%, rgba(172,192,29,0.1) 1px, transparent 1px),
-            linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.05) 50%, transparent 60%)
-          `,
-          backgroundSize: '60px 60px, 40px 40px, 120px 120px',
-          backgroundPosition: '0 0, 30px 30px, 0 0'
-        }}></div>
-      </div>
-      
-      {/* Floating Particles */}
+      {/* Floating Geometric Shapes */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-white/20 rounded-full animate-bounce" style={{ animationDelay: '0s', animationDuration: '3s' }}></div>
-        <div className="absolute top-3/4 right-1/4 w-1 h-1 bg-[#aac01d]/30 rounded-full animate-bounce" style={{ animationDelay: '1s', animationDuration: '4s' }}></div>
-        <div className="absolute top-1/2 left-3/4 w-1.5 h-1.5 bg-white/15 rounded-full animate-bounce" style={{ animationDelay: '2s', animationDuration: '5s' }}></div>
-        <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-[#aac01d]/20 rounded-full animate-bounce" style={{ animationDelay: '3s', animationDuration: '3.5s' }}></div>
+        {/* Large rotating ring */}
+        <div className="absolute top-20 right-20 w-32 h-32 border border-white/10 rounded-full animate-[spin_30s_linear_infinite]"></div>
+        <div className="absolute top-24 right-24 w-24 h-24 border border-[#aac01d]/20 rounded-full animate-[spin_20s_linear_infinite_reverse]"></div>
+        
+        {/* Floating squares */}
+        <div className="absolute bottom-1/4 left-1/6 w-4 h-4 bg-white/5 rotate-45 animate-[float_6s_ease-in-out_infinite]"></div>
+        <div className="absolute top-1/3 right-1/5 w-6 h-6 border border-[#aac01d]/20 rotate-12 animate-[float_8s_ease-in-out_infinite_1s]"></div>
+        
+        {/* Glowing orbs */}
+        <div className="absolute top-1/4 left-1/4 w-3 h-3 bg-gradient-to-r from-white/30 to-white/10 rounded-full blur-sm animate-[bounce_4s_ease-in-out_infinite]"></div>
+        <div className="absolute top-2/3 right-1/3 w-2 h-2 bg-[#aac01d]/40 rounded-full blur-sm animate-[bounce_5s_ease-in-out_infinite_0.5s]"></div>
+        <div className="absolute bottom-1/3 left-1/3 w-2.5 h-2.5 bg-white/20 rounded-full blur-sm animate-[bounce_6s_ease-in-out_infinite_1s]"></div>
+        <div className="absolute top-1/2 right-1/6 w-1.5 h-1.5 bg-[#aac01d]/30 rounded-full blur-sm animate-[bounce_4.5s_ease-in-out_infinite_1.5s]"></div>
       </div>
       
-      {/* Glass Morphism Background Effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/5 backdrop-blur-[0.5px]"></div>
+      {/* Subtle grid pattern */}
+      <div className="absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: `
+          linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+        `,
+        backgroundSize: '50px 50px'
+      }}></div>
       
-      <div className="w-full max-w-md relative z-10">
+      {/* Main Content */}
+      <div className="w-full max-w-[420px] relative z-10">
+        {/* Glow effect behind card */}
+        <div className="absolute -inset-4 bg-gradient-to-r from-[#aac01d]/20 via-white/10 to-[#507295]/20 rounded-[2.5rem] blur-2xl opacity-60"></div>
+        
         {/* Main Login Card */}
-        <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden backdrop-blur-sm bg-white/95">
+        <div className="relative bg-white/[0.97] backdrop-blur-2xl rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border border-white/50 overflow-hidden">
+          {/* Decorative top accent */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#507295] via-[#aac01d] to-[#507295]"></div>
+          
           {/* Header Section */}
-          <CardHeader className="text-center bg-gradient-to-b from-white to-gray-50/50 p-8 pb-6">
-            <div className="mb-6">
-              <Image
-                src="/kardex.png"
-                alt="Kardex Logo"
-                width={200}
-                height={80}
-                className="mx-auto drop-shadow-sm"
-                priority
-              />
+          <div className="relative pt-10 pb-6 px-8 text-center">
+            {/* Subtle background pattern in header */}
+            <div className="absolute inset-0 opacity-[0.02]" style={{
+              backgroundImage: 'radial-gradient(circle at 50% 50%, #507295 1px, transparent 1px)',
+              backgroundSize: '20px 20px'
+            }}></div>
+            
+            <div className="relative mb-8">
+              <div className="inline-block relative">
+                {/* Logo glow effect */}
+                <div className="absolute -inset-4 bg-gradient-to-r from-[#aac01d]/10 to-[#507295]/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <Image
+                  src="/kardex.png"
+                  alt="Kardex Logo"
+                  width={180}
+                  height={72}
+                  className="relative drop-shadow-sm transition-transform duration-300 hover:scale-105"
+                  priority
+                />
+              </div>
             </div>
-            <CardTitle className="text-2xl font-bold text-[#507295] mb-2">
-              Welcome 
-            </CardTitle>
-            <CardDescription className="text-gray-600">
-              Sign in to your account to continue
-            </CardDescription>
-          </CardHeader>
+            
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-[#507295] to-[#3d7a9e] bg-clip-text text-transparent mb-2">
+              Welcome Back
+            </h1>
+            <p className="text-gray-500 text-sm">
+              Enter your credentials to access your dashboard
+            </p>
+          </div>
 
           {/* Form Section */}
-          <CardContent className="p-8 relative">
+          <div className="px-8 pb-8 relative">
             {/* Success Overlay */}
             {loginSuccess && (
-              <div className="absolute inset-0 bg-white/98 backdrop-blur-md flex items-center justify-center z-20 rounded-3xl">
+              <div className="absolute inset-0 bg-white/[0.98] backdrop-blur-md flex items-center justify-center z-20">
                 <div className="text-center p-8">
-                  <div className="mb-6">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle2 className="h-12 w-12 text-green-600 animate-bounce" />
+                  <div className="mb-6 relative">
+                    <div className="absolute inset-0 bg-green-400/20 rounded-full blur-xl animate-pulse"></div>
+                    <div className="relative w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-green-200">
+                      <CheckCircle2 className="h-12 w-12 text-white animate-[scale_0.5s_ease-out]" />
                     </div>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">Welcome Back!</h3>
-                  <p className="text-gray-600 mb-6">Login successful. Redirecting to your dashboard...</p>
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce"></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Success!</h3>
+                  <p className="text-gray-600 mb-6">Redirecting to your dashboard...</p>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
                   </div>
                 </div>
               </div>
@@ -284,50 +310,65 @@ export default function LoginPage() {
             
             {/* Loading Overlay */}
             {(isLoading || isSubmitting) && !loginSuccess && (
-              <div className="absolute inset-0 bg-white/95 backdrop-blur-md flex items-center justify-center z-10 rounded-3xl">
+              <div className="absolute inset-0 bg-white/[0.98] backdrop-blur-md flex items-center justify-center z-10">
                 <div className="text-center p-8">
-                  <div className="mb-6">
-                    <div className="relative w-16 h-16 mx-auto">
-                      <Loader2 className="h-16 w-16 text-[#507295] animate-spin" />
-                      <div className="absolute inset-0 border-4 border-[#aac01d]/20 rounded-full animate-pulse"></div>
+                  <div className="mb-6 relative">
+                    <div className="w-20 h-20 mx-auto relative">
+                      <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
+                      <div className="absolute inset-0 border-4 border-transparent border-t-[#507295] border-r-[#aac01d] rounded-full animate-spin"></div>
+                      <div className="absolute inset-2 bg-gradient-to-br from-[#507295]/10 to-[#aac01d]/10 rounded-full flex items-center justify-center">
+                        <Shield className="h-6 w-6 text-[#507295]" />
+                      </div>
                     </div>
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     {isSubmitting ? "Authenticating..." : "Loading..."}
                   </h3>
-                  <p className="text-gray-600 text-sm mb-6">
-                    {isSubmitting 
-                      ? "Verifying your credentials..." 
-                      : "Preparing your dashboard..."}
+                  <p className="text-gray-500 text-sm mb-6">
+                    {isSubmitting ? "Verifying your credentials" : "Preparing your session"}
                   </p>
-                  <div className="w-64 h-2 bg-gray-200 rounded-full mx-auto overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-[#507295] via-[#aac01d] to-[#507295] rounded-full animate-pulse"></div>
+                  <div className="w-48 h-1.5 bg-gray-100 rounded-full mx-auto overflow-hidden">
+                    <div className="h-full w-1/2 bg-gradient-to-r from-[#507295] to-[#aac01d] rounded-full animate-[loading_1s_ease-in-out_infinite]"></div>
                   </div>
                 </div>
               </div>
             )}
             
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                 {/* Email Field */}
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">Email Address</FormLabel>
+                      <FormLabel className="text-sm font-medium text-gray-700 mb-1.5 block">
+                        Email Address
+                      </FormLabel>
                       <FormControl>
-                        <div className="relative">
+                        <div className={`relative group transition-all duration-300 ${focusedField === 'email' ? 'scale-[1.02]' : ''}`}>
+                          <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
+                            focusedField === 'email' ? 'text-[#507295]' : 'text-gray-400'
+                          }`}>
+                            <Mail className="h-5 w-5" />
+                          </div>
                           <Input
-                            placeholder="Enter your email"
-                            type="email"
-                            className="h-12 pl-4 pr-4 border-2 border-gray-200 rounded-xl focus:border-[#507295] focus:ring-0 transition-colors duration-200 bg-gray-50/50 focus:bg-white"
-                            disabled={isLoading}
                             {...field}
+                            placeholder="you@example.com"
+                            type="email"
+                            className={`h-13 pl-12 pr-4 border-2 rounded-xl transition-all duration-300 bg-gray-50/50 text-gray-900 placeholder:text-gray-400 ${
+                              focusedField === 'email' 
+                                ? 'border-[#507295] bg-white shadow-lg shadow-[#507295]/10' 
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            style={{ height: '52px' }}
+                            disabled={isLoading || isSubmitting}
+                            onFocus={() => setFocusedField('email')}
+                            onBlur={(e) => { field.onBlur(); setFocusedField(null); }}
                           />
                         </div>
                       </FormControl>
-                      <FormMessage className="text-red-500 text-xs mt-1" />
+                      <FormMessage className="text-red-500 text-xs mt-1.5 ml-1" />
                     </FormItem>
                   )}
                 />
@@ -338,19 +379,33 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">Password</FormLabel>
+                      <FormLabel className="text-sm font-medium text-gray-700 mb-1.5 block">
+                        Password
+                      </FormLabel>
                       <FormControl>
-                        <div className="relative">
+                        <div className={`relative group transition-all duration-300 ${focusedField === 'password' ? 'scale-[1.02]' : ''}`}>
+                          <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
+                            focusedField === 'password' ? 'text-[#507295]' : 'text-gray-400'
+                          }`}>
+                            <Lock className="h-5 w-5" />
+                          </div>
                           <Input
+                            {...field}
                             placeholder="Enter your password"
                             type="password"
-                            className="h-12 pl-4 pr-4 border-2 border-gray-200 rounded-xl focus:border-[#507295] focus:ring-0 transition-colors duration-200 bg-gray-50/50 focus:bg-white"
-                            disabled={isLoading}
-                            {...field}
+                            className={`h-13 pl-12 pr-4 border-2 rounded-xl transition-all duration-300 bg-gray-50/50 text-gray-900 placeholder:text-gray-400 ${
+                              focusedField === 'password' 
+                                ? 'border-[#507295] bg-white shadow-lg shadow-[#507295]/10' 
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            style={{ height: '52px' }}
+                            disabled={isLoading || isSubmitting}
+                            onFocus={() => setFocusedField('password')}
+                            onBlur={(e) => { field.onBlur(); setFocusedField(null); }}
                           />
                         </div>
                       </FormControl>
-                      <FormMessage className="text-red-500 text-xs mt-1" />
+                      <FormMessage className="text-red-500 text-xs mt-1.5 ml-1" />
                     </FormItem>
                   )}
                 />
@@ -360,67 +415,110 @@ export default function LoginPage() {
                   control={form.control}
                   name="rememberMe"
                   render={({ field }) => (
-                    <FormItem className="flex items-center space-x-3 space-y-0">
+                    <FormItem className="flex items-center gap-3">
                       <FormControl>
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-2 border-gray-300 text-[#aac01d] focus:ring-[#aac01d] focus:ring-2 transition-colors duration-200"
-                          checked={field.value}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                        />
+                        <label className="relative flex items-center cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={field.value}
+                            onChange={(e) => field.onChange(e.target.checked)}
+                            disabled={isLoading || isSubmitting}
+                          />
+                          <div className={`w-5 h-5 rounded-md border-2 transition-all duration-200 flex items-center justify-center ${
+                            field.value 
+                              ? 'bg-gradient-to-br from-[#507295] to-[#aac01d] border-transparent' 
+                              : 'border-gray-300 bg-white group-hover:border-gray-400'
+                          }`}>
+                            {field.value && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </label>
                       </FormControl>
-                      <FormLabel className="text-sm text-gray-600 font-normal cursor-pointer">
-                        Remember me 
+                      <FormLabel className="text-sm text-gray-600 font-normal cursor-pointer select-none">
+                        Keep me signed in
                       </FormLabel>
                     </FormItem>
                   )}
                 />
 
                 {/* Submit Button */}
-                <Button
-                  type="submit"
-                  disabled={isLoading || isSubmitting || loginSuccess}
-                  className={`w-full h-12 font-semibold rounded-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] ${
-                    loginSuccess 
-                      ? "bg-green-500 hover:bg-green-500 shadow-green-200" 
-                      : "bg-gradient-to-r from-[#507295] to-[#aac01d] hover:from-[#4a6b8a] hover:to-[#96b216] shadow-lg hover:shadow-xl"
-                  } text-white shadow-lg`}
-                >
-                  {loginSuccess ? (
-                    <>
-                      <CheckCircle2 className="h-5 w-5 mr-2" />
-                      <span>Welcome Back!</span>
-                    </>
-                  ) : isLoading || isSubmitting ? (
-                    <>
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      <span>{isSubmitting ? "Signing In..." : "Loading..."}</span>
-                    </>
-                  ) : (
-                    <span>Sign In to Dashboard</span>
-                  )}
-                </Button>
+                <div className="pt-2">
+                  <Button
+                    type="submit"
+                    disabled={isLoading || isSubmitting || loginSuccess}
+                    className={`w-full h-13 font-semibold rounded-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group ${
+                      loginSuccess 
+                        ? "bg-gradient-to-r from-green-500 to-green-600" 
+                        : "bg-gradient-to-r from-[#507295] via-[#5a8bab] to-[#aac01d]"
+                    } text-white shadow-lg hover:shadow-xl`}
+                    style={{ height: '52px', backgroundSize: '200% 100%' }}
+                  >
+                    {/* Shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                    
+                    <span className="relative flex items-center justify-center gap-2">
+                      {loginSuccess ? (
+                        <>
+                          <CheckCircle2 className="h-5 w-5 animate-bounce" />
+                          <span>Welcome Back!</span>
+                        </>
+                      ) : isLoading || isSubmitting ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span>{isSubmitting ? "Signing In..." : "Loading..."}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Sign In to Dashboard</span>
+                          <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                </div>
               </form>
             </Form>
-          </CardContent>
+          </div>
 
           {/* Footer */}
-          <CardFooter className="bg-gradient-to-b from-gray-50/50 to-gray-100/50 p-6 text-center">
-            <div className="w-full">
-              <p className="text-xs text-gray-500">
-                Secure login powered by advanced encryption
-              </p>
+          <div className="px-8 py-5 bg-gradient-to-b from-gray-50/80 to-gray-100/80 border-t border-gray-100">
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+              <Shield className="h-3.5 w-3.5 text-gray-400" />
+              <span>Secured by enterprise-grade encryption</span>
             </div>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
 
-        {/* Additional Info */}
-        <div className="text-center mt-6">
-          <p className="text-white/70 text-xs">
-            © 2024 Kardex. All rights reserved.
+        {/* Copyright */}
+        <div className="text-center mt-8">
+          <p className="text-white/60 text-xs font-medium tracking-wide">
+            © 2024 Kardex Remstar. All rights reserved.
           </p>
         </div>
       </div>
+      
+      {/* CSS Animations */}
+      <style jsx>{`
+        @keyframes float {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(30px, -30px); }
+        }
+        @keyframes loading {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        @keyframes scale {
+          0% { transform: scale(0); }
+          50% { transform: scale(1.2); }
+          100% { transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 }

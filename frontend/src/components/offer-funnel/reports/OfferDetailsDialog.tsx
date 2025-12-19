@@ -157,7 +157,7 @@ const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({
   const fetchOfferDetails = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getOfferDetails(offerId);
+      const response = await apiService.getOffer(offerId);
       if (response.success && response.data?.offer) {
         setOffer(response.data.offer);
       } else {

@@ -374,41 +374,8 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
       return;
     }
 
-    // Check if this is a COMPLETED stage for non-TICKET_WORK activities - show report dialog
-    const mandatoryReportActivities = [
-      'BD_VISIT', 'INSTALLATION', 'MAINTENANCE', 'MAINTENANCE_PLANNED', 'SPARE_REPLACEMENT'
-    ];
-    
-    if (selectedStage === 'COMPLETED' && 
-        selectedActivity.activityType !== 'TICKET_WORK' &&
-        mandatoryReportActivities.includes(selectedActivity.activityType)) {
-      // Store the stage data for after report upload
-      const stageData = {
-        stage: selectedStage,
-        notes: stageNotes || undefined,
-        startTime: new Date().toISOString(),
-        ...(enhancedStageLocation && {
-          latitude: enhancedStageLocation.latitude,
-          longitude: enhancedStageLocation.longitude,
-          location: enhancedStageLocation.address || `${enhancedStageLocation.latitude}, ${enhancedStageLocation.longitude}`,
-          accuracy: enhancedStageLocation.accuracy,
-          locationSource: enhancedStageLocation.source
-        }),
-        ...(capturedPhotos.length > 0 && {
-          photos: capturedPhotos.map(photo => ({
-            filename: photo.filename,
-            dataUrl: photo.dataUrl,
-            size: photo.size,
-            timestamp: photo.timestamp
-          }))
-        })
-      };
-      
-      setPendingStageData(stageData);
-      setShowStageDialog(false);
-      setShowReportDialog(true);
-      return;
-    }
+    // Report upload is now optional - activities can be completed directly
+    // without requiring a file upload
 
     try {
       setIsUpdatingStage(true);
@@ -732,44 +699,50 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
         onStatusChange={handleStatusChange}
       />
 
-      {/* Activity Stage Update Dialog - Mobile Optimized */}
+      {/* Activity Stage Update Dialog - Clean Modern Design */}
       <Dialog open={showStageDialog} onOpenChange={(open) => !open && setShowStageDialog(false)}>
-        <DialogContent className="sm:max-w-[400px] max-h-[90vh] overflow-y-auto mx-3">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Activity className="h-4 w-4 text-purple-600" />
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto mx-3">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="flex items-center gap-3 text-xl font-bold text-gray-900">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100">
+                <Activity className="h-5 w-5 text-purple-600" />
+              </div>
               Update Stage
             </DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm">
-              Progress to next stage
+            <DialogDescription className="text-gray-500 mt-1">
+              Move your activity to the next stage
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            {/* Current Stage - Mobile Optimized */}
-            <div className="bg-muted p-3 rounded-xl">
-              <p className="text-xs font-bold text-muted-foreground mb-2">Current Stage</p>
-              <div className="flex items-center gap-2">
-                <span className="text-base">{STAGE_DEFINITIONS[getCurrentStage(selectedActivity || {} as Activity)]?.icon}</span>
-                <span className="font-bold text-sm">
+          <div className="space-y-5 py-4">
+            {/* Current Stage Display */}
+            <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white border border-gray-200 shadow-sm">
+                <span className="text-2xl">{STAGE_DEFINITIONS[getCurrentStage(selectedActivity || {} as Activity)]?.icon}</span>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Current Stage</p>
+                <p className="text-lg font-semibold text-gray-900">
                   {STAGE_DEFINITIONS[getCurrentStage(selectedActivity || {} as Activity)]?.label}
-                </span>
+                </p>
               </div>
             </div>
 
-            {/* Next Stage Selection - Mobile Optimized */}
+            {/* Stage Selection */}
             <div className="space-y-2">
-              <label className="text-xs font-bold">Select Next Stage</label>
+              <label className="text-sm font-semibold text-gray-900">
+                Select Next Stage <span className="text-red-500">*</span>
+              </label>
               <Select value={selectedStage} onValueChange={setSelectedStage}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Choose next stage..." />
+                <SelectTrigger className="h-12 bg-white border border-gray-200 rounded-lg hover:border-purple-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-colors">
+                  <SelectValue placeholder="Choose stage..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-lg shadow-lg border border-gray-200">
                   {getNextAvailableStages(selectedActivity || {} as Activity).map((stage) => (
-                    <SelectItem key={stage} value={stage}>
-                      <div className="flex items-center gap-2">
-                        <span>{STAGE_DEFINITIONS[stage]?.icon}</span>
-                        <span>{STAGE_DEFINITIONS[stage]?.label || stage}</span>
+                    <SelectItem key={stage} value={stage} className="py-3 cursor-pointer hover:bg-purple-50 focus:bg-purple-50">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{STAGE_DEFINITIONS[stage]?.icon}</span>
+                        <span className="font-medium text-gray-900">{STAGE_DEFINITIONS[stage]?.label || stage}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -777,68 +750,67 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
               </Select>
             </div>
 
-            {/* Stage Notes - Mobile Optimized */}
+            {/* Notes Input */}
             <div className="space-y-2">
-              <label className="text-xs font-bold">Notes (Optional)</label>
+              <label className="text-sm font-semibold text-gray-900">Notes (Optional)</label>
               <Textarea
                 value={stageNotes}
                 onChange={(e) => setStageNotes(e.target.value)}
-                placeholder="Add notes about this stage..."
+                placeholder="Add any notes about this stage..."
                 rows={3}
-                className="text-sm resize-none"
+                className="resize-none bg-white border border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-colors"
               />
             </div>
 
-            {/* Enhanced Location Section */}
+            {/* Location Capture */}
             {selectedStage && (
-              <div className="space-y-3">
-                <EnhancedLocationCapture
-                  onLocationCapture={handleEnhancedLocationCapture}
-                  previousLocation={selectedActivity ? {
-                    latitude: selectedActivity.latitude || 0,
-                    longitude: selectedActivity.longitude || 0,
-                    accuracy: 100,
-                    timestamp: new Date(selectedActivity.startTime).getTime(),
-                    source: 'gps' as const,
-                    address: selectedActivity.location || `${selectedActivity.latitude || 0}, ${selectedActivity.longitude || 0}`
-                  } : undefined}
-                  required={true}
-                  enableJumpDetection={true}
-                  className=""
-                />
-              </div>
-            )}
-
-            {/* Photo Capture Section */}
-            {selectedStage && requiresPhoto(selectedStage) && (
-              <PhotoCapture
-                onPhotoCapture={handlePhotoCapture}
-                maxPhotos={3}
+              <EnhancedLocationCapture
+                onLocationCapture={handleEnhancedLocationCapture}
+                previousLocation={selectedActivity ? {
+                  latitude: selectedActivity.latitude || 0,
+                  longitude: selectedActivity.longitude || 0,
+                  accuracy: 100,
+                  timestamp: new Date(selectedActivity.startTime).getTime(),
+                  source: 'gps' as const,
+                  address: selectedActivity.location || `${selectedActivity.latitude || 0}, ${selectedActivity.longitude || 0}`
+                } : undefined}
                 required={true}
-                label="Activity Verification Photos"
-                description="Take photos to verify your activity progress"
-                className="mt-3"
+                enableJumpDetection={true}
               />
             )}
 
-            {/* Preview */}
+            {/* Photo Capture */}
+            {selectedStage && requiresPhoto(selectedStage) && (
+              <PhotoCapture
+                onPhotoCapture={handlePhotoCapture}
+                maxPhotos={1}
+                required={true}
+                label="Verification Photos"
+                description="Take photos to verify your progress"
+              />
+            )}
+
+            {/* Selected Stage Preview */}
             {selectedStage && (
-              <div className="bg-purple-50 border border-purple-200 p-2 rounded-lg">
-                <div className="flex items-center gap-1 mb-1">
-                  <ArrowRight className="h-3 w-3 text-purple-600" />
-                  <span className="text-xs font-medium text-purple-900">Next:</span>
+              <div className="flex items-center gap-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600">
+                  <ArrowRight className="h-5 w-5 text-white" />
                 </div>
-                <div className="flex items-center gap-2 ml-4">
-                  <span className="text-sm">{STAGE_DEFINITIONS[selectedStage]?.icon}</span>
-                  <span className="text-xs font-semibold text-purple-900">
-                    {STAGE_DEFINITIONS[selectedStage]?.label}
-                  </span>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-purple-600 uppercase tracking-wide">Moving to</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xl">{STAGE_DEFINITIONS[selectedStage]?.icon}</span>
+                    <span className="text-lg font-semibold text-gray-900">
+                      {STAGE_DEFINITIONS[selectedStage]?.label}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="flex gap-2 pt-2">
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => {
@@ -851,7 +823,7 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
                 setCapturedPhotos([]);
               }}
               disabled={isUpdatingStage}
-              className="flex-1 h-11 text-sm font-semibold"
+              className="flex-1 h-11 font-medium"
             >
               Cancel
             </Button>
@@ -863,7 +835,7 @@ export default function ActivityStatusManager({ activities = [], onActivityChang
                 (requiresLocation(selectedStage) && !enhancedStageLocation) ||
                 (requiresPhoto(selectedStage) && capturedPhotos.length === 0)
               }
-              className="flex-1 h-11 bg-purple-600 hover:bg-purple-700 text-sm font-semibold"
+              className="flex-1 h-11 bg-purple-600 hover:bg-purple-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
               {isUpdatingStage ? (
                 <>

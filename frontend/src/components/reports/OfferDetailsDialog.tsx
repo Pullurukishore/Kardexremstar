@@ -157,15 +157,20 @@ const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({
   const fetchOfferDetails = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getOfferDetails(offerId);
-      if (response.success && response.data?.offer) {
+      const response = await apiService.getOffer(offerId);
+      // Backend returns { offer: {...} } directly
+      if (response?.offer) {
+        setOffer(response.offer);
+      } else if (response?.data?.offer) {
+        // Fallback for wrapped response
         setOffer(response.data.offer);
       } else {
+        console.error('Unexpected response structure:', response);
         toast.error('Failed to load offer details');
       }
     } catch (error: any) {
       console.error('Error fetching offer details:', error);
-      toast.error(error?.response?.data?.error || 'Failed to load offer details');
+      toast.error(error?.response?.data?.error || error?.message || 'Failed to load offer details');
     } finally {
       setLoading(false);
     }
@@ -181,55 +186,71 @@ const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle className="text-2xl font-bold">
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden border-0 shadow-2xl">
+        <DialogHeader className="px-6 pt-6 pb-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white">
+          <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+              <FileText className="h-6 w-6" />
+            </div>
             Offer Details
           </DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="max-h-[calc(90vh-120px)]">
-          <div className="px-6 py-4 space-y-6">
+          <div className="px-6 py-5 space-y-6 bg-gradient-to-b from-gray-50 to-white">
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="relative">
+                  <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+                  <div className="absolute inset-0 animate-ping h-12 w-12 rounded-full bg-blue-200 opacity-30"></div>
+                </div>
+                <p className="mt-4 text-gray-600 font-medium">Loading offer details...</p>
               </div>
             ) : offer ? (
               <>
                 {/* Header Section with Stage Prominently */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-100 mb-6">
+                <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 rounded-xl border border-blue-100/50 shadow-sm">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-gray-600">Offer Reference</div>
-                      <div className="font-bold text-xl text-gray-900">{offer.offerReferenceNumber}</div>
+                    <div className="space-y-3">
+                      <div className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Offer Reference</div>
+                      <div className="font-bold text-2xl text-gray-900">{offer.offerReferenceNumber}</div>
                       {offer.offerReferenceDate && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          📅 {format(new Date(offer.offerReferenceDate), 'MMM dd, yyyy')}
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Calendar className="h-4 w-4 text-blue-500" />
+                          {format(new Date(offer.offerReferenceDate), 'MMMM dd, yyyy')}
                         </div>
                       )}
                       {offer.title && (
-                        <div className="text-sm text-gray-600 mt-2">{offer.title}</div>
+                        <div className="text-base text-gray-700 font-medium bg-white/60 px-3 py-2 rounded-lg border border-gray-100">{offer.title}</div>
                       )}
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-4 flex flex-col items-start md:items-end">
                       <div>
-                        <div className="text-sm font-medium text-gray-600 mb-2">Current Stage</div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Current Stage</div>
                         <Badge 
                           style={{ backgroundColor: stageColor, color: 'white' }}
-                          className="text-sm px-4 py-2 font-semibold shadow-lg"
+                          className="text-base px-5 py-2.5 font-bold shadow-lg rounded-full"
                         >
-                          ⚡ {offer.stage}
+                          ⚡ {offer.stage.replace(/_/g, ' ')}
                         </Badge>
                       </div>
+                      <Badge 
+                        style={{ backgroundColor: productColor, color: 'white' }}
+                        className="text-sm px-4 py-1.5 font-semibold shadow-md"
+                      >
+                        {offer.productType || 'N/A'}
+                      </Badge>
                     </div>
                   </div>
                 </div>
 
                 {/* Customer & Contact Information */}
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="bg-gradient-to-r from-emerald-600 to-green-600 text-white p-4">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                      <Building2 className="h-5 w-5" />
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-4">
+                    <h3 className="font-bold text-lg flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-lg">
+                        <Building2 className="h-5 w-5" />
+                      </div>
                       Customer & Contact Information
                     </h3>
                   </div>
@@ -314,14 +335,16 @@ const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({
                 </div>
 
                 {/* Financial Information */}
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                      <DollarSign className="h-5 w-5" />
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="bg-gradient-to-r from-violet-500 to-purple-600 text-white px-5 py-4">
+                    <h3 className="font-bold text-lg flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-lg">
+                        <DollarSign className="h-5 w-5" />
+                      </div>
                       Financial Information
                     </h3>
                   </div>
-                  <div className="p-4 space-y-4">
+                  <div className="p-5 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-white shadow-lg">
                         <div className="text-sm font-semibold text-blue-100 mb-1">Offer Value</div>
@@ -369,14 +392,16 @@ const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({
                 </div>
 
                 {/* Offer Details */}
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white p-4">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white px-5 py-4">
+                    <h3 className="font-bold text-lg flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-lg">
+                        <FileText className="h-5 w-5" />
+                      </div>
                       Offer Details
                     </h3>
                   </div>
-                  <div className="p-4 space-y-3">
+                  <div className="p-5 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <dt className="text-xs text-gray-500 font-semibold uppercase mb-1">Title</dt>

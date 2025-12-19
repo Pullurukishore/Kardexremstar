@@ -21,10 +21,10 @@ const getToken = (): string | null => {
     if (localStorageToken) {
       return localStorageToken;
     }
-    
+
     // Fallback to cookies (same pattern as AuthContext)
-    const cookieToken = getCookie('accessToken') || getCookie('token') || 
-                       localStorage.getItem('cookie_accessToken');
+    const cookieToken = getCookie('accessToken') || getCookie('token') ||
+      localStorage.getItem('cookie_accessToken');
     return cookieToken;
   }
   return null;
@@ -107,7 +107,7 @@ class ApiClient {
   // Method to set PIN session manually (for fallbacks)
   public setPinSession(sessionId: string): void {
     if (process.env.NODE_ENV === 'development') {
-      }
+    }
     this.pinSessionId = sessionId;
     // Note: Backend now controls expiration in the main PIN validation response
     // This manual session storage is just for fallback cases
@@ -133,11 +133,11 @@ class ApiClient {
                 if (parsedData.sessionId && new Date(parsedData.expiresAt) > new Date()) {
                   config.headers['Authorization'] = `PinSession ${parsedData.sessionId}`;
                   this.pinSessionId = parsedData.sessionId;
-                  }
+                }
               }
             }
           } catch (error) {
-            }
+          }
         }
         return config;
       },
@@ -151,11 +151,11 @@ class ApiClient {
       (response) => response,
       async (error: AxiosError<ApiError>) => {
         const originalRequest = error.config as any;
-        
+
         // Skip token refresh logic for PIN validation and other requests that want to handle errors themselves
-        const shouldSkipTokenRefresh = originalRequest.headers?.['X-Skip-Global-Error-Handler'] || 
-                                     originalRequest.url?.includes('/auth/validate-pin');
-        
+        const shouldSkipTokenRefresh = originalRequest.headers?.['X-Skip-Global-Error-Handler'] ||
+          originalRequest.url?.includes('/auth/validate-pin');
+
         // If error is not 401 or it's a refresh token request, or should skip token refresh, reject
         if (error.response?.status !== 401 || originalRequest._retry || shouldSkipTokenRefresh) {
           // Check if request wants to skip global error handling
@@ -230,12 +230,13 @@ class ApiClient {
     if (error.response) {
       const { status, data } = error.response;
       const errorMessage = data?.message || 'An error occurred';
-      
+
       if (status >= 500) {
         toast.error('Server error. Please try again later.');
       } else if (status === 401) {
+        // Don't call logout here - the response interceptor handles 401 with token refresh
+        // Only show toast if this is after all refresh attempts have failed
         toast.error('Session expired. Please log in again.');
-        this.logout();
       } else if (status === 403) {
         toast.error('You do not have permission to perform this action.');
       } else if (status === 404) {

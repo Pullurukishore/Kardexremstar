@@ -142,11 +142,17 @@ interface ReportFilters {
   reportType: string;
   customerId?: string;
   assetId?: string;
+  page?: string;
+  limit?: string;
 }
 
 export const generateReport = async (req: Request, res: Response) => {
   try {
-    const { from, to, zoneId, reportType, customerId, assetId } = req.query as unknown as ReportFilters;
+    const { from, to, zoneId, reportType, customerId, assetId, page, limit } = req.query as unknown as ReportFilters;
+
+    // Parse pagination params with defaults
+    const pageNum = page ? parseInt(page) : 1;
+    const limitNum = limit ? parseInt(limit) : 500; // Default 500 per page
 
     // Parse dates and ensure proper time is set with timezone consideration
     const userTimeZone = 'Asia/Kolkata'; // Set your timezone here
@@ -219,7 +225,7 @@ export const generateReport = async (req: Request, res: Response) => {
         return await generateHerAnalysisReport(res, whereClause, startDate, endDate);
       // Offer Funnel Reports
       case 'offer-summary':
-        return await generateOfferSummaryReport(res, whereClause, startDate, endDate);
+        return await generateOfferSummaryReport(res, whereClause, startDate, endDate, pageNum, limitNum);
       case 'target-report':
         return await generateTargetReport(res, whereClause, startDate, endDate);
       case 'product-type-analysis':
@@ -2880,8 +2886,12 @@ async function generateHerAnalysisReport(res: Response, whereClause: any, startD
 
 export const generateZoneReport = async (req: Request, res: Response) => {
   try {
-    const { from, to, reportType, customerId, assetId, zoneId } = req.query as unknown as ReportFilters;
+    const { from, to, reportType, customerId, assetId, zoneId, page, limit } = req.query as unknown as ReportFilters;
     const user = (req as any).user;
+
+    // Parse pagination params with defaults
+    const pageNum = page ? parseInt(page) : 1;
+    const limitNum = limit ? parseInt(limit) : 500;
 
     // Get user's zones - different logic for ZONE_USER vs SERVICE_PERSON
     let userZoneIds: number[] = [];
@@ -2971,7 +2981,7 @@ export const generateZoneReport = async (req: Request, res: Response) => {
         return await generateHerAnalysisReport(res, whereClause, startDate, endDate);
       // Offer Funnel Reports
       case 'offer-summary':
-        return await generateOfferSummaryReport(res, whereClause, startDate, endDate);
+        return await generateOfferSummaryReport(res, whereClause, startDate, endDate, pageNum, limitNum);
       case 'target-report':
         return await generateTargetReport(res, whereClause, startDate, endDate);
       case 'product-type-analysis':
@@ -3304,9 +3314,15 @@ export const exportZoneReport = async (req: Request, res: Response) => {
 /**
  * Generate Offer Summary Report
  */
-const generateOfferSummaryReport = async (res: Response, whereClause: any, startDate: Date, endDate: Date) => {
+const generateOfferSummaryReport = async (res: Response, whereClause: any, startDate: Date, endDate: Date, page: number = 1, limit: number = 500) => {
   try {
-    // Fetch offers with important fields
+    // Calculate skip for pagination
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination info
+    const totalCount = await prisma.offer.count({ where: whereClause });
+
+    // Fetch offers with important fields and pagination
     const offers = await prisma.offer.findMany({
       where: whereClause,
       select: {
@@ -3388,6 +3404,8 @@ const generateOfferSummaryReport = async (res: Response, whereClause: any, start
         updatedAt: true,
       },
       orderBy: { createdAt: 'desc' },
+      skip: skip,
+      take: limit,
     });
 
     // Calculate summary statistics
@@ -3457,6 +3475,12 @@ const generateOfferSummaryReport = async (res: Response, whereClause: any, start
       success: true,
       data: {
         offers,
+        pagination: {
+          total: totalCount,
+          page: page,
+          limit: limit,
+          pages: Math.ceil(totalCount / limit),
+        },
         summary: {
           totalOffers: summary._count.id,
           totalOfferValue: Number(summary._sum.offerValue || 0),

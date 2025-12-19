@@ -35,7 +35,7 @@ export interface GeocodeOptions {
 export class GeocodingService {
   private static readonly API_KEY = process.env.LOCATIONIQ_KEY || ''; // ✅ use .env
   private static readonly BASE_URL = 'https://us1.locationiq.com/v1/reverse.php';
-  
+
   // Default bounding box for India (can be overridden per request)
   private static readonly DEFAULT_INDIA_BOUNDS = {
     minLat: 6.0,
@@ -43,7 +43,7 @@ export class GeocodingService {
     minLng: 68.0,
     maxLng: 97.0
   };
-  
+
   // Major Indian cities for region validation
   private static readonly MAJOR_CITIES = {
     'mumbai': { lat: 19.0760, lng: 72.8777, radius: 50 },
@@ -55,19 +55,19 @@ export class GeocodingService {
     'pune': { lat: 18.5204, lng: 73.8567, radius: 30 },
     'ahmedabad': { lat: 23.0225, lng: 72.5714, radius: 30 }
   };
-  
+
 
   static async reverseGeocode(
-    latitude: number, 
-    longitude: number, 
+    latitude: number,
+    longitude: number,
     options: GeocodeOptions = {}
   ): Promise<ReverseGeocodeResult> {
     try {
       if (!this.API_KEY) {
         const errorMsg = 'Missing LocationIQ API key. Please set LOCATIONIQ_KEY in .env';
         logger.error(errorMsg);
-        return { 
-          address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, 
+        return {
+          address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
           source: 'fallback',
           error: errorMsg
         };
@@ -77,7 +77,7 @@ export class GeocodingService {
 
       // Apply bounding box if provided or use India default
       const boundingBox = options.boundingBox || this.DEFAULT_INDIA_BOUNDS;
-      
+
       const params: any = {
         key: this.API_KEY,
         lat: latitude,
@@ -90,7 +90,7 @@ export class GeocodingService {
         viewbox: `${boundingBox.minLng},${boundingBox.maxLat},${boundingBox.maxLng},${boundingBox.minLat}`,
         bounded: 1 // Restrict results to viewbox
       };
-      
+
       // Add country filter if specified
       if (options.expectedRegion?.country) {
         params.countrycodes = options.expectedRegion.country.toLowerCase();
@@ -101,40 +101,40 @@ export class GeocodingService {
         'User-Agent': 'KardexCare/1.0 (support@kardexcare.local)',
       };
 
-      const { data } = await axios.get(this.BASE_URL, { 
-        params, 
-        headers, 
+      const { data } = await axios.get(this.BASE_URL, {
+        params,
+        headers,
         timeout: 15000, // Increased timeout
       });
 
       logger.info('LocationIQ API response received:', { hasData: !!data, displayName: data?.display_name });
 
       const address = this.formatAddress(data);
-      
+
       // Validate the returned address coordinates against expected location
       const coordinateValidation = this.validateAddressCoordinates(
-        latitude, 
-        longitude, 
-        data, 
+        latitude,
+        longitude,
+        data,
         options
       );
-      
+
       if (address && address !== `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`) {
         logger.info(`Reverse geocoding successful: ${address}`, {
           coordinateValidation,
           inputCoords: `${latitude}, ${longitude}`,
           returnedCoords: data.lat && data.lon ? `${data.lat}, ${data.lon}` : 'N/A'
         });
-        
-        return { 
-          address, 
+
+        return {
+          address,
           source: 'locationiq',
           coordinateValidation
         };
       } else {
         logger.warn('LocationIQ returned no valid address, using coordinates');
-        return { 
-          address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, 
+        return {
+          address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
           source: 'fallback',
           error: 'No valid address found in LocationIQ response',
           coordinateValidation
@@ -148,7 +148,7 @@ export class GeocodingService {
         data: error.response?.data,
         coordinates: `${latitude}, ${longitude}`
       });
-      
+
       let errorMessage = 'Unknown geocoding error';
       if (error.code === 'ENOTFOUND') {
         errorMessage = 'Network error: Unable to reach LocationIQ service';
@@ -161,9 +161,9 @@ export class GeocodingService {
       } else if (error.code === 'ECONNABORTED') {
         errorMessage = 'Request timeout - LocationIQ service too slow';
       }
-      
-      return { 
-        address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, 
+
+      return {
+        address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
         source: 'fallback',
         error: errorMessage,
         coordinateValidation: {
@@ -179,13 +179,13 @@ export class GeocodingService {
       logger.warn('No data provided to formatAddress');
       return null;
     }
-    
+
     // Try display_name first (most complete address)
     if (data.display_name && typeof data.display_name === 'string') {
       logger.info('Using display_name for address');
       return data.display_name;
     }
-    
+
     // Try to build address from components
     const { address } = data;
     if (address && typeof address === 'object') {
@@ -206,7 +206,7 @@ export class GeocodingService {
         return formattedAddress;
       }
     }
-    
+
     logger.warn('Unable to format address from data:', data);
     return null;
   }
@@ -222,16 +222,16 @@ export class GeocodingService {
     options: GeocodeOptions
   ): { isValid: boolean; distanceFromExpected?: number; warnings?: string[] } {
     const warnings: string[] = [];
-    
+
     // Check if geocoding service returned coordinates
     if (!geocodeData.lat || !geocodeData.lon) {
       warnings.push('Geocoding service did not return coordinates');
       return { isValid: false, warnings };
     }
-    
+
     const returnedLat = parseFloat(geocodeData.lat);
     const returnedLng = parseFloat(geocodeData.lon);
-    
+
     // Calculate distance between input and returned coordinates
     const distance = LocationValidationService.calculateDistance(
       inputLat,
@@ -239,29 +239,29 @@ export class GeocodingService {
       returnedLat,
       returnedLng
     );
-    
+
     // Use coordinate-based validation instead of address names
     const maxAllowedDistance = options.maxDistanceFromExpected || 5; // 5km default
-    
+
     if (distance > maxAllowedDistance) {
       warnings.push(
         `Address coordinates are ${distance.toFixed(2)}km away from GPS location (max: ${maxAllowedDistance}km)`
       );
-      
+
       // Check if this might be a name collision (same place name in different regions)
       if (distance > 50) {
         warnings.push(
           'Large coordinate difference suggests possible place name collision - using GPS coordinates for validation'
         );
       }
-      
+
       return {
         isValid: false,
         distanceFromExpected: distance,
         warnings
       };
     }
-    
+
     // Additional validation: Check if returned coordinates are within expected region
     if (options.expectedRegion) {
       const regionValidation = this.validateRegion(returnedLat, returnedLng, options.expectedRegion);
@@ -269,7 +269,7 @@ export class GeocodingService {
         warnings.push(...regionValidation.warnings);
       }
     }
-    
+
     return {
       isValid: distance <= maxAllowedDistance,
       distanceFromExpected: distance,
@@ -286,12 +286,12 @@ export class GeocodingService {
     expectedRegion: { city?: string; state?: string; country?: string }
   ): { isValid: boolean; warnings: string[] } {
     const warnings: string[] = [];
-    
+
     // Check if coordinates are within major city bounds
     if (expectedRegion.city) {
       const cityKey = expectedRegion.city.toLowerCase();
       const cityInfo = this.MAJOR_CITIES[cityKey as keyof typeof this.MAJOR_CITIES];
-      
+
       if (cityInfo) {
         const distanceFromCity = LocationValidationService.calculateDistance(
           lat,
@@ -299,7 +299,7 @@ export class GeocodingService {
           cityInfo.lat,
           cityInfo.lng
         );
-        
+
         if (distanceFromCity > cityInfo.radius) {
           warnings.push(
             `Location is ${distanceFromCity.toFixed(1)}km from ${expectedRegion.city} center (expected within ${cityInfo.radius}km)`
@@ -308,7 +308,7 @@ export class GeocodingService {
         }
       }
     }
-    
+
     return { isValid: true, warnings };
   }
 
@@ -325,12 +325,12 @@ export class GeocodingService {
       maxDistanceFromExpected: maxDistanceKm,
       expectedCoordinates: { latitude, longitude }
     };
-    
+
     // Set city-specific options if provided
     if (expectedCity) {
       const cityKey = expectedCity.toLowerCase();
       const cityInfo = this.MAJOR_CITIES[cityKey as keyof typeof this.MAJOR_CITIES];
-      
+
       if (cityInfo) {
         // Create bounding box around the expected city
         const buffer = 0.5; // degrees (~55km)
@@ -340,14 +340,103 @@ export class GeocodingService {
           minLng: cityInfo.lng - buffer,
           maxLng: cityInfo.lng + buffer
         };
-        
+
         options.expectedRegion = {
           city: expectedCity,
           country: 'in' // India
         };
       }
     }
-    
+
     return this.reverseGeocode(latitude, longitude, options);
+  }
+
+  /**
+   * Forward geocode an address to coordinates
+   * Used for manual address entry to get approximate coordinates
+   */
+  static async forwardGeocode(address: string): Promise<{
+    success: boolean;
+    latitude?: number;
+    longitude?: number;
+    displayName?: string;
+    error?: string;
+  }> {
+    try {
+      if (!this.API_KEY) {
+        const errorMsg = 'Missing LocationIQ API key';
+        logger.error(errorMsg);
+        return { success: false, error: errorMsg };
+      }
+
+      if (!address || address.trim().length < 3) {
+        return { success: false, error: 'Address too short' };
+      }
+
+      logger.info(`Forward geocoding request for address: ${address}`);
+
+      const params = {
+        key: this.API_KEY,
+        q: address.trim(),
+        format: 'json',
+        'accept-language': 'en',
+        addressdetails: 1,
+        limit: 1,
+        // Bias results towards India
+        countrycodes: 'in',
+        viewbox: `${this.DEFAULT_INDIA_BOUNDS.minLng},${this.DEFAULT_INDIA_BOUNDS.maxLat},${this.DEFAULT_INDIA_BOUNDS.maxLng},${this.DEFAULT_INDIA_BOUNDS.minLat}`,
+        bounded: 1
+      };
+
+      const headers = {
+        'Accept': 'application/json',
+        'User-Agent': 'KardexCare/1.0 (support@kardexcare.local)',
+      };
+
+      const SEARCH_URL = 'https://us1.locationiq.com/v1/search.php';
+      const { data } = await axios.get(SEARCH_URL, {
+        params,
+        headers,
+        timeout: 10000
+      });
+
+      // LocationIQ returns an array of results
+      if (data && Array.isArray(data) && data.length > 0) {
+        const result = data[0];
+        const latitude = parseFloat(result.lat);
+        const longitude = parseFloat(result.lon);
+
+        logger.info(`Forward geocoding successful: ${result.display_name}`, {
+          latitude,
+          longitude
+        });
+
+        return {
+          success: true,
+          latitude,
+          longitude,
+          displayName: result.display_name
+        };
+      }
+
+      logger.warn('Forward geocoding returned no results for:', address);
+      return { success: false, error: 'No results found for address' };
+
+    } catch (error: any) {
+      logger.error('Forward geocoding error:', {
+        message: error.message,
+        status: error.response?.status,
+        address
+      });
+
+      let errorMessage = 'Geocoding failed';
+      if (error.response?.status === 404) {
+        errorMessage = 'Address not found';
+      } else if (error.response?.status === 429) {
+        errorMessage = 'Rate limit exceeded';
+      }
+
+      return { success: false, error: errorMessage };
+    }
   }
 }

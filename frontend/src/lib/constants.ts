@@ -8,22 +8,22 @@ export const AUTH_CONFIG = {
   ACCESS_TOKEN: 'accessToken',
   REFRESH_TOKEN: 'refreshToken',
   USER_ROLE: 'userRole',
-  
+
   // Cookie options
   COOKIE_OPTIONS: {
     path: '/',
     secure: isProduction, // Only send over HTTPS in production
     sameSite: 'lax',
     httpOnly: false, // Must be false for client-side access
-    maxAge: 60 * 60 * 24 * 7, // 7 days for refresh token
+    maxAge: 60 * 60 * 24 * 30, // 30 days for refresh token
   },
-  
+
   // Token expiration times (in seconds)
   TOKEN_EXPIRY: {
-    ACCESS: 15 * 60, // 15 minutes
-    REFRESH: 7 * 24 * 60 * 60, // 7 days
+    ACCESS: 7 * 24 * 60 * 60, // 7 days (matches backend)
+    REFRESH: 30 * 24 * 60 * 60, // 30 days (matches backend)
   },
-  
+
   // API endpoints
   ENDPOINTS: {
     LOGIN: '/auth/login',
@@ -98,7 +98,7 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   PROFILE: '/profile',
   SETTINGS: '/settings',
-  
+
   // Role-based routes
   ADMIN: {
     DASHBOARD: '/admin/dashboard',
